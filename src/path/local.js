@@ -1,7 +1,8 @@
-import Path from "./path.js";
+import Path, {CHILDREN} from "./path.js";
 
 const fs = require("fs");
 const path = require("path");
+const {shell} = require("electron");
 
 function statsToMetadata(stats) {
 	return {
@@ -43,25 +44,31 @@ function readdir(path) {
 	});
 }
 
-
 export default class Local extends Path {
 	constructor(p) {
 		super();
-		this._path = p;
+		this._path = path.resolve(p); /* to get rid of a trailing slash */
 		this._target = null;
 		this._error = null;
 		this._meta = {};
 	}
 
-	getName() {
-		return path.basename(this._path);
+	getPath() { return this._path; }
+	getName() { return path.basename(this._path); }
+ 
+	getParent() {
+		let parent = new this.constructor(path.dirname(this._path));
+		return (parent.is(this) ? null : parent);
 	}
 
-	isDirectory() { return this._meta.isDirectory; }
-	isSymbolicLink() { return this._meta.isSymbolicLink; }
+	supports(what) { 
+		switch (what) {
+			case CHILDREN: return this._meta.isDirectory; break;
+		}
+	}
 
-	follow() {
-		return new this.constructor(this._target);
+	activate() {
+		shell.openItem(this._path);
 	}
 
 	getChildren() {
