@@ -1,0 +1,21 @@
+{
+  "name": "cfo",
+  "version": "0.0.0",
+  "main": "main.js",
+  "window": {
+    "toolbar": false,
+    "width": 800,
+    "height": 600,
+    "icon": "icon.png"
+  },
+  "devDependencies": {
+    "less": "^2.7.1",
+    "rollup": "^0.36.4",
+    "rollup-plugin-includepaths": "^0.1.7"
+  },
+  "scripts": {
+	"app": "electron .",
+    "rollup": "rollup -c",
+    "lessc": "cd css && lessc src/app.less"
+  }
+}
