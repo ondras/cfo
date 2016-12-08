@@ -207,6 +207,13 @@ class List {
 			case "End": this._focusAt(this._items.length-1); break;
 			case "ArrowUp": this._focusBy(-1); break;
 			case "ArrowDown": this._focusBy(+1); break;
+			case "PageUp": this._focusByPage(-1); break;
+			case "PageDown": this._focusByPage(+1); break;
+
+			case "Backspace":
+				let parent = this._path.getParent();
+				parent && this.setPath(parent);
+			break;
 
 			case "Enter":
 				let path = this._getFocusedPath();
@@ -269,6 +276,20 @@ class List {
 		return this._items.reduce((result, item, index) => {
 			return (item.node == focused ? index : result);
 		}, -1);
+	}
+
+	_focusByPage(diff) {
+		let index = this._getFocusedIndex();
+		if (index == -1) { return; }
+
+		let sampleRow = this._items[0].node;
+		let page = Math.floor(this._node.offsetHeight / sampleRow.offsetHeight);
+
+		index += page*diff;
+		index = Math.max(index, 0);
+		index = Math.min(index, this._items.length-1);
+
+		return this._focusAt(index);
 	}
 
 	_focusBy(diff) {

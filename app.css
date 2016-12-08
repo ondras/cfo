@@ -1,0 +1,33 @@
+body {
+  margin: 0;
+}
+.list {
+  height: 100vh;
+  overflow: auto;
+}
+.list table {
+  font: 12px ubuntu;
+  line-height: 14px;
+}
+.list table td {
+  border-collapse: collapse;
+  padding: 2px;
+  -webkit-font-smoothing: none;
+}
+.list tr.focus {
+  background-color: #e8e8e8;
+}
+.list tr.focus td {
+  border-top: 1px solid black;
+  border-bottom: 1px solid black;
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+.list tr.focus td:first-child {
+  border-left: 1px solid black;
+  padding-left: 1px;
+}
+.list tr.focus td:last-child {
+  border-right: 1px solid black;
+  padding-right: 1px;
+}

@@ -16,6 +16,6 @@
   "scripts": {
 	"app": "electron .",
     "rollup": "rollup -c",
-    "lessc": "cd css && lessc src/app.less"
+    "lessc": "lessc src/css/app.less > app.css"
   }
 }
