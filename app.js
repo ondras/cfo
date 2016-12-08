@@ -66,14 +66,9 @@ class Local extends Path {
 		this._meta = {};
 	}
 
-	getPath() {
-		return this._path;
-	}
-
-	getName() {
-		return path.basename(this._path);
-	}
-
+	getPath() { return this._path; }
+	getName() { return path.basename(this._path); }
+ 
 	getParent() {
 		let parent = new this.constructor(path.dirname(this._path));
 		return (parent.is(this) ? null : parent);
@@ -156,6 +151,17 @@ class Up extends Path {
 	}
 }
 
+function scrollIntoView(node, scrollable = node.offsetParent) {
+	let nodeRect = node.getBoundingClientRect();
+	let scrollableRect = scrollable.getBoundingClientRect();
+
+	let top = nodeRect.top - scrollableRect.top;
+	let bottom = scrollableRect.bottom - nodeRect.bottom;
+
+	if (top < 0) { scrollable.scrollTop += top; } /* upper edge above */
+	if (bottom < 0) { scrollable.scrollTop -= bottom; } /* lower edge below */
+}
+
 function SORT(a, b) {
 	let childScoreA = (a.supports(CHILDREN) ? 1 : 2);
 	let childScoreB = (b.supports(CHILDREN) ? 1 : 2);
@@ -170,8 +176,11 @@ class List {
 		this._pendingPath = null; /* trying to list this one (will be switched to _path afterwards) */
 		this._items = [];
 
+		this._node = document.createElement("div");
+		this._node.classList.add("list");
 		this._table = document.createElement("table");
-		document.body.appendChild(this._table);
+		this._node.appendChild(this._table);
+		document.body.appendChild(this._node);
 
 		document.addEventListener("keydown", this);
 	}
@@ -188,7 +197,8 @@ class List {
 	}
 
 	handleEvent(e) {
-		this.handleKey(e.key);
+		let handled = this.handleKey(e.key);
+		if (handled) { e.preventDefault(); }
 	}
 
 	handleKey(key) {
@@ -206,7 +216,13 @@ class List {
 					path.activate();
 				}
 			break;
+
+			default:
+				return false;
+			break;
 		}
+
+		return true;
 	}
 
 	_show(paths, path) {
@@ -266,7 +282,11 @@ class List {
 	_focusAt(index) {
 		let oldIndex = this._getFocusedIndex();
 		if (oldIndex > -1) { this._items[oldIndex].node.classList.remove("focus"); }
-		if (index > -1) { this._items[index].node.classList.add("focus"); }
+		if (index > -1) { 
+			let node = this._items[index].node;
+			node.classList.add("focus");
+			scrollIntoView(node, this._node);
+		}
 	}
 
 	_clear() {
