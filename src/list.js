@@ -1,5 +1,6 @@
 import Up from "path/up.js";
 import {CHILDREN} from "path/path.js";
+import * as html from "util/html.js";
 
 function SORT(a, b) {
 	let childScoreA = (a.supports(CHILDREN) ? 1 : 2);
@@ -15,8 +16,11 @@ export default class List {
 		this._pendingPath = null; /* trying to list this one (will be switched to _path afterwards) */
 		this._items = [];
 
+		this._node = document.createElement("div");
+		this._node.classList.add("list");
 		this._table = document.createElement("table");
-		document.body.appendChild(this._table);
+		this._node.appendChild(this._table);
+		document.body.appendChild(this._node);
 
 		document.addEventListener("keydown", this);
 	}
@@ -33,7 +37,8 @@ export default class List {
 	}
 
 	handleEvent(e) {
-		this.handleKey(e.key);
+		let handled = this.handleKey(e.key);
+		if (handled) { e.preventDefault(); }
 	}
 
 	handleKey(key) {
@@ -51,7 +56,13 @@ export default class List {
 					path.activate();
 				}
 			break;
+
+			default:
+				return false;
+			break;
 		}
+
+		return true;
 	}
 
 	_show(paths, path) {
@@ -111,7 +122,11 @@ export default class List {
 	_focusAt(index) {
 		let oldIndex = this._getFocusedIndex();
 		if (oldIndex > -1) { this._items[oldIndex].node.classList.remove("focus"); }
-		if (index > -1) { this._items[index].node.classList.add("focus"); }
+		if (index > -1) { 
+			let node = this._items[index].node;
+			node.classList.add("focus");
+			html.scrollIntoView(node, this._node);
+		}
 	}
 
 	_clear() {
