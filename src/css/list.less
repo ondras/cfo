@@ -1,0 +1,56 @@
+.list {
+	height: 100%;
+	background-color: #fff;
+	display: flex;
+	flex-direction: column;
+
+	.scroll {
+		flex: 1;
+		overflow: auto;
+	}
+
+	input {
+		width: 100%;
+	}
+
+	img {
+		margin-right: 2px;
+		vertical-align: sub;
+	}
+
+	table {
+		width: 100%;
+		border-collapse: collapse;
+
+		td {
+			white-space: nowrap;
+			padding: 1px;
+			line-height: 1;
+
+			&:not(:first-child) {
+				text-align: right;
+			}
+		}
+	}
+
+	tr.focus {
+		@border: 1px solid black;
+		background-color: #e8e8e8;
+
+		td {
+			border-top: @border;
+			border-bottom: @border;
+			padding-top: 0;
+			padding-bottom: 0;
+
+			&:first-child {
+				border-left: @border;
+				padding-left: 0;
+			}
+			&:last-child {
+				border-right: @border;
+				padding-right: 0;
+			}
+		}
+	}
+}

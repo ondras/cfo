@@ -1,7 +1,11 @@
+import Local from "path/local.js";
 import Up from "path/up.js";
 import {CHILDREN} from "path/path.js";
 import * as html from "util/html.js";
 import * as format from "util/format.js";
+import * as status from "status.js";
+
+const TEMPLATE = document.querySelector("#list");
 
 function SORT(a, b) {
 	let childScoreA = (a.supports(CHILDREN) ? 1 : 2);
@@ -17,13 +21,23 @@ export default class List {
 		this._pendingPath = null; /* trying to list this one (will be switched to _path afterwards) */
 		this._items = [];
 
-		this._node = document.createElement("div");
-		this._node.classList.add("list");
-		this._table = document.createElement("table");
-		this._node.appendChild(this._table);
-		document.body.appendChild(this._node);
+		let dom = TEMPLATE.content.cloneNode(true);
 
+		this._node = dom.querySelector(".list");
+		this._scroll = dom.querySelector(".scroll");
+		this._table = dom.querySelector("table");
+		this._input = dom.querySelector("input");
+
+		this._table.addEventListener("click", this);
 		document.addEventListener("keydown", this);
+	}
+
+	destroy() {
+
+	}
+
+	getNode() {
+		return this._node;
 	}
 
 	setPath(path) {
@@ -37,12 +51,47 @@ export default class List {
 		});
 	}
 
-	handleEvent(e) {
-		let handled = this.handleKey(e.key);
-		if (handled) { e.preventDefault(); }
+	activate() {
+
 	}
 
-	handleKey(key) {
+	deactivate() {
+
+	}
+
+	handleEvent(e) {
+		switch (e.type) {
+			case "click":
+				let index = this._nodeToIndex(e.target);
+				if (index != -1) { this._focusAt(index); }
+			break;
+
+			case "keydown":
+				if (e.target == this._input) { 
+					this._handleInputKey(e.key);
+				} else {
+					let handled = this._handleKey(e.key);
+					if (handled) { e.preventDefault(); }
+				}
+			break;
+		}
+	}
+
+	_handleInputKey(key) {
+		switch (key) {
+			case "Enter":
+				this._input.blur();
+				let path = new Local(this._input.value);
+				this.setPath(path);
+			break;
+
+			case "Escape":
+				this._input.blur();
+			break;
+		}
+	}
+
+	_handleKey(key) {
 		switch (key) {
 			case "Home": this._focusAt(0); break;
 			case "End": this._focusAt(this._items.length-1); break;
@@ -79,6 +128,7 @@ export default class List {
 		this._clear();
 
 		this._path = path;
+		this._input.value = path.getPath();
 		paths.sort(SORT);
 
 		let parent = this._path.getParent();
@@ -99,7 +149,13 @@ export default class List {
 	_build(paths) {
 		return paths.map(path => {
 			let node = this._table.insertRow();
-			node.insertCell().innerHTML = path.getName();
+
+			let td = node.insertCell();
+			let img = html.node("img", {src:path.getImage()});
+			td.appendChild(img);
+
+			let name = path.getName();
+			if (name) td.appendChild(html.text(name));
 
 			let size = path.getSize();
 			node.insertCell().innerHTML = (size === undefined ? "" : format.size(size));
@@ -112,6 +168,14 @@ export default class List {
 
 			return {node, path};
 		});
+	}
+
+	_nodeToIndex(node) {
+		while (node && node.nodeName.toLowerCase() != "tr") { node = node.parentNode; }
+
+		return this._items.reduce((result, item, index) => {
+			return (item.node == node ? index : result);
+		}, -1);
 	}
 
 	_getFocusedPath() {
@@ -136,8 +200,6 @@ export default class List {
 		let page = Math.floor(this._node.offsetHeight / sampleRow.offsetHeight);
 
 		index += page*diff;
-		index = Math.max(index, 0);
-		index = Math.min(index, this._items.length-1);
 
 		return this._focusAt(index);
 	}
@@ -146,17 +208,23 @@ export default class List {
 		let index = this._getFocusedIndex();
 		if (index == -1) { return; }
 
-		index = (index + diff + this._items.length) % this._items.length; // js modulus
-		return this._focusAt(index);
+		return this._focusAt(index + diff);
 	}
 
 	_focusAt(index) {
+		index = Math.max(index, 0);
+		index = Math.min(index, this._items.length-1);
+
 		let oldIndex = this._getFocusedIndex();
+		if (index == oldIndex) { return; }
+
 		if (oldIndex > -1) { this._items[oldIndex].node.classList.remove("focus"); }
 		if (index > -1) { 
 			let node = this._items[index].node;
 			node.classList.add("focus");
-			html.scrollIntoView(node, this._node);
+			html.scrollIntoView(node, this._scroll);
+
+			status.set(this._items[index].path.getDescription());
 		}
 	}
 

@@ -1,4 +1,5 @@
 import Path, {CHILDREN} from "./path.js";
+import * as format from "util/format.js";
 
 const fs = require("fs");
 const path = require("path");
@@ -61,6 +62,19 @@ export default class Local extends Path {
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
+	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
+
+	getDescription() {
+		let d = this._path;
+		/* fixme relativni */
+		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
+		if (!this._meta_isDirectory) {
+			let size = this.getSize();
+			/* fixme vynuceny vypnuty autoformat */
+			if (size !== undefined) { d = `${d}, ${format.size(size)}`; }
+		}
+		return d;
+	}
  
 	getParent() {
 		let parent = new this.constructor(path.dirname(this._path));

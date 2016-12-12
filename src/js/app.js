@@ -1,5 +1,4 @@
-import LocalPath from "path/local.js";
-import List from "list.js";
+import Pane from "pane.js";
 
 window.FIXME = (...args) => console.error(...args);
 
@@ -33,7 +32,5 @@ if (!("".padStart)) {
 	}
 }
 
-let list = new List();
-
-let p = new LocalPath("/home/ondras/");
-list.setPath(p); 
+let pane = new Pane();
+console.log(pane);

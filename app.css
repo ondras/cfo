@@ -1,17 +1,45 @@
+* {
+  box-sizing: inherit;
+}
 body {
+  box-sizing: border-box;
   margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font: 12px ubuntu;
+  background-color: #e8e8e8;
+}
+section {
+  width: 50%;
+  flex: 1;
+  overflow: hidden;
 }
 .list {
-  height: 100vh;
+  height: 100%;
+  background-color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.list .scroll {
+  flex: 1;
   overflow: auto;
 }
+.list input {
+  width: 100%;
+}
+.list img {
+  margin-right: 2px;
+  vertical-align: sub;
+}
 .list table {
+  width: 100%;
   border-collapse: collapse;
-  font: 12px ubuntu;
-  line-height: 14px;
 }
 .list table td {
-  padding: 2px;
+  white-space: nowrap;
+  padding: 1px;
+  line-height: 1;
 }
 .list table td:not(:first-child) {
   text-align: right;
@@ -22,14 +50,14 @@ body {
 .list tr.focus td {
   border-top: 1px solid black;
   border-bottom: 1px solid black;
-  padding-top: 1px;
-  padding-bottom: 1px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .list tr.focus td:first-child {
   border-left: 1px solid black;
-  padding-left: 1px;
+  padding-left: 0;
 }
 .list tr.focus td:last-child {
   border-right: 1px solid black;
-  padding-right: 1px;
+  padding-right: 0;
 }

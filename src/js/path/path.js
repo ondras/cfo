@@ -1,13 +1,17 @@
 export default class Path {
 	is(other) { return other.getPath() == this.getPath(); }
-	getName() {}
 	getPath() {}
+
+	getName() {}
+	getImage() {}
+	getDate() {}
+	getSize() {}
+	getMode() {}
+	getDescription() {}
+
+	supports(what) {}
 	getParent() {}
 	getChildren() {}
-	getDate() { }
-	getSize() { }
-	getMode() { }
-	supports(what) {}
 	activate() {}
 }
 
