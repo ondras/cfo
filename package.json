@@ -14,8 +14,11 @@
     "rollup-plugin-includepaths": "^0.1.7"
   },
   "scripts": {
-	"app": "electron .",
-    "rollup": "rollup -c",
-    "lessc": "lessc src/css/app.less > app.css"
+    "app": "electron .",
+    "js": "rollup -c",
+    "css": "lessc src/css/app.less > app.css"
+  },
+  "dependencies": {
+    "electron": "^1.4.12"
   }
 }

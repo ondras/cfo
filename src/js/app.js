@@ -25,6 +25,14 @@ String.prototype.fileLocaleCompare = function(other) {
 	return 0; /* same length, same normal/special positions, same localeCompared normal chars */
 }
 
+if (!("".padStart)) { 
+	String.prototype.padStart = function(len, what = " ") {
+		let result = this;
+		while (result.length < len) { result = `${what}${result}`; }
+		return result;
+	}
+}
+
 let list = new List();
 
 let p = new LocalPath("/home/ondras/");

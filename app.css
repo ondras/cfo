@@ -6,13 +6,15 @@ body {
   overflow: auto;
 }
 .list table {
+  border-collapse: collapse;
   font: 12px ubuntu;
   line-height: 14px;
 }
 .list table td {
-  border-collapse: collapse;
   padding: 2px;
-  -webkit-font-smoothing: none;
+}
+.list table td:not(:first-child) {
+  text-align: right;
 }
 .list tr.focus {
   background-color: #e8e8e8;

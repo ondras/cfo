@@ -7,6 +7,9 @@ class Path {
 	getPath() {}
 	getParent() {}
 	getChildren() {}
+	getDate() { }
+	getSize() { }
+	getMode() { }
 	supports(what) {}
 	activate() {}
 }
@@ -20,7 +23,10 @@ const {shell} = require("electron");
 function statsToMetadata(stats) {
 	return {
 		isDirectory: stats.isDirectory(),
-		isSymbolicLink: stats.isSymbolicLink()
+		isSymbolicLink: stats.isSymbolicLink(),
+		date: stats.mtime,
+		size: stats.size,
+		mode: stats.mode
 	}
 }
 
@@ -68,6 +74,9 @@ class Local extends Path {
 
 	getPath() { return this._path; }
 	getName() { return path.basename(this._path); }
+	getDate() { return this._meta.date; }
+	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
+	getMode() { return this._meta.mode; }
  
 	getParent() {
 		let parent = new this.constructor(path.dirname(this._path));
@@ -160,6 +169,33 @@ function scrollIntoView(node, scrollable = node.offsetParent) {
 
 	if (top < 0) { scrollable.scrollTop += top; } /* upper edge above */
 	if (bottom < 0) { scrollable.scrollTop -= bottom; } /* lower edge below */
+}
+
+const MASK = "rwxrwxrwx";
+
+function mode(m) {
+	return MASK.replace(/./g, (ch, index) => {
+		let perm = 1 << (MASK.length-index-1);
+		return (m & perm ? ch : "–");
+	});
+}
+
+function date(date) {
+	let d = date.getDate();
+	let mo = date.getMonth()+1;
+	let y = date.getFullYear();
+
+	let h = date.getHours().toString().padStart(2, "0");
+	let m = date.getMinutes().toString().padStart(2, "0");
+	let s = date.getSeconds().toString().padStart(2, "0");
+
+	return `${d}.${mo}.${y} ${h}:${m}:${s}`;
+}
+
+function size(bytes) {
+	{
+		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
+	}
 }
 
 function SORT(a, b) {
@@ -260,6 +296,15 @@ class List {
 			let node = this._table.insertRow();
 			node.insertCell().innerHTML = path.getName();
 
+			let size$$1 = path.getSize();
+			node.insertCell().innerHTML = (size$$1 === undefined ? "" : size(size$$1));
+
+			let date$$1 = path.getDate();
+			node.insertCell().innerHTML = (date$$1 === undefined ? "" : date(date$$1));
+
+			let mode$$1 = path.getMode();
+			node.insertCell().innerHTML = (mode$$1 === undefined ? "" : mode(mode$$1));
+
 			return {node, path};
 		});
 	}
@@ -341,6 +386,14 @@ String.prototype.fileLocaleCompare = function(other) {
 
 	return 0; /* same length, same normal/special positions, same localeCompared normal chars */
 };
+
+if (!("".padStart)) { 
+	String.prototype.padStart = function(len, what = " ") {
+		let result = this;
+		while (result.length < len) { result = `${what}${result}`; }
+		return result;
+	};
+}
 
 let list = new List();
 

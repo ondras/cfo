@@ -7,13 +7,16 @@ body {
 	overflow: auto;
 
 	table {
+		border-collapse: collapse;
 		font: 12px ubuntu;
 		line-height: 14px;
 
 		td {
-			border-collapse: collapse;
 			padding: 2px;
-			-webkit-font-smoothing: none;
+
+			&:not(:first-child) {
+				text-align: right;
+			}
 		}
 	}
 

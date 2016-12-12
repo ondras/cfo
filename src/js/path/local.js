@@ -7,7 +7,10 @@ const {shell} = require("electron");
 function statsToMetadata(stats) {
 	return {
 		isDirectory: stats.isDirectory(),
-		isSymbolicLink: stats.isSymbolicLink()
+		isSymbolicLink: stats.isSymbolicLink(),
+		date: stats.mtime,
+		size: stats.size,
+		mode: stats.mode
 	}
 }
 
@@ -55,6 +58,9 @@ export default class Local extends Path {
 
 	getPath() { return this._path; }
 	getName() { return path.basename(this._path); }
+	getDate() { return this._meta.date; }
+	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
+	getMode() { return this._meta.mode; }
  
 	getParent() {
 		let parent = new this.constructor(path.dirname(this._path));

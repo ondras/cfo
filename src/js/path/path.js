@@ -4,6 +4,9 @@ export default class Path {
 	getPath() {}
 	getParent() {}
 	getChildren() {}
+	getDate() { }
+	getSize() { }
+	getMode() { }
 	supports(what) {}
 	activate() {}
 }

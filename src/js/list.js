@@ -1,6 +1,7 @@
 import Up from "path/up.js";
 import {CHILDREN} from "path/path.js";
 import * as html from "util/html.js";
+import * as format from "util/format.js";
 
 function SORT(a, b) {
 	let childScoreA = (a.supports(CHILDREN) ? 1 : 2);
@@ -99,6 +100,15 @@ export default class List {
 		return paths.map(path => {
 			let node = this._table.insertRow();
 			node.insertCell().innerHTML = path.getName();
+
+			let size = path.getSize();
+			node.insertCell().innerHTML = (size === undefined ? "" : format.size(size));
+
+			let date = path.getDate();
+			node.insertCell().innerHTML = (date === undefined ? "" : format.date(date));
+
+			let mode = path.getMode();
+			node.insertCell().innerHTML = (mode === undefined ? "" : format.mode(mode));
 
 			return {node, path};
 		});
