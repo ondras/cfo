@@ -248,7 +248,6 @@ class List {
 		this._input = dom.querySelector("input");
 
 		this._table.addEventListener("click", this);
-		document.addEventListener("keydown", this);
 	}
 
 	destroy() {
@@ -270,12 +269,12 @@ class List {
 		});
 	}
 
-	activate() {
-
+	focus() {
+		document.addEventListener("keydown", this);
 	}
 
-	deactivate() {
-
+	blur() {
+		document.removeEventListener("keydown", this);
 	}
 
 	handleEvent(e) {
@@ -457,43 +456,114 @@ class List {
 
 const storage = Object.create(null);
 
-function randomId() {
-	return `i${Math.random().toString().replace(/\D/g, "")}`;
+function publish(message, publisher, data) {
+	let subscribers = storage[message] || [];
+	subscribers.forEach(subscriber => {
+		typeof(subscriber) == "function"
+			? subscriber(message, publisher, data)
+			: subscriber.handleMessage(message, publisher, data);
+	});
+}
+
+function subscribe(message, subscriber) {
+	if (!(message in storage)) { storage[message] = []; }
+	storage[message].push(subscriber);
 }
 
 class Tabs {
 	constructor() {
 		this._node = node("div");
-		this._list = node("ul");
-		this._name = randomId;
+		this._list = node("ul", {className:"tabs"});
+		this._selectedIndex = -1;
 	}
 
-	getNode() {
-		return this._node;
-	}
+	getNode() { return this._node; }
+	getList() { return this._list; }
 
-	getList() {
-		return this._list;
+	handleEvent(e) {
+		let all = Array.from(this._list.children);
+		let index = all.indexOf(e.target);
+		if (index != -1) { this.selectedIndex = index; }
 	}
 
 	add(content) {
 		this._node.appendChild(content);
-
-		let id = randomId();
-		let radio = node("input", {type:"radio", name:this._name, id});
+		content.style.display = "none";
 
 		let li = node("li");
+		li.innerHTML = "testik";
 		this._list.appendChild(li);
 
-		let label = node("label", {htmlFor:id});
-		li.appendChild(label);
-		label.innerHTML = "testik";
+		li.addEventListener("click", this);
 
-		return label;
+		return li;
+	}
+
+	get selectedIndex() { return this._selectedIndex; }
+
+	set selectedIndex(index) {
+		if (index == this._selectedIndex) { return; }
+
+		let messageData = {
+			oldIndex: this._selectedIndex,
+			newIndex: index
+		};
+
+		if (this._selectedIndex > -1) {
+			this._list.children[this._selectedIndex].classList.remove("active");
+			this._node.children[this._selectedIndex].style.display = "none";
+		}
+
+		this._selectedIndex = index;
+
+		if (this._selectedIndex > -1) {
+			this._list.children[this._selectedIndex].classList.add("active");
+			this._node.children[this._selectedIndex].style.display = "";
+		}
+
+		publish("tab-change", this, messageData);
 	}
 }
 
 const PARENT = document.querySelector("section");
+
+class Pane {
+	constructor() {
+		this._lists = [];
+		this._tabs = new Tabs();
+
+		PARENT.appendChild(this._tabs.getList());
+		PARENT.appendChild(this._tabs.getNode());
+
+		subscribe("tab-change", this);
+
+		let p = new Local("/home/ondras/");
+		this._addList(p);
+
+		this._addList(p);
+
+	}
+
+	handleMessage(message, publisher, data) {
+		switch (message) {
+			case "tab-change":
+				if (publisher != this._tabs) { return; }
+				if (data.oldIndex > -1) { this._lists[data.oldIndex].blur(); }
+				if (data.newIndex > -1) { this._lists[data.newIndex].focus(); }
+			break;
+		}
+	}
+
+	_addList(path) {
+		let list = new List();
+		this._lists.push(list);
+		this._tabs.add(list.getNode());
+
+		this._tabs.selectedIndex = this._lists.length-1;
+
+		list.setPath(path); 
+	}
+}
 
 window.FIXME = (...args) => console.error(...args);
 
@@ -526,5 +596,8 @@ if (!("".padStart)) {
 		return result;
 	};
 }
+
+window.pane = new Pane();
+console.log(pane);
 
 }());

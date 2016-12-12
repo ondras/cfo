@@ -32,5 +32,5 @@ if (!("".padStart)) {
 	}
 }
 
-let pane = new Pane();
+window.pane = new Pane();
 console.log(pane);

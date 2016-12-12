@@ -1,38 +1,57 @@
 import * as pubsub from "util/pubsub.js";
 import * as html from "util/html.js";
 
-function randomId() {
-	return `i${Math.random().toString().replace(/\D/g, "")}`;
-}
-
 export default class Tabs {
 	constructor() {
 		this._node = html.node("div");
-		this._list = html.node("ul");
-		this._name = randomId;
+		this._list = html.node("ul", {className:"tabs"});
+		this._selectedIndex = -1;
 	}
 
-	getNode() {
-		return this._node;
-	}
+	getNode() { return this._node; }
+	getList() { return this._list; }
 
-	getList() {
-		return this._list;
+	handleEvent(e) {
+		let all = Array.from(this._list.children);
+		let index = all.indexOf(e.target);
+		if (index != -1) { this.selectedIndex = index; }
 	}
 
 	add(content) {
 		this._node.appendChild(content);
-
-		let id = randomId();
-		let radio = html.node("input", {type:"radio", name:this._name, id});
+		content.style.display = "none";
 
 		let li = html.node("li");
+		li.innerHTML = "testik";
 		this._list.appendChild(li);
 
-		let label = html.node("label", {htmlFor:id});
-		li.appendChild(label);
-		label.innerHTML = "testik";
+		li.addEventListener("click", this);
 
-		return label;
+		return li;
+	}
+
+	get selectedIndex() { return this._selectedIndex; }
+
+	set selectedIndex(index) {
+		if (index == this._selectedIndex) { return; }
+
+		let messageData = {
+			oldIndex: this._selectedIndex,
+			newIndex: index
+		}
+
+		if (this._selectedIndex > -1) {
+			this._list.children[this._selectedIndex].classList.remove("active");
+			this._node.children[this._selectedIndex].style.display = "none";
+		}
+
+		this._selectedIndex = index;
+
+		if (this._selectedIndex > -1) {
+			this._list.children[this._selectedIndex].classList.add("active");
+			this._node.children[this._selectedIndex].style.display = "";
+		}
+
+		pubsub.publish("tab-change", this, messageData);
 	}
 }

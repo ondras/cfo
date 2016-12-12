@@ -29,7 +29,6 @@ export default class List {
 		this._input = dom.querySelector("input");
 
 		this._table.addEventListener("click", this);
-		document.addEventListener("keydown", this);
 	}
 
 	destroy() {
@@ -51,12 +50,12 @@ export default class List {
 		});
 	}
 
-	activate() {
-
+	focus() {
+		document.addEventListener("keydown", this);
 	}
 
-	deactivate() {
-
+	blur() {
+		document.removeEventListener("keydown", this);
 	}
 
 	handleEvent(e) {

@@ -16,6 +16,18 @@ section {
 	width: 50%;
 	flex: 1;
 	overflow: hidden;
+
+	display: flex;
+	flex-direction: column;
+
+	& > div {
+		flex: 1;
+		overflow: hidden;
+	}
+}
+
+footer {
+	padding: 3px;
 }
 
 @import "list.less";

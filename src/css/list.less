@@ -7,6 +7,7 @@
 	.scroll {
 		flex: 1;
 		overflow: auto;
+		padding: 1px;
 	}
 
 	input {
@@ -25,7 +26,8 @@
 		td {
 			white-space: nowrap;
 			padding: 1px;
-			line-height: 1;
+			height: 20px;
+			vertical-align: middle;
 
 			&:not(:first-child) {
 				text-align: right;
@@ -34,23 +36,7 @@
 	}
 
 	tr.focus {
-		@border: 1px solid black;
 		background-color: #e8e8e8;
-
-		td {
-			border-top: @border;
-			border-bottom: @border;
-			padding-top: 0;
-			padding-bottom: 0;
-
-			&:first-child {
-				border-left: @border;
-				padding-left: 0;
-			}
-			&:last-child {
-				border-right: @border;
-				padding-right: 0;
-			}
-		}
+		box-shadow: 0 0 0 1px #000;
 	}
 }
