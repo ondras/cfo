@@ -2,16 +2,16 @@ import LocalPath from "path/local.js";
 import List from "list.js";
 import Tabs from "tabs.js";
 import * as pubsub from "util/pubsub.js";
-
-const PARENT = document.querySelector("section");
+import * as html from "util/html.js";
 
 export default class Pane {
 	constructor() {
 		this._lists = [];
 		this._tabs = new Tabs();
+		this._node = html.node("div", {className:"pane"});
 
-		PARENT.appendChild(this._tabs.getList());
-		PARENT.appendChild(this._tabs.getNode());
+		this._node.appendChild(this._tabs.getList());
+		this._node.appendChild(this._tabs.getNode());
 
 		pubsub.subscribe("tab-change", this);
 
@@ -21,6 +21,8 @@ export default class Pane {
 		this._addList(p);
 
 	}
+
+	getNode() { return this._node; }
 
 	handleMessage(message, publisher, data) {
 		switch (message) {

@@ -32,5 +32,10 @@ if (!("".padStart)) {
 	}
 }
 
-window.pane = new Pane();
-console.log(pane);
+let panes = [
+	new Pane(),
+	new Pane()
+];
+
+let parent = document.querySelector("#panes");
+panes.forEach(pane => parent.appendChild(pane.getNode()));

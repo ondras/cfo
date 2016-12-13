@@ -29,6 +29,7 @@ export default class List {
 		this._input = dom.querySelector("input");
 
 		this._table.addEventListener("click", this);
+		this._table.addEventListener("dblclick", this);
 	}
 
 	destroy() {
@@ -63,6 +64,10 @@ export default class List {
 			case "click":
 				let index = this._nodeToIndex(e.target);
 				if (index != -1) { this._focusAt(index); }
+			break;
+
+			case "dblclick":
+				this._activate();
 			break;
 
 			case "keydown":
@@ -104,14 +109,7 @@ export default class List {
 				parent && this.setPath(parent);
 			break;
 
-			case "Enter":
-				let path = this._getFocusedPath();
-				if (path.supports(CHILDREN)) {
-					this.setPath(path);
-				} else {
-					path.activate();
-				}
-			break;
+			case "Enter": this._activate(); break;
 
 			default:
 				return false;
@@ -119,6 +117,15 @@ export default class List {
 		}
 
 		return true;
+	}
+
+	_activate() {
+		let path = this._getFocusedPath();
+		if (path.supports(CHILDREN)) {
+			this.setPath(path);
+		} else {
+			path.activate();
+		}
 	}
 
 	_show(paths, path) {

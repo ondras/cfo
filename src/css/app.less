@@ -12,22 +12,17 @@ body {
 	background-color: #e8e8e8;
 }
 
-section {
-	width: 50%;
+#panes {
 	flex: 1;
 	overflow: hidden;
-
 	display: flex;
-	flex-direction: column;
-
-	& > div {
-		flex: 1;
-		overflow: hidden;
-	}
+	flex-direction: row;
 }
 
 footer {
 	padding: 3px;
 }
 
+@import "pane.less";
 @import "list.less";
+@import "tabs.less";

@@ -248,6 +248,7 @@ class List {
 		this._input = dom.querySelector("input");
 
 		this._table.addEventListener("click", this);
+		this._table.addEventListener("dblclick", this);
 	}
 
 	destroy() {
@@ -282,6 +283,10 @@ class List {
 			case "click":
 				let index = this._nodeToIndex(e.target);
 				if (index != -1) { this._focusAt(index); }
+			break;
+
+			case "dblclick":
+				this._activate();
 			break;
 
 			case "keydown":
@@ -323,14 +328,7 @@ class List {
 				parent && this.setPath(parent);
 			break;
 
-			case "Enter":
-				let path = this._getFocusedPath();
-				if (path.supports(CHILDREN)) {
-					this.setPath(path);
-				} else {
-					path.activate();
-				}
-			break;
+			case "Enter": this._activate(); break;
 
 			default:
 				return false;
@@ -338,6 +336,15 @@ class List {
 		}
 
 		return true;
+	}
+
+	_activate() {
+		let path = this._getFocusedPath();
+		if (path.supports(CHILDREN)) {
+			this.setPath(path);
+		} else {
+			path.activate();
+		}
 	}
 
 	_show(paths, path) {
@@ -525,15 +532,14 @@ class Tabs {
 	}
 }
 
-const PARENT = document.querySelector("section");
-
 class Pane {
 	constructor() {
 		this._lists = [];
 		this._tabs = new Tabs();
+		this._node = node("div", {className:"pane"});
 
-		PARENT.appendChild(this._tabs.getList());
-		PARENT.appendChild(this._tabs.getNode());
+		this._node.appendChild(this._tabs.getList());
+		this._node.appendChild(this._tabs.getNode());
 
 		subscribe("tab-change", this);
 
@@ -543,6 +549,8 @@ class Pane {
 		this._addList(p);
 
 	}
+
+	getNode() { return this._node; }
 
 	handleMessage(message, publisher, data) {
 		switch (message) {
@@ -597,7 +605,12 @@ if (!("".padStart)) {
 	};
 }
 
-window.pane = new Pane();
-console.log(pane);
+let panes = [
+	new Pane(),
+	new Pane()
+];
+
+let parent = document.querySelector("#panes");
+panes.forEach(pane => parent.appendChild(pane.getNode()));
 
 }());

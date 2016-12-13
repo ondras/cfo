@@ -10,19 +10,24 @@ body {
   font: 12px ubuntu;
   background-color: #e8e8e8;
 }
-section {
-  width: 50%;
+#panes {
   flex: 1;
   overflow: hidden;
   display: flex;
-  flex-direction: column;
-}
-section > div {
-  flex: 1;
-  overflow: hidden;
+  flex-direction: row;
 }
 footer {
   padding: 3px;
+}
+.pane {
+  width: 50%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.pane > div {
+  flex: 1;
+  overflow: hidden;
 }
 .list {
   height: 100%;
@@ -43,6 +48,8 @@ footer {
   vertical-align: sub;
 }
 .list table {
+  -webkit-user-select: none;
+  user-select: none;
   width: 100%;
   border-collapse: collapse;
 }
@@ -58,4 +65,12 @@ footer {
 .list tr.focus {
   background-color: #e8e8e8;
   box-shadow: 0 0 0 1px #000;
+}
+.tabs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tabs li {
+  display: inline-block;
 }
