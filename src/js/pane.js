@@ -24,7 +24,23 @@ export default class Pane {
 
 	getNode() { return this._node; }
 
+	focus() {
+		let index = this._tabs.selectedIndex;
+		if (index > -1) { this._lists[index].focus(); }
+	}
+
+	blur() {
+		let index = this._tabs.selectedIndex;
+		if (index > -1) { this._lists[index].blur(); }
+	}
+
+	adjustTab(diff) {
+		let index = this._tabs.selectedIndex;
+		if (index > -1) { this._tabs.selectedIndex += diff; }
+	}
+
 	handleMessage(message, publisher, data) {
+		return;
 		switch (message) {
 			case "tab-change":
 				if (publisher != this._tabs) { return; }
@@ -44,3 +60,4 @@ export default class Pane {
 		list.setPath(path); 
 	}
 }
+

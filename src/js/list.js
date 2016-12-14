@@ -18,7 +18,12 @@ function SORT(a, b) {
 export default class List {
 	constructor() {
 		this._path = null;
-		this._pendingPath = null; /* trying to list this one (will be switched to _path afterwards) */
+
+		/* we want to focus this path when possible: 
+		  1) child after listing parent,
+		  2) active item during blur
+		*/
+		this._pathToBeFocused = null; 
 		this._items = [];
 
 		let dom = TEMPLATE.content.cloneNode(true);
@@ -41,10 +46,11 @@ export default class List {
 	}
 
 	setPath(path) {
-		this._pendingPath = path;
+		this._pathToBeFocused = this._path; // will try to focus it afterwards
+		this._path = path;
 		path.getChildren().then(paths => {
-			if (!this._pendingPath.is(path)) { return; } /* got a new one in the meantime */
-			this._show(paths, path);
+			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
+			this._show(paths);
 		}, e => {
 			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
 			alert(e.message);
@@ -53,10 +59,14 @@ export default class List {
 
 	focus() {
 		document.addEventListener("keydown", this);
+		this._focusPath(this._pathToBeFocused);
+		this._pathToBeFocused = null;
 	}
 
 	blur() {
 		document.removeEventListener("keydown", this);
+		this._pathToBeFocused = this._getFocusedPath();
+		this._input.blur();
 	}
 
 	handleEvent(e) {
@@ -128,13 +138,10 @@ export default class List {
 		}
 	}
 
-	_show(paths, path) {
-		let oldPath = this._path;
-
+	_show(paths) {
 		this._clear();
 
-		this._path = path;
-		this._input.value = path.getPath();
+		this._input.value = this._path.getPath();
 		paths.sort(SORT);
 
 		let parent = this._path.getParent();
@@ -146,10 +153,8 @@ export default class List {
 		this._items = this._build(paths);
 		if (!paths.length) { return; }
 
-		let focusIndex = this._items.reduce((result, item, index) => {
-			return (oldPath && oldPath.is(item.path) ? index : result);
-		}, 0);
-		this._focusAt(focusIndex);
+		this._focusPath(this._pathToBeFocused);
+		this._pathToBeFocused = null;
 	}
 
 	_build(paths) {
@@ -234,9 +239,14 @@ export default class List {
 		}
 	}
 
+	_focusPath(path) {
+		let focusIndex = this._items.reduce((result, item, index) => {
+			return (path && item.path.is(path) ? index : result);
+		}, 0);
+		this._focusAt(focusIndex);
+	}
+
 	_clear() {
-		this._path = null;
-		this._pendingPath = null;
 		this._items = [];
 		this._table.innerHTML = "";
 	}

@@ -237,7 +237,12 @@ function SORT(a, b) {
 class List {
 	constructor() {
 		this._path = null;
-		this._pendingPath = null; /* trying to list this one (will be switched to _path afterwards) */
+
+		/* we want to focus this path when possible: 
+		  1) child after listing parent,
+		  2) active item during blur
+		*/
+		this._pathToBeFocused = null; 
 		this._items = [];
 
 		let dom = TEMPLATE.content.cloneNode(true);
@@ -260,10 +265,11 @@ class List {
 	}
 
 	setPath(path) {
-		this._pendingPath = path;
+		this._pathToBeFocused = this._path; // will try to focus it afterwards
+		this._path = path;
 		path.getChildren().then(paths => {
-			if (!this._pendingPath.is(path)) { return; } /* got a new one in the meantime */
-			this._show(paths, path);
+			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
+			this._show(paths);
 		}, e => {
 			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
 			alert(e.message);
@@ -272,10 +278,14 @@ class List {
 
 	focus() {
 		document.addEventListener("keydown", this);
+		this._focusPath(this._pathToBeFocused);
+		this._pathToBeFocused = null;
 	}
 
 	blur() {
 		document.removeEventListener("keydown", this);
+		this._pathToBeFocused = this._getFocusedPath();
+		this._input.blur();
 	}
 
 	handleEvent(e) {
@@ -347,13 +357,10 @@ class List {
 		}
 	}
 
-	_show(paths, path) {
-		let oldPath = this._path;
-
+	_show(paths) {
 		this._clear();
 
-		this._path = path;
-		this._input.value = path.getPath();
+		this._input.value = this._path.getPath();
 		paths.sort(SORT);
 
 		let parent = this._path.getParent();
@@ -365,10 +372,8 @@ class List {
 		this._items = this._build(paths);
 		if (!paths.length) { return; }
 
-		let focusIndex = this._items.reduce((result, item, index) => {
-			return (oldPath && oldPath.is(item.path) ? index : result);
-		}, 0);
-		this._focusAt(focusIndex);
+		this._focusPath(this._pathToBeFocused);
+		this._pathToBefocused = null;
 	}
 
 	_build(paths) {
@@ -453,9 +458,14 @@ class List {
 		}
 	}
 
+	_focusPath(path) {
+		let focusIndex = this._items.reduce((result, item, index) => {
+			return (path && item.path.is(path) ? index : result);
+		}, 0);
+		this._focusAt(focusIndex);
+	}
+
 	_clear() {
-		this._path = null;
-		this._pendingPath = null;
 		this._items = [];
 		this._table.innerHTML = "";
 	}
@@ -510,6 +520,7 @@ class Tabs {
 
 	set selectedIndex(index) {
 		if (index == this._selectedIndex) { return; }
+		index = (index + this._list.children.length) % this._list.children.length; /* js negative modulus */
 
 		let messageData = {
 			oldIndex: this._selectedIndex,
@@ -552,7 +563,23 @@ class Pane {
 
 	getNode() { return this._node; }
 
+	focus() {
+		let index = this._tabs.selectedIndex;
+		if (index > -1) { this._lists[index].focus(); }
+	}
+
+	blur() {
+		let index = this._tabs.selectedIndex;
+		if (index > -1) { this._lists[index].blur(); }
+	}
+
+	adjustTab(diff) {
+		let index = this._tabs.selectedIndex;
+		if (index > -1) { this._tabs.selectedIndex += diff; }
+	}
+
 	handleMessage(message, publisher, data) {
+		return;
 		switch (message) {
 			case "tab-change":
 				if (publisher != this._tabs) { return; }
@@ -572,6 +599,159 @@ class Pane {
 		list.setPath(path); 
 	}
 }
+
+const codes = {
+	back: 8,
+	tab: 9,
+	enter: 13,
+	esc: 27,
+	space: 32,
+	pgup: 33,
+	pgdn: 34,
+	end: 35,
+	home: 36,
+	left: 37,
+	up: 38,
+	right: 39,
+	down: 40,
+	ins: 45,
+	del: 46,
+	f1: 112,
+	f2: 113,
+	f3: 114,
+	f4: 115,
+	f5: 116,
+	f6: 117,
+	f7: 118,
+	f8: 119,
+	f9: 120,
+	f10: 121,
+	f11: 122,
+	f12: 123
+};
+
+const modifiers = ["ctrl", "alt", "shift", "meta"]; // meta = command
+
+let registry$1 = [];
+
+function handler(e) {
+	let available = registry$1.filter(reg => {
+		if (reg.type != e.type) { return false; }
+
+		for (let m in reg.modifiers) {
+			if (reg.modifiers[m] != e[m]) { return false; }
+		}
+
+		let code = (e.type == "keypress" ? e.charCode : e.keyCode);
+		if (reg.code != code) { return false; }
+
+		return true;
+	});
+
+
+	let index = available.length;
+	if (!index) { return; }
+
+	while (index --> 0) {
+		let executed = available[index].func();
+		if (executed) { 
+			e.preventDefault();
+			return;
+		}
+	}
+}
+
+function parse(key) {
+	let result = {
+		func: null,
+		modifiers: {}
+	};
+
+	key = key.toLowerCase();
+
+	modifiers.forEach(mod => {
+		let mkey = mod + "Key";
+		result.modifiers[mkey] = false;
+
+		let re = new RegExp(mod + "[+-]");
+		key = key.replace(re, () => {
+			result.modifiers[mkey] = true;
+			return "";
+		});
+	});
+
+	if (key.length == 1) {
+		result.code = key.charCodeAt(0);
+		result.type = "keypress";
+	} else {
+		if (!(key in codes)) { throw new Error("Unknown keyboard code " + key); }
+		result.code = codes[key];
+		result.type = "keydown";
+	}
+
+	return result;
+}
+
+function register$1(func, key) {
+	let item = parse(key);
+	item.func = func;
+	registry$1.push(item);
+}
+
+window.addEventListener("keydown", handler);
+window.addEventListener("keypress", handler);
+
+const document$1 = window.document;
+const registry = Object.create(null);
+
+function syncDisabledAttribute(command) {
+	let enabled = registry[command].enabled;
+	let nodes = Array.from(document$1.querySelectorAll(`[data-command='${command}']`));
+
+	nodes.forEach(n => n.disabled = !enabled);
+}
+
+function register$$1(command, keys, func) {
+	function wrap() {
+		if (isEnabled(command)) {
+			func(command);
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	registry[command] = {
+		func: wrap,
+		enabled: true
+	};
+
+	[].concat(keys || []).forEach(key => register$1(wrap, key));
+
+	return command;
+}
+
+
+
+
+
+function isEnabled(command) {
+	return registry[command].enabled;
+}
+
+function execute(command) {
+	return registry[command].func();
+}
+
+document$1.body.addEventListener("click", e => {
+	let node = e.target;
+	while (node) {
+		let c = node.getAttribute("data-command");
+		if (c) { return execute(c); }
+		if (node == event.currentTarget) { break; }
+		node = node.parentNode;
+	}
+});
 
 window.FIXME = (...args) => console.error(...args);
 
@@ -605,12 +785,36 @@ if (!("".padStart)) {
 	};
 }
 
-let panes = [
-	new Pane(),
-	new Pane()
-];
+let PANES = [];
+let index = -1;
 
-let parent = document.querySelector("#panes");
-panes.forEach(pane => parent.appendChild(pane.getNode()));
+function focus(i) {
+	if (index > -1) { PANES[index].blur(); }
+	index = i;
+	if (index > -1) { PANES[index].focus(); }
+}
+
+function build() {
+	PANES.push(new Pane());
+	PANES.push(new Pane());
+
+	let parent = document.querySelector("#panes");
+	PANES.forEach(pane => parent.appendChild(pane.getNode()));
+	focus(0);
+}
+
+build();
+
+register$$1("pane:toggle", "Tab", () => {
+	focus((index + 1) % PANES.length);
+});
+
+register$$1("tab:next", "Ctrl+Tab", () => {
+	PANES[index].adjustTab(+1);
+});
+
+register$$1("tab:prev", "Ctrl+Shift+Tab", () => {
+	PANES[index].adjustTab(-1);
+});
 
 }());

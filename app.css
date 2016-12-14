@@ -20,7 +20,6 @@ footer {
 }
 .pane {
   width: 50%;
-  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -72,4 +71,7 @@ footer {
 }
 .tabs li {
   display: inline-block;
+}
+.tabs li.active {
+  font-weight: bold;
 }

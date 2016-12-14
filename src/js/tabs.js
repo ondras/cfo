@@ -34,6 +34,7 @@ export default class Tabs {
 
 	set selectedIndex(index) {
 		if (index == this._selectedIndex) { return; }
+		index = (index + this._list.children.length) % this._list.children.length; /* js negative modulus */
 
 		let messageData = {
 			oldIndex: this._selectedIndex,
