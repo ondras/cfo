@@ -1,4 +1,4 @@
-const {app, BrowserWindow, remote} = require("electron");
+const {app, BrowserWindow, remote, globalShortcut} = require("electron");
 const pkg = require("./package.json");
 
 app.on("window-all-closed", () => {
@@ -13,6 +13,7 @@ app.on("ready", () => {
 	}
 	let win = new BrowserWindow(options);
 	win.setMenu(null);
+
 	win.loadURL(`file://${__dirname}/index.html`);
 	win.openDevTools();
 });

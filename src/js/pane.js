@@ -11,6 +11,7 @@ export default class Pane {
 		this._active = false;
 		this._lists = [];
 		this._tabs = new Tabs();
+		this._labels = [];
 		this._node = html.node("div", {className:"pane"});
 
 		this._node.addEventListener("click", this);
@@ -19,6 +20,7 @@ export default class Pane {
 		this._node.appendChild(this._tabs.getNode());
 
 		pubsub.subscribe("tab-change", this);
+		pubsub.subscribe("list-change", this);
 
 		let p = new LocalPath("/home/ondras/");
 		this._addList(p);
@@ -48,6 +50,11 @@ export default class Pane {
 		if (index > -1) { this._tabs.selectedIndex += diff; }
 	}
 
+	getList() {
+		let index = this._tabs.selectedIndex;
+		if (index > -1) { return this._lists[index]; }
+	}
+
 	handleEvent(e) {
 		panes.activate(this);
 	}
@@ -60,13 +67,27 @@ export default class Pane {
 				if (data.oldIndex > -1) { this._lists[data.oldIndex].deactivate(); }
 				if (data.newIndex > -1) { this._lists[data.newIndex].activate(); }
 			break;
+
+			case "list-change":
+				let index = this._lists.indexOf(publisher);
+				if (index > -1) { 
+					let path = publisher.getPath();
+					if (path) {
+						let label = this._labels[index];
+						html.clear(label);
+						label.appendChild(html.text(path.getName()));
+					}
+				}
+			break;
 		}
 	}
 
 	_addList(path) {
 		let list = new List();
 		this._lists.push(list);
-		this._tabs.add(list.getNode());
+
+		let label = this._tabs.add(list.getNode());
+		this._labels.push(label);
 
 		this._tabs.selectedIndex = this._lists.length-1;
 
