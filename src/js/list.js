@@ -17,6 +17,7 @@ function SORT(a, b) {
 
 export default class List {
 	constructor() {
+		this._active = false;
 		this._path = null;
 
 		/* we want to focus this path when possible: 
@@ -57,15 +58,22 @@ export default class List {
 		});
 	}
 
-	focus() {
+	activate() {
+		if (this._active) { return; }
+		this._active = true;
 		document.addEventListener("keydown", this);
+
 		this._focusPath(this._pathToBeFocused);
 		this._pathToBeFocused = null;
 	}
 
-	blur() {
+	deactivate() {
+		if (!this._active) { return; }
+		this._active = false;
 		document.removeEventListener("keydown", this);
+
 		this._pathToBeFocused = this._getFocusedPath();
+		this._removeFocus();
 		this._input.blur();
 	}
 
@@ -77,7 +85,7 @@ export default class List {
 			break;
 
 			case "dblclick":
-				this._activate();
+				this._activatePath();
 			break;
 
 			case "keydown":
@@ -119,7 +127,7 @@ export default class List {
 				parent && this.setPath(parent);
 			break;
 
-			case "Enter": this._activate(); break;
+			case "Enter": this._activatePath(); break;
 
 			default:
 				return false;
@@ -129,7 +137,7 @@ export default class List {
 		return true;
 	}
 
-	_activate() {
+	_activatePath() {
 		let path = this._getFocusedPath();
 		if (path.supports(CHILDREN)) {
 			this.setPath(path);
@@ -153,8 +161,10 @@ export default class List {
 		this._items = this._build(paths);
 		if (!paths.length) { return; }
 
-		this._focusPath(this._pathToBeFocused);
-		this._pathToBeFocused = null;
+		if (this._active) {
+			this._focusPath(this._pathToBeFocused);
+			this._pathToBeFocused = null;
+		}
 	}
 
 	_build(paths) {
@@ -222,6 +232,11 @@ export default class List {
 		return this._focusAt(index + diff);
 	}
 
+	_removeFocus() {
+		let index = this._getFocusedIndex();
+		if (index > -1) { this._items[index].node.classList.remove("focus"); }
+	}
+
 	_focusAt(index) {
 		index = Math.max(index, 0);
 		index = Math.min(index, this._items.length-1);
@@ -229,7 +244,8 @@ export default class List {
 		let oldIndex = this._getFocusedIndex();
 		if (index == oldIndex) { return; }
 
-		if (oldIndex > -1) { this._items[oldIndex].node.classList.remove("focus"); }
+		this._removeFocus();
+
 		if (index > -1) { 
 			let node = this._items[index].node;
 			node.classList.add("focus");

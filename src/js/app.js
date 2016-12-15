@@ -1,5 +1,5 @@
-import Pane from "pane.js";
 import * as command from "util/command.js";
+import * as panes from "panes.js";
 
 window.FIXME = (...args) => console.error(...args);
 
@@ -33,34 +33,4 @@ if (!("".padStart)) {
 	}
 }
 
-let PANES = [];
-let index = -1;
-
-function focus(i) {
-	if (index > -1) { PANES[index].blur(); }
-	index = i;
-	if (index > -1) { PANES[index].focus(); }
-}
-
-function build() {
-	PANES.push(new Pane());
-	PANES.push(new Pane());
-
-	let parent = document.querySelector("#panes");
-	PANES.forEach(pane => parent.appendChild(pane.getNode()));
-	focus(0);
-}
-
-build();
-
-command.register("pane:toggle", "Tab", () => {
-	focus((index + 1) % PANES.length);
-});
-
-command.register("tab:next", "Ctrl+Tab", () => {
-	PANES[index].adjustTab(+1);
-});
-
-command.register("tab:prev", "Ctrl+Shift+Tab", () => {
-	PANES[index].adjustTab(-1);
-});
+panes.init();

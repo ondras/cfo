@@ -1,6 +1,149 @@
 (function () {
 'use strict';
 
+/* Accelerator-to-KeyboardEvent.code mapping where not 1:1 */
+const CODES = {
+	"return": "enter",
+	"left": "arrowleft",
+	"up": "arrowup",
+	"right": "arrowright",
+	"down": "arrowdown",
+	"esc": "escape"
+};
+
+const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
+const REGISTRY = [];
+
+function handler(e) {
+	let available = REGISTRY.filter(reg => {
+		if (reg.type != e.type) { return false; }
+
+		for (let m in reg.modifiers) {
+			if (reg.modifiers[m] != e[m]) { return false; }
+		}
+
+		if ("key" in reg && reg.key != e.key.toLowerCase()) { return false; }
+		if ("code" in reg && reg.code != e.code.toLowerCase()) { return false; }
+
+		return true;
+	});
+
+	while (available.length) {
+		let executed = available.pop().func();
+		if (executed) { 
+			e.preventDefault();
+			return;
+		}
+	}
+}
+
+function parse(key) {
+	let result = {
+		func: null,
+		modifiers: {}
+	};
+
+	key = key.toLowerCase();
+
+	MODIFIERS.forEach(mod => {
+		let mkey = mod + "Key";
+		result.modifiers[mkey] = false;
+
+		let re = new RegExp(mod + "[+-]");
+		key = key.replace(re, () => {
+			result.modifiers[mkey] = true;
+			return "";
+		});
+	});
+
+	if (key.length == 1) {
+		result.key = key.charCodeAt(0);
+		result.type = "keypress";
+	} else {
+		result.code = CODES[key] || key;
+		result.type = "keydown";
+	}
+
+	return result;
+}
+
+function register$1(func, key) {
+	let item = parse(key);
+	item.func = func;
+	REGISTRY.push(item);
+}
+
+window.addEventListener("keydown", handler);
+window.addEventListener("keypress", handler);
+
+const storage = Object.create(null);
+
+function publish(message, publisher, data) {
+	let subscribers = storage[message] || [];
+	subscribers.forEach(subscriber => {
+		typeof(subscriber) == "function"
+			? subscriber(message, publisher, data)
+			: subscriber.handleMessage(message, publisher, data);
+	});
+}
+
+function subscribe(message, subscriber) {
+	if (!(message in storage)) { storage[message] = []; }
+	storage[message].push(subscriber);
+}
+
+const document$1 = window.document;
+const registry = Object.create(null);
+
+function syncDisabledAttribute(command) {
+	let enabled = registry[command].enabled;
+	let nodes = Array.from(document$1.querySelectorAll(`[data-command='${command}']`));
+
+	nodes.forEach(n => n.disabled = !enabled);
+}
+
+function register$$1(command, keys, func) {
+	function wrap() {
+		if (isEnabled(command)) {
+			func(command);
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	registry[command] = {
+		func: wrap,
+		enabled: true
+	};
+
+	[].concat(keys || []).forEach(key => register$1(wrap, key));
+
+	return command;
+}
+
+
+
+
+
+function isEnabled(command) {
+	return registry[command].enabled;
+}
+
+function execute(command) {
+	return registry[command].func();
+}
+
+document$1.body.addEventListener("click", e => {
+	let node = e.target;
+	while (node) {
+		let c = node.getAttribute("data-command");
+		if (c) { return execute(c); }
+		if (node == event.currentTarget) { break; }
+		node = node.parentNode;
+	}
+});
+
 class Path {
 	is(other) { return other.getPath() == this.getPath(); }
 	getPath() {}
@@ -236,6 +379,7 @@ function SORT(a, b) {
 
 class List {
 	constructor() {
+		this._active = false;
 		this._path = null;
 
 		/* we want to focus this path when possible: 
@@ -276,15 +420,22 @@ class List {
 		});
 	}
 
-	focus() {
+	activate() {
+		if (this._active) { return; }
+		this._active = true;
 		document.addEventListener("keydown", this);
+
 		this._focusPath(this._pathToBeFocused);
 		this._pathToBeFocused = null;
 	}
 
-	blur() {
+	deactivate() {
+		if (!this._active) { return; }
+		this._active = false;
 		document.removeEventListener("keydown", this);
+
 		this._pathToBeFocused = this._getFocusedPath();
+		this._removeFocus();
 		this._input.blur();
 	}
 
@@ -296,7 +447,7 @@ class List {
 			break;
 
 			case "dblclick":
-				this._activate();
+				this._activatePath();
 			break;
 
 			case "keydown":
@@ -338,7 +489,7 @@ class List {
 				parent && this.setPath(parent);
 			break;
 
-			case "Enter": this._activate(); break;
+			case "Enter": this._activatePath(); break;
 
 			default:
 				return false;
@@ -348,7 +499,7 @@ class List {
 		return true;
 	}
 
-	_activate() {
+	_activatePath() {
 		let path = this._getFocusedPath();
 		if (path.supports(CHILDREN)) {
 			this.setPath(path);
@@ -372,8 +523,10 @@ class List {
 		this._items = this._build(paths);
 		if (!paths.length) { return; }
 
-		this._focusPath(this._pathToBeFocused);
-		this._pathToBeFocused = null;
+		if (this._active) {
+			this._focusPath(this._pathToBeFocused);
+			this._pathToBeFocused = null;
+		}
 	}
 
 	_build(paths) {
@@ -441,6 +594,11 @@ class List {
 		return this._focusAt(index + diff);
 	}
 
+	_removeFocus() {
+		let index = this._getFocusedIndex();
+		if (index > -1) { this._items[index].node.classList.remove("focus"); }
+	}
+
 	_focusAt(index) {
 		index = Math.max(index, 0);
 		index = Math.min(index, this._items.length-1);
@@ -448,7 +606,8 @@ class List {
 		let oldIndex = this._getFocusedIndex();
 		if (index == oldIndex) { return; }
 
-		if (oldIndex > -1) { this._items[oldIndex].node.classList.remove("focus"); }
+		this._removeFocus();
+
 		if (index > -1) { 
 			let node$$1 = this._items[index].node;
 			node$$1.classList.add("focus");
@@ -469,22 +628,6 @@ class List {
 		this._items = [];
 		this._table.innerHTML = "";
 	}
-}
-
-const storage = Object.create(null);
-
-function publish(message, publisher, data) {
-	let subscribers = storage[message] || [];
-	subscribers.forEach(subscriber => {
-		typeof(subscriber) == "function"
-			? subscriber(message, publisher, data)
-			: subscriber.handleMessage(message, publisher, data);
-	});
-}
-
-function subscribe(message, subscriber) {
-	if (!(message in storage)) { storage[message] = []; }
-	storage[message].push(subscriber);
 }
 
 class Tabs {
@@ -545,9 +688,12 @@ class Tabs {
 
 class Pane {
 	constructor() {
+		this._active = false;
 		this._lists = [];
 		this._tabs = new Tabs();
 		this._node = node("div", {className:"pane"});
+
+		this._node.addEventListener("click", this);
 
 		this._node.appendChild(this._tabs.getList());
 		this._node.appendChild(this._tabs.getNode());
@@ -563,14 +709,18 @@ class Pane {
 
 	getNode() { return this._node; }
 
-	focus() {
+	activate() {
+		if (this._active) { return; }
+		this._active = true;
 		let index = this._tabs.selectedIndex;
-		if (index > -1) { this._lists[index].focus(); }
+		if (index > -1) { this._lists[index].activate(); }
 	}
 
-	blur() {
+	deactivate() {
+		if (!this._active) { return; }
+		this._active = false;
 		let index = this._tabs.selectedIndex;
-		if (index > -1) { this._lists[index].blur(); }
+		if (index > -1) { this._lists[index].deactivate(); }
 	}
 
 	adjustTab(diff) {
@@ -578,13 +728,17 @@ class Pane {
 		if (index > -1) { this._tabs.selectedIndex += diff; }
 	}
 
+	handleEvent(e) {
+		activate(this);
+	}
+
 	handleMessage(message, publisher, data) {
-		return;
 		switch (message) {
 			case "tab-change":
 				if (publisher != this._tabs) { return; }
-				if (data.oldIndex > -1) { this._lists[data.oldIndex].blur(); }
-				if (data.newIndex > -1) { this._lists[data.newIndex].focus(); }
+				if (!this._active) { return; }
+				if (data.oldIndex > -1) { this._lists[data.oldIndex].deactivate(); }
+				if (data.newIndex > -1) { this._lists[data.newIndex].activate(); }
 			break;
 		}
 	}
@@ -600,131 +754,40 @@ class Pane {
 	}
 }
 
-/* Accelerator-to-KeyboardEvent.code mapping where not 1:1 */
-const CODES = {
-	"return": "enter",
-	"left": "arrowleft",
-	"up": "arrowup",
-	"right": "arrowright",
-	"down": "arrowdown",
-	"esc": "escape"
-};
+const PANES = [];
+let index = -1;
 
-const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
-const REGISTRY = [];
-
-function handler(e) {
-	let available = REGISTRY.filter(reg => {
-		if (reg.type != e.type) { return false; }
-
-		for (let m in reg.modifiers) {
-			if (reg.modifiers[m] != e[m]) { return false; }
-		}
-
-		if ("key" in reg && reg.key != e.key.toLowerCase()) { return false; }
-		if ("code" in reg && reg.code != e.code.toLowerCase()) { return false; }
-
-		return true;
-	});
-
-	while (available.length) {
-		let executed = available.pop().func();
-		if (executed) { 
-			e.preventDefault();
-			return;
-		}
-	}
+function activate(pane) {
+	index = PANES.indexOf(pane);
+	PANES[(index+1) % 2].deactivate();
+	PANES[index].activate();
 }
 
-function parse(key) {
-	let result = {
-		func: null,
-		modifiers: {}
-	};
-
-	key = key.toLowerCase();
-
-	MODIFIERS.forEach(mod => {
-		let mkey = mod + "Key";
-		result.modifiers[mkey] = false;
-
-		let re = new RegExp(mod + "[+-]");
-		key = key.replace(re, () => {
-			result.modifiers[mkey] = true;
-			return "";
-		});
-	});
-
-	if (key.length == 1) {
-		result.key = key.charCodeAt(0);
-		result.type = "keypress";
-	} else {
-		result.code = CODES[key] || key;
-		result.type = "keydown";
-	}
-
-	return result;
+function getActive() {
+	return PANES[index];
 }
 
-function register$1(func, key) {
-	let item = parse(key);
-	item.func = func;
-	REGISTRY.push(item);
+function init() {
+	PANES.push(new Pane());
+	PANES.push(new Pane());
+
+	let parent = document.querySelector("#panes");
+	PANES.forEach(pane => parent.appendChild(pane.getNode()));
+
+	activate(PANES[0]);
 }
 
-window.addEventListener("keydown", handler);
-window.addEventListener("keypress", handler);
+register$$1("pane:toggle", "Tab", () => {
+	let i = (index + 1) % PANES.length;
+	activate(PANES[i]);
+});
 
-const document$1 = window.document;
-const registry = Object.create(null);
+register$$1("tab:next", "Ctrl+Tab", () => {
+	getActive().adjustTab(+1);
+});
 
-function syncDisabledAttribute(command) {
-	let enabled = registry[command].enabled;
-	let nodes = Array.from(document$1.querySelectorAll(`[data-command='${command}']`));
-
-	nodes.forEach(n => n.disabled = !enabled);
-}
-
-function register$$1(command, keys, func) {
-	function wrap() {
-		if (isEnabled(command)) {
-			func(command);
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	registry[command] = {
-		func: wrap,
-		enabled: true
-	};
-
-	[].concat(keys || []).forEach(key => register$1(wrap, key));
-
-	return command;
-}
-
-
-
-
-
-function isEnabled(command) {
-	return registry[command].enabled;
-}
-
-function execute(command) {
-	return registry[command].func();
-}
-
-document$1.body.addEventListener("click", e => {
-	let node = e.target;
-	while (node) {
-		let c = node.getAttribute("data-command");
-		if (c) { return execute(c); }
-		if (node == event.currentTarget) { break; }
-		node = node.parentNode;
-	}
+register$$1("tab:prev", "Ctrl+Shift+Tab", () => {
+	getActive().adjustTab(-1);
 });
 
 window.FIXME = (...args) => console.error(...args);
@@ -759,36 +822,6 @@ if (!("".padStart)) {
 	};
 }
 
-let PANES = [];
-let index = -1;
-
-function focus(i) {
-	if (index > -1) { PANES[index].blur(); }
-	index = i;
-	if (index > -1) { PANES[index].focus(); }
-}
-
-function build() {
-	PANES.push(new Pane());
-	PANES.push(new Pane());
-
-	let parent = document.querySelector("#panes");
-	PANES.forEach(pane => parent.appendChild(pane.getNode()));
-	focus(0);
-}
-
-build();
-
-register$$1("pane:toggle", "Tab", () => {
-	focus((index + 1) % PANES.length);
-});
-
-register$$1("tab:next", "Ctrl+Tab", () => {
-	PANES[index].adjustTab(+1);
-});
-
-register$$1("tab:prev", "Ctrl+Shift+Tab", () => {
-	PANES[index].adjustTab(-1);
-});
+init();
 
 }());
