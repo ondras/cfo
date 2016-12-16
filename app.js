@@ -15,6 +15,7 @@ const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
 
 function handler(e) {
+		if (e.type == "keypress") alert(e.key);
 	let available = REGISTRY.filter(reg => {
 		if (reg.type != e.type) { return false; }
 
@@ -332,11 +333,16 @@ class Up extends Path {
 	getPath() { return this._path.getPath(); }
 	getChildren() { return this._path.getChildren(); }
 	getParent() { return this._path.getParent(); }
+	getName() { return this._path.getName(); }
 	getImage() { return "up.png"; }
 
 	supports(what) {
 		return (what == CHILDREN);
 	}
+}
+
+function clear(node) {
+	node.innerHTML = "";
 }
 
 function text(t) {
@@ -404,9 +410,8 @@ class List {
 
 	}
 
-	getNode() {
-		return this._node;
-	}
+	getNode() { return this._node; }
+	getPath() { return this._path; }
 
 	setPath(path) {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
@@ -418,6 +423,7 @@ class List {
 			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
 			alert(e.message);
 		});
+		publish("list-change", this);
 	}
 
 	activate() {
@@ -651,7 +657,6 @@ class Tabs {
 		content.style.display = "none";
 
 		let li = node("li");
-		li.innerHTML = "testik";
 		this._list.appendChild(li);
 
 		li.addEventListener("click", this);
@@ -691,6 +696,7 @@ class Pane {
 		this._active = false;
 		this._lists = [];
 		this._tabs = new Tabs();
+		this._labels = [];
 		this._node = node("div", {className:"pane"});
 
 		this._node.addEventListener("click", this);
@@ -699,6 +705,7 @@ class Pane {
 		this._node.appendChild(this._tabs.getNode());
 
 		subscribe("tab-change", this);
+		subscribe("list-change", this);
 
 		let p = new Local("/home/ondras/");
 		this._addList(p);
@@ -728,6 +735,11 @@ class Pane {
 		if (index > -1) { this._tabs.selectedIndex += diff; }
 	}
 
+	getList() {
+		let index = this._tabs.selectedIndex;
+		if (index > -1) { return this._lists[index]; }
+	}
+
 	handleEvent(e) {
 		activate(this);
 	}
@@ -740,19 +752,35 @@ class Pane {
 				if (data.oldIndex > -1) { this._lists[data.oldIndex].deactivate(); }
 				if (data.newIndex > -1) { this._lists[data.newIndex].activate(); }
 			break;
+
+			case "list-change":
+				let index = this._lists.indexOf(publisher);
+				if (index > -1) { 
+					let path = publisher.getPath();
+					if (path) {
+						let label = this._labels[index];
+						clear(label);
+						label.appendChild(text(path.getName()));
+					}
+				}
+			break;
 		}
 	}
 
 	_addList(path) {
 		let list = new List();
 		this._lists.push(list);
-		this._tabs.add(list.getNode());
+
+		let label = this._tabs.add(list.getNode());
+		this._labels.push(label);
 
 		this._tabs.selectedIndex = this._lists.length-1;
 
 		list.setPath(path); 
 	}
 }
+
+const {app} = require("electron").remote;
 
 const PANES = [];
 let index = -1;
@@ -788,6 +816,11 @@ register$$1("tab:next", "Ctrl+Tab", () => {
 
 register$$1("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
+});
+
+register$$1("list:home", "Ctrl+H", () => {
+	let home = new Local(app.getPath("home"));
+	getActive().getList().setPath(home);
 });
 
 window.FIXME = (...args) => console.error(...args);

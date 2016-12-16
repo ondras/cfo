@@ -3,6 +3,7 @@ import Up from "path/up.js";
 import {CHILDREN} from "path/path.js";
 import * as html from "util/html.js";
 import * as format from "util/format.js";
+import * as pubsub from "util/pubsub.js";
 import * as status from "status.js";
 
 const TEMPLATE = document.querySelector("#list");
@@ -42,9 +43,8 @@ export default class List {
 
 	}
 
-	getNode() {
-		return this._node;
-	}
+	getNode() { return this._node; }
+	getPath() { return this._path; }
 
 	setPath(path) {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
@@ -56,6 +56,7 @@ export default class List {
 			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
 			alert(e.message);
 		});
+		pubsub.publish("list-change", this);
 	}
 
 	activate() {

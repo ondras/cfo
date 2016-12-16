@@ -1,5 +1,8 @@
 import * as command from "util/command.js";
 import Pane from "pane.js";
+import LocalPath from "path/local.js";
+
+const {app} = require("electron").remote;
 
 const PANES = [];
 let index = -1;
@@ -35,4 +38,9 @@ command.register("tab:next", "Ctrl+Tab", () => {
 
 command.register("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
+});
+
+command.register("list:home", "Ctrl+H", () => {
+	let home = new LocalPath(app.getPath("home"));
+	getActive().getList().setPath(home);
 });

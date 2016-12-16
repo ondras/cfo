@@ -22,7 +22,6 @@ export default class Tabs {
 		content.style.display = "none";
 
 		let li = html.node("li");
-		li.innerHTML = "testik";
 		this._list.appendChild(li);
 
 		li.addEventListener("click", this);

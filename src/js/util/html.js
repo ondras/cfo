@@ -1,3 +1,7 @@
+export function clear(node) {
+	node.innerHTML = "";
+}
+
 export function text(t) {
 	return document.createTextNode(t);
 }
