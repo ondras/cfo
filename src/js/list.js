@@ -140,11 +140,8 @@ export default class List {
 
 	_activatePath() {
 		let path = this._getFocusedPath();
-		if (path.supports(CHILDREN)) {
-			this.setPath(path);
-		} else {
-			path.activate();
-		}
+		if (!path) { return; }
+		path.activate(this);
 	}
 
 	_show(paths) {

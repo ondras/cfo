@@ -15,7 +15,6 @@ const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
 
 function handler(e) {
-		if (e.type == "keypress") alert(e.key);
 	let available = REGISTRY.filter(reg => {
 		if (reg.type != e.type) { return false; }
 
@@ -159,7 +158,9 @@ class Path {
 	supports(what) {}
 	getParent() {}
 	getChildren() {}
-	activate() {}
+	activate(list) {
+		if (this.supports(CHILDREN)) { list.setPath(this); }
+	}
 }
 
 const CHILDREN = 0;
@@ -277,8 +278,12 @@ class Local extends Path {
 		}
 	}
 
-	activate() {
-		shell.openItem(this._path);
+	activate(list) {
+		if (this.supports(CHILDREN)) {
+			return super.activate(list);
+		} else {
+			shell.openItem(this._path);
+		}
 	}
 
 	getChildren() {
@@ -329,12 +334,10 @@ class Up extends Path {
 		this._path = path;
 	}
 
+	getImage() { return "up.png"; }
 	getDescription() { return this._path.getDescription(); }
 	getPath() { return this._path.getPath(); }
-	getChildren() { return this._path.getChildren(); }
-	getParent() { return this._path.getParent(); }
-	getName() { return this._path.getName(); }
-	getImage() { return "up.png"; }
+	activate(list) { list.setPath(this._path); }
 
 	supports(what) {
 		return (what == CHILDREN);
@@ -507,11 +510,8 @@ class List {
 
 	_activatePath() {
 		let path = this._getFocusedPath();
-		if (path.supports(CHILDREN)) {
-			this.setPath(path);
-		} else {
-			path.activate();
-		}
+		if (!path) { return; }
+		path.activate(this);
 	}
 
 	_show(paths) {

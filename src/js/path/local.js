@@ -87,8 +87,12 @@ export default class Local extends Path {
 		}
 	}
 
-	activate() {
-		shell.openItem(this._path);
+	activate(list) {
+		if (this.supports(CHILDREN)) {
+			return super.activate(list);
+		} else {
+			shell.openItem(this._path);
+		}
 	}
 
 	getChildren() {
