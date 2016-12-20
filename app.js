@@ -493,11 +493,6 @@ class List {
 			case "PageUp": this._focusByPage(-1); break;
 			case "PageDown": this._focusByPage(+1); break;
 
-			case "Backspace":
-				let parent = this._path.getParent();
-				parent && this.setPath(parent);
-			break;
-
 			case "Enter": this._activatePath(); break;
 
 			default:
@@ -737,7 +732,7 @@ class Pane {
 
 	getList() {
 		let index = this._tabs.selectedIndex;
-		if (index > -1) { return this._lists[index]; }
+		return (index > -1 ? this._lists[index] : null);
 	}
 
 	handleEvent(e) {
@@ -816,6 +811,26 @@ register$$1("tab:next", "Ctrl+Tab", () => {
 
 register$$1("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
+});
+
+register$$1("list:up", "Backspace", () => {
+	let list = getActive().getList();
+	let parent = list.getPath().getParent();
+	parent && list.setPath(parent);
+});
+
+register$$1("list:top", "Ctrl+Backspace", () => {
+	let list = getActive().getList();
+	let path = list.getPath();
+	while (true) {
+		let parent = path.getParent();
+		if (parent) { 
+			path = parent;
+		} else {
+			break;
+		}
+	}
+	list.setPath(path);
 });
 
 register$$1("list:home", "Ctrl+H", () => {
