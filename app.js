@@ -15,10 +15,7 @@ const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
 
 function handler(e) {
-		if (e.type == "keypress") alert(e.key);
 	let available = REGISTRY.filter(reg => {
-		if (reg.type != e.type) { return false; }
-
 		for (let m in reg.modifiers) {
 			if (reg.modifiers[m] != e[m]) { return false; }
 		}
@@ -57,13 +54,7 @@ function parse(key) {
 		});
 	});
 
-	if (key.length == 1) {
-		result.key = key.charCodeAt(0);
-		result.type = "keypress";
-	} else {
-		result.code = CODES[key] || key;
-		result.type = "keydown";
-	}
+	result.code = CODES[key] || key;
 
 	return result;
 }
@@ -75,7 +66,6 @@ function register$1(func, key) {
 }
 
 window.addEventListener("keydown", handler);
-window.addEventListener("keypress", handler);
 
 const storage = Object.create(null);
 

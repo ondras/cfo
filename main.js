@@ -1,4 +1,4 @@
-const {app, BrowserWindow, remote, globalShortcut} = require("electron");
+const {app, BrowserWindow, remote, Menu} = require("electron");
 const pkg = require("./package.json");
 
 app.on("window-all-closed", () => {
@@ -6,6 +6,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("ready", () => {
+	Menu.setApplicationMenu(null);
 	let options = {
 		width: pkg.window.width,
 		height: pkg.window.height,
