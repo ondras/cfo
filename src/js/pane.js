@@ -52,7 +52,7 @@ export default class Pane {
 
 	getList() {
 		let index = this._tabs.selectedIndex;
-		if (index > -1) { return this._lists[index]; }
+		return (index > -1 ? this._lists[index] : null);
 	}
 
 	handleEvent(e) {

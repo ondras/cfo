@@ -40,6 +40,26 @@ command.register("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
 });
 
+command.register("list:up", "Backspace", () => {
+	let list = getActive().getList();
+	let parent = list.getPath().getParent();
+	parent && list.setPath(parent);
+});
+
+command.register("list:top", "Ctrl+Backspace", () => {
+	let list = getActive().getList();
+	let path = list.getPath();
+	while (true) {
+		let parent = path.getParent();
+		if (parent) { 
+			path = parent;
+		} else {
+			break;
+		}
+	}
+	list.setPath(path);
+});
+
 command.register("list:home", "Ctrl+H", () => {
 	let home = new LocalPath(app.getPath("home"));
 	getActive().getList().setPath(home);

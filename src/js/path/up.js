@@ -7,12 +7,10 @@ export default class Up extends Path {
 		this._path = path;
 	}
 
+	getImage() { return "up.png"; }
 	getDescription() { return this._path.getDescription(); }
 	getPath() { return this._path.getPath(); }
-	getChildren() { return this._path.getChildren(); }
-	getParent() { return this._path.getParent(); }
-	getName() { return this._path.getName(); }
-	getImage() { return "up.png"; }
+	activate(list) { list.setPath(this._path); }
 
 	supports(what) {
 		return (what == CHILDREN);

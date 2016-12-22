@@ -123,11 +123,6 @@ export default class List {
 			case "PageUp": this._focusByPage(-1); break;
 			case "PageDown": this._focusByPage(+1); break;
 
-			case "Backspace":
-				let parent = this._path.getParent();
-				parent && this.setPath(parent);
-			break;
-
 			case "Enter": this._activatePath(); break;
 
 			default:
@@ -140,11 +135,8 @@ export default class List {
 
 	_activatePath() {
 		let path = this._getFocusedPath();
-		if (path.supports(CHILDREN)) {
-			this.setPath(path);
-		} else {
-			path.activate();
-		}
+		if (!path) { return; }
+		path.activate(this);
 	}
 
 	_show(paths) {

@@ -12,7 +12,9 @@ export default class Path {
 	supports(what) {}
 	getParent() {}
 	getChildren() {}
-	activate() {}
+	activate(list) {
+		if (this.supports(CHILDREN)) { list.setPath(this); }
+	}
 }
 
 export const CHILDREN = 0;

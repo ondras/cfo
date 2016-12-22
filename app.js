@@ -149,7 +149,9 @@ class Path {
 	supports(what) {}
 	getParent() {}
 	getChildren() {}
-	activate() {}
+	activate(list) {
+		if (this.supports(CHILDREN)) { list.setPath(this); }
+	}
 }
 
 const CHILDREN = 0;
@@ -267,8 +269,12 @@ class Local extends Path {
 		}
 	}
 
-	activate() {
-		shell.openItem(this._path);
+	activate(list) {
+		if (this.supports(CHILDREN)) {
+			return super.activate(list);
+		} else {
+			shell.openItem(this._path);
+		}
 	}
 
 	getChildren() {
@@ -319,12 +325,10 @@ class Up extends Path {
 		this._path = path;
 	}
 
+	getImage() { return "up.png"; }
 	getDescription() { return this._path.getDescription(); }
 	getPath() { return this._path.getPath(); }
-	getChildren() { return this._path.getChildren(); }
-	getParent() { return this._path.getParent(); }
-	getName() { return this._path.getName(); }
-	getImage() { return "up.png"; }
+	activate(list) { list.setPath(this._path); }
 
 	supports(what) {
 		return (what == CHILDREN);
@@ -480,11 +484,6 @@ class List {
 			case "PageUp": this._focusByPage(-1); break;
 			case "PageDown": this._focusByPage(+1); break;
 
-			case "Backspace":
-				let parent = this._path.getParent();
-				parent && this.setPath(parent);
-			break;
-
 			case "Enter": this._activatePath(); break;
 
 			default:
@@ -497,11 +496,8 @@ class List {
 
 	_activatePath() {
 		let path = this._getFocusedPath();
-		if (path.supports(CHILDREN)) {
-			this.setPath(path);
-		} else {
-			path.activate();
-		}
+		if (!path) { return; }
+		path.activate(this);
 	}
 
 	_show(paths) {
@@ -727,7 +723,7 @@ class Pane {
 
 	getList() {
 		let index = this._tabs.selectedIndex;
-		if (index > -1) { return this._lists[index]; }
+		return (index > -1 ? this._lists[index] : null);
 	}
 
 	handleEvent(e) {
@@ -806,6 +802,26 @@ register$$1("tab:next", "Ctrl+Tab", () => {
 
 register$$1("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
+});
+
+register$$1("list:up", "Backspace", () => {
+	let list = getActive().getList();
+	let parent = list.getPath().getParent();
+	parent && list.setPath(parent);
+});
+
+register$$1("list:top", "Ctrl+Backspace", () => {
+	let list = getActive().getList();
+	let path = list.getPath();
+	while (true) {
+		let parent = path.getParent();
+		if (parent) { 
+			path = parent;
+		} else {
+			break;
+		}
+	}
+	list.setPath(path);
 });
 
 register$$1("list:home", "Ctrl+H", () => {
