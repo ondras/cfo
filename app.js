@@ -240,7 +240,24 @@ function mkdir(path, mode$$1) {
 	})
 }
 
+function open(path, flags, mode$$1) {
+	return new Promise((resolve, reject) => {
+		fs.open(path, flags, mode$$1, (err, fd) => {
+			if (err) { reject(err); } else { resolve(fd); }
+		});
+	});
+}
+
+function close(fd) {
+	return new Promise((resolve, reject) => {
+		fs.close(fd, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	})
+}
+
 class Local extends Path {
+
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); /* to get rid of a trailing slash */
@@ -299,7 +316,7 @@ class Local extends Path {
 		if (opts.dir) {
 			return mkdir(this._path);
 		} else {
-			// fixme
+			return open(this._path, "wx").then(close);
 		}
 	}
 
@@ -443,6 +460,12 @@ class List {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
 		this._loadPathContents(path);
 		publish("list-change", this);
+	}
+
+	focusInput() {
+		this._input.focus();
+		this._input.selectionStart = 0;
+		this._input.selectionEnd = this._input.value.length;
 	}
 
 	activate() {
@@ -866,13 +889,18 @@ register$$1("list:home", "Ctrl+H", () => {
 	getActive().getList().setPath(home);
 });
 
+register$$1("list:input", "Ctrl+L", () => {
+	getActive().getList().focusInput();
+});
+
 let resolve;
 
-let form = node("form", {id:"prompt"});
-let text$1 = node("p");
-let input = node("input", {type:"text"});
-let ok = node("button", {type:"submit"}, "OK");
-let cancel = node("button", {type:"button"}, "Cancel");
+const body = document.body;
+const form = node("form", {id:"prompt"});
+const text$1 = node("p");
+const input = node("input", {type:"text"});
+const ok = node("button", {type:"submit"}, "OK");
+const cancel = node("button", {type:"button"}, "Cancel");
 
 form.appendChild(text$1);
 form.appendChild(input);
@@ -881,16 +909,17 @@ form.appendChild(cancel);
 
 form.addEventListener("submit", e => {
 	e.preventDefault();
-	close(input.value);
+	close$1(input.value);
 });
 
 function onKeyDown(e) {
-	if (e.key == "Escape") { close(null); }
+	if (e.key == "Escape") { close$1(null); }
 	e.stopPropagation();
 }
 
-function close(value) {
+function close$1(value) {
 	window.removeEventListener("keydown", onKeyDown, true);
+	body.classList.remove("modal");
 	form.parentNode.removeChild(form);
 	resolve(value);
 }
@@ -900,8 +929,11 @@ function prompt(t, value = "") {
 	text$1.appendChild(text(t));
 	input.value = value;
 
-	document.body.appendChild(form);
+	body.classList.add("modal");
+	body.appendChild(form);
 	window.addEventListener("keydown", onKeyDown, true);
+	input.selectionStart = 0;
+	input.selectionEnd = input.value.length;
 	input.focus();
 
 	return new Promise(r => resolve = r);
@@ -952,29 +984,26 @@ register$$1("directory:new", "F7", () => {
 		let newPath = path.append(name);
 		newPath.create({dir:true}).then(
 			() => list.reload(newPath),
-			e => {window.eee = e; alert(`Cannot create "${name}" (${e})`);}
+			e => alert(e.message)
 		);
 	});
 });
 
 register$$1("file:new", "Shift+F4", () => {
-	let path = getActive().getList().getPath();
+	let list = getActive().getList();
+	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
-	var text = _("createfile.name", path.getPath());
-	var title = _("createfile.title");
-	var name = undefined.showPrompt(text, title, FC.getPreference("newname") || "new.txt");
-	if (!name) { return; }
+	/* fixme new.txt mit jako preferenci */
+	prompt(`Create new file in "${path.getPath()}"`, "new.txt").then(name => {
+		if (!name) { return; }
 
-	try {
-		var newFile = path.append(name);
-		newFile.create(false);
-		panel.resync(newFile);
-		/* this.cmdEdit(); */
-	} catch (e) {
-		var text = _("error.create", name, e.name);
-		undefined.showAlert(text);
-	}
+		let newPath = path.append(name);
+		newPath.create({dir:false}).then(
+			() => list.reload(newPath),
+			e => alert(e.message)
+		);
+	});
 });
 
 }());

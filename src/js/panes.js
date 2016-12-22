@@ -64,3 +64,7 @@ command.register("list:home", "Ctrl+H", () => {
 	let home = new LocalPath(app.getPath("home"));
 	getActive().getList().setPath(home);
 });
+
+command.register("list:input", "Ctrl+L", () => {
+	getActive().getList().focusInput();
+});

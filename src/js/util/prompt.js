@@ -2,11 +2,12 @@ import * as html from "util/html.js";
 
 let resolve;
 
-let form = html.node("form", {id:"prompt"});
-let text = html.node("p");
-let input = html.node("input", {type:"text"});
-let ok = html.node("button", {type:"submit"}, "OK");
-let cancel = html.node("button", {type:"button"}, "Cancel");
+const body = document.body;
+const form = html.node("form", {id:"prompt"});
+const text = html.node("p");
+const input = html.node("input", {type:"text"});
+const ok = html.node("button", {type:"submit"}, "OK");
+const cancel = html.node("button", {type:"button"}, "Cancel");
 
 form.appendChild(text);
 form.appendChild(input);
@@ -25,6 +26,7 @@ function onKeyDown(e) {
 
 function close(value) {
 	window.removeEventListener("keydown", onKeyDown, true);
+	body.classList.remove("modal");
 	form.parentNode.removeChild(form);
 	resolve(value);
 }
@@ -34,8 +36,11 @@ export default function prompt(t, value = "") {
 	text.appendChild(html.text(t));
 	input.value = value;
 
-	document.body.appendChild(form);
+	body.classList.add("modal");
+	body.appendChild(form);
 	window.addEventListener("keydown", onKeyDown, true);
+	input.selectionStart = 0;
+	input.selectionEnd = input.value.length;
 	input.focus();
 
 	return new Promise(r => resolve = r);

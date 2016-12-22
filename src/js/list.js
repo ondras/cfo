@@ -57,6 +57,12 @@ export default class List {
 		pubsub.publish("list-change", this);
 	}
 
+	focusInput() {
+		this._input.focus();
+		this._input.selectionStart = 0;
+		this._input.selectionEnd = this._input.value.length;
+	}
+
 	activate() {
 		if (this._active) { return; }
 		this._active = true;
