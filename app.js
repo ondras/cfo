@@ -1,8 +1,8 @@
 (function () {
 'use strict';
 
-/* Accelerator-to-KeyboardEvent.code mapping where not 1:1 */
-const CODES = {
+/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
+const KEYS = {
 	"return": "enter",
 	"left": "arrowleft",
 	"up": "arrowup",
@@ -20,8 +20,7 @@ function handler(e) {
 			if (reg.modifiers[m] != e[m]) { return false; }
 		}
 
-		if ("key" in reg && reg.key != e.key.toLowerCase()) { return false; }
-		if ("code" in reg && reg.code != e.code.toLowerCase()) { return false; }
+		if (reg.key != e.key.toLowerCase()) { return false; }
 
 		return true;
 	});
@@ -54,7 +53,7 @@ function parse(key) {
 		});
 	});
 
-	result.code = CODES[key] || key;
+	result.key = KEYS[key] || key;
 
 	return result;
 }
@@ -152,9 +151,12 @@ class Path {
 	activate(list) {
 		if (this.supports(CHILDREN)) { list.setPath(this); }
 	}
+	append(leaf) {}
+	create(opts) {}
 }
 
-const CHILDREN = 0;
+const CHILDREN = 0; // list children
+const CREATE = 1; // create descendants
 
 const MASK = "rwxrwxrwx";
 
@@ -230,6 +232,14 @@ function readdir(path) {
 	});
 }
 
+function mkdir(path, mode$$1) {
+	return new Promise((resolve, reject) => {
+		fs.mkdir(path, mode$$1, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	})
+}
+
 class Local extends Path {
 	constructor(p) {
 		super();
@@ -240,7 +250,7 @@ class Local extends Path {
 	}
 
 	getPath() { return this._path; }
-	getName() { return path.basename(this._path); }
+	getName() { return path.basename(this._path) || "/"; }
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
@@ -250,7 +260,7 @@ class Local extends Path {
 		let d = this._path;
 		/* fixme relativni */
 		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
-		if (!this._meta_isDirectory) {
+		if (!this._meta.isDirectory) {
 			let size$$1 = this.getSize();
 			/* fixme vynuceny vypnuty autoformat */
 			if (size$$1 !== undefined) { d = `${d}, ${size(size$$1)}`; }
@@ -265,7 +275,10 @@ class Local extends Path {
 
 	supports(what) { 
 		switch (what) {
-			case CHILDREN: return this._meta.isDirectory; break;
+			case CHILDREN:
+			case CREATE:
+				return this._meta.isDirectory;
+			break;
 		}
 	}
 
@@ -274,6 +287,19 @@ class Local extends Path {
 			return super.activate(list);
 		} else {
 			shell.openItem(this._path);
+		}
+	}
+
+	append(leaf) {
+		let newPath = path.resolve(this._path, leaf);
+		return new this.constructor(newPath);
+	}
+
+	create(opts = {}) {
+		if (opts.dir) {
+			return mkdir(this._path);
+		} else {
+			// fixme
 		}
 	}
 
@@ -343,8 +369,9 @@ function text(t) {
 	return document.createTextNode(t);
 }
 
-function node(name, attrs = {}) {
+function node(name, attrs = {}, content = "") {
 	let n = document.createElement(name);
+	content && n.appendChild(text(content));
 	return Object.assign(n, attrs);
 }
 
@@ -407,16 +434,14 @@ class List {
 	getNode() { return this._node; }
 	getPath() { return this._path; }
 
+	reload(pathToBeFocused) {
+		this._pathToBeFocused = pathToBeFocused;
+		this._loadPathContents(this._path);
+	}
+
 	setPath(path) {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
-		this._path = path;
-		path.getChildren().then(paths => {
-			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
-			this._show(paths);
-		}, e => {
-			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
-			alert(e.message);
-		});
+		this._loadPathContents(path);
 		publish("list-change", this);
 	}
 
@@ -492,6 +517,18 @@ class List {
 		}
 
 		return true;
+	}
+
+	_loadPathContents(path) {
+		this._path = path;
+		/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
+		return path.stat().then(() => path.getChildren()).then(paths => {
+			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
+			this._show(paths);
+		}, e => {
+			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
+			alert(e.message);
+		});
 	}
 
 	_activatePath() {
@@ -829,6 +866,47 @@ register$$1("list:home", "Ctrl+H", () => {
 	getActive().getList().setPath(home);
 });
 
+let resolve;
+
+let form = node("form", {id:"prompt"});
+let text$1 = node("p");
+let input = node("input", {type:"text"});
+let ok = node("button", {type:"submit"}, "OK");
+let cancel = node("button", {type:"button"}, "Cancel");
+
+form.appendChild(text$1);
+form.appendChild(input);
+form.appendChild(ok);
+form.appendChild(cancel);
+
+form.addEventListener("submit", e => {
+	e.preventDefault();
+	close(input.value);
+});
+
+function onKeyDown(e) {
+	if (e.key == "Escape") { close(null); }
+	e.stopPropagation();
+}
+
+function close(value) {
+	window.removeEventListener("keydown", onKeyDown, true);
+	form.parentNode.removeChild(form);
+	resolve(value);
+}
+
+function prompt(t, value = "") {
+	clear(text$1);
+	text$1.appendChild(text(t));
+	input.value = value;
+
+	document.body.appendChild(form);
+	window.addEventListener("keydown", onKeyDown, true);
+	input.focus();
+
+	return new Promise(r => resolve = r);
+}
+
 window.FIXME = (...args) => console.error(...args);
 
 String.prototype.fileLocaleCompare = function(other) {
@@ -862,5 +940,41 @@ if (!("".padStart)) {
 }
 
 init();
+
+register$$1("directory:new", "F7", () => {
+	let list = getActive().getList();
+	let path = list.getPath();
+	if (!path.supports(CREATE)) { return; }
+
+	prompt(`Create new directory in "${path.getPath()}"`).then(name => {
+		if (!name) { return; }
+
+		let newPath = path.append(name);
+		newPath.create({dir:true}).then(
+			() => list.reload(newPath),
+			e => {window.eee = e; alert(`Cannot create "${name}" (${e})`);}
+		);
+	});
+});
+
+register$$1("file:new", "Shift+F4", () => {
+	let path = getActive().getList().getPath();
+	if (!path.supports(CREATE)) { return; }
+
+	var text = _("createfile.name", path.getPath());
+	var title = _("createfile.title");
+	var name = undefined.showPrompt(text, title, FC.getPreference("newname") || "new.txt");
+	if (!name) { return; }
+
+	try {
+		var newFile = path.append(name);
+		newFile.create(false);
+		panel.resync(newFile);
+		/* this.cmdEdit(); */
+	} catch (e) {
+		var text = _("error.create", name, e.name);
+		undefined.showAlert(text);
+	}
+});
 
 }());

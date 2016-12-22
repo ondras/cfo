@@ -1,5 +1,5 @@
-/* Accelerator-to-KeyboardEvent.code mapping where not 1:1 */
-const CODES = {
+/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
+const KEYS = {
 	"return": "enter",
 	"left": "arrowleft",
 	"up": "arrowup",
@@ -17,8 +17,7 @@ function handler(e) {
 			if (reg.modifiers[m] != e[m]) { return false; }
 		}
 
-		if ("key" in reg && reg.key != e.key.toLowerCase()) { return false; }
-		if ("code" in reg && reg.code != e.code.toLowerCase()) { return false; }
+		if (reg.key != e.key.toLowerCase()) { return false; }
 
 		return true;
 	});
@@ -51,7 +50,7 @@ function parse(key) {
 		});
 	});
 
-	result.code = CODES[key] || key;
+	result.key = KEYS[key] || key;
 
 	return result;
 }

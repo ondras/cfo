@@ -9,7 +9,7 @@ body {
 	display: flex;
 	flex-direction: column;
 	font: 12px ubuntu;
-	background-color: #e8e8e8;
+	background-color: @bg;
 }
 
 #panes {
@@ -22,6 +22,8 @@ footer {
 	padding: 3px;
 }
 
+@import "variables.less";
 @import "pane.less";
 @import "list.less";
 @import "tabs.less";
+@import "prompt.less";

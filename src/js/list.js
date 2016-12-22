@@ -46,16 +46,14 @@ export default class List {
 	getNode() { return this._node; }
 	getPath() { return this._path; }
 
+	reload(pathToBeFocused) {
+		this._pathToBeFocused = pathToBeFocused;
+		this._loadPathContents(this._path);
+	}
+
 	setPath(path) {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
-		this._path = path;
-		path.getChildren().then(paths => {
-			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
-			this._show(paths);
-		}, e => {
-			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
-			alert(e.message);
-		});
+		this._loadPathContents(path);
 		pubsub.publish("list-change", this);
 	}
 
@@ -131,6 +129,18 @@ export default class List {
 		}
 
 		return true;
+	}
+
+	_loadPathContents(path) {
+		this._path = path;
+		/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
+		return path.stat().then(() => path.getChildren()).then(paths => {
+			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
+			this._show(paths);
+		}, e => {
+			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
+			alert(e.message);
+		});
 	}
 
 	_activatePath() {

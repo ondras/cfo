@@ -1,4 +1,4 @@
-import Path, {CHILDREN} from "./path.js";
+import Path, {CHILDREN, CREATE} from "./path.js";
 import * as format from "util/format.js";
 
 const fs = require("fs");
@@ -48,6 +48,14 @@ function readdir(path) {
 	});
 }
 
+function mkdir(path, mode) {
+	return new Promise((resolve, reject) => {
+		fs.mkdir(path, mode, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	})
+}
+
 export default class Local extends Path {
 	constructor(p) {
 		super();
@@ -58,7 +66,7 @@ export default class Local extends Path {
 	}
 
 	getPath() { return this._path; }
-	getName() { return path.basename(this._path); }
+	getName() { return path.basename(this._path) || "/"; }
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
@@ -68,7 +76,7 @@ export default class Local extends Path {
 		let d = this._path;
 		/* fixme relativni */
 		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
-		if (!this._meta_isDirectory) {
+		if (!this._meta.isDirectory) {
 			let size = this.getSize();
 			/* fixme vynuceny vypnuty autoformat */
 			if (size !== undefined) { d = `${d}, ${format.size(size)}`; }
@@ -83,7 +91,10 @@ export default class Local extends Path {
 
 	supports(what) { 
 		switch (what) {
-			case CHILDREN: return this._meta.isDirectory; break;
+			case CHILDREN:
+			case CREATE:
+				return this._meta.isDirectory;
+			break;
 		}
 	}
 
@@ -92,6 +103,19 @@ export default class Local extends Path {
 			return super.activate(list);
 		} else {
 			shell.openItem(this._path);
+		}
+	}
+
+	append(leaf) {
+		let newPath = path.resolve(this._path, leaf);
+		return new this.constructor(newPath);
+	}
+
+	create(opts = {}) {
+		if (opts.dir) {
+			return mkdir(this._path);
+		} else {
+			// fixme
 		}
 	}
 

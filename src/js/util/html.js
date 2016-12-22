@@ -6,8 +6,9 @@ export function text(t) {
 	return document.createTextNode(t);
 }
 
-export function node(name, attrs = {}) {
+export function node(name, attrs = {}, content = "") {
 	let n = document.createElement(name);
+	content && n.appendChild(text(content));
 	return Object.assign(n, attrs);
 }
 

@@ -15,6 +15,9 @@ export default class Path {
 	activate(list) {
 		if (this.supports(CHILDREN)) { list.setPath(this); }
 	}
+	append(leaf) {}
+	create(opts) {}
 }
 
-export const CHILDREN = 0;
+export const CHILDREN = 0; // list children
+export const CREATE = 1; // create descendants
