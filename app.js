@@ -1,139 +1,6 @@
 (function () {
 'use strict';
 
-/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
-const KEYS = {
-	"return": "enter",
-	"left": "arrowleft",
-	"up": "arrowup",
-	"right": "arrowright",
-	"down": "arrowdown",
-	"esc": "escape"
-};
-
-const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
-const REGISTRY = [];
-
-function handler(e) {
-	let available = REGISTRY.filter(reg => {
-		for (let m in reg.modifiers) {
-			if (reg.modifiers[m] != e[m]) { return false; }
-		}
-
-		if (reg.key != e.key.toLowerCase()) { return false; }
-
-		return true;
-	});
-
-	while (available.length) {
-		let executed = available.pop().func();
-		if (executed) { 
-			e.preventDefault();
-			return;
-		}
-	}
-}
-
-function parse(key) {
-	let result = {
-		func: null,
-		modifiers: {}
-	};
-
-	key = key.toLowerCase();
-
-	MODIFIERS.forEach(mod => {
-		let mkey = mod + "Key";
-		result.modifiers[mkey] = false;
-
-		let re = new RegExp(mod + "[+-]");
-		key = key.replace(re, () => {
-			result.modifiers[mkey] = true;
-			return "";
-		});
-	});
-
-	result.key = KEYS[key] || key;
-
-	return result;
-}
-
-function register$1(func, key) {
-	let item = parse(key);
-	item.func = func;
-	REGISTRY.push(item);
-}
-
-window.addEventListener("keydown", handler);
-
-const storage = Object.create(null);
-
-function publish(message, publisher, data) {
-	let subscribers = storage[message] || [];
-	subscribers.forEach(subscriber => {
-		typeof(subscriber) == "function"
-			? subscriber(message, publisher, data)
-			: subscriber.handleMessage(message, publisher, data);
-	});
-}
-
-function subscribe(message, subscriber) {
-	if (!(message in storage)) { storage[message] = []; }
-	storage[message].push(subscriber);
-}
-
-const document$1 = window.document;
-const registry = Object.create(null);
-
-function syncDisabledAttribute(command) {
-	let enabled = registry[command].enabled;
-	let nodes = Array.from(document$1.querySelectorAll(`[data-command='${command}']`));
-
-	nodes.forEach(n => n.disabled = !enabled);
-}
-
-function register$$1(command, keys, func) {
-	function wrap() {
-		if (isEnabled(command)) {
-			func(command);
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	registry[command] = {
-		func: wrap,
-		enabled: true
-	};
-
-	[].concat(keys || []).forEach(key => register$1(wrap, key));
-
-	return command;
-}
-
-
-
-
-
-function isEnabled(command) {
-	return registry[command].enabled;
-}
-
-function execute(command) {
-	return registry[command].func();
-}
-
-document$1.body.addEventListener("click", e => {
-	let node = e.target;
-	while (node) {
-		let c = node.getAttribute("data-command");
-		if (c) { return execute(c); }
-		if (node == event.currentTarget) { break; }
-		node = node.parentNode;
-	}
-});
-
 class Path {
 	is(other) { return other.getPath() == this.getPath(); }
 	getPath() {}
@@ -157,6 +24,7 @@ class Path {
 
 const CHILDREN = 0; // list children
 const CREATE = 1; // create descendants
+const EDIT = 2; // edit file via the default text editor
 
 const MASK = "rwxrwxrwx";
 
@@ -296,6 +164,10 @@ class Local extends Path {
 			case CREATE:
 				return this._meta.isDirectory;
 			break;
+
+			case EDIT:
+				return !this._meta.isDirectory;
+			break;
 		}
 	}
 
@@ -405,6 +277,22 @@ function scrollIntoView(node, scrollable = node.offsetParent) {
 	if (bottom < 0) { scrollable.scrollTop -= bottom; } /* lower edge below */
 }
 
+const storage = Object.create(null);
+
+function publish(message, publisher, data) {
+	let subscribers = storage[message] || [];
+	subscribers.forEach(subscriber => {
+		typeof(subscriber) == "function"
+			? subscriber(message, publisher, data)
+			: subscriber.handleMessage(message, publisher, data);
+	});
+}
+
+function subscribe(message, subscriber) {
+	if (!(message in storage)) { storage[message] = []; }
+	storage[message].push(subscriber);
+}
+
 const node$1 = document.querySelector("footer");
 
 function set(value) {
@@ -468,6 +356,12 @@ class List {
 		this._input.selectionEnd = this._input.value.length;
 	}
 
+	getFocusedPath() {
+		let index = this._getFocusedIndex();
+		if (index == -1) { return null; }
+		return this._items[index].path;
+	}
+
 	activate() {
 		if (this._active) { return; }
 		this._active = true;
@@ -482,7 +376,7 @@ class List {
 		this._active = false;
 		document.removeEventListener("keydown", this);
 
-		this._pathToBeFocused = this._getFocusedPath();
+		this._pathToBeFocused = this.getFocusedPath();
 		this._removeFocus();
 		this._input.blur();
 	}
@@ -555,7 +449,7 @@ class List {
 	}
 
 	_activatePath() {
-		let path = this._getFocusedPath();
+		let path = this.getFocusedPath();
 		if (!path) { return; }
 		path.activate(this);
 	}
@@ -611,12 +505,6 @@ class List {
 		return this._items.reduce((result, item, index) => {
 			return (item.node == node$$1 ? index : result);
 		}, -1);
-	}
-
-	_getFocusedPath() {
-		let index = this._getFocusedIndex();
-		if (index == -1) { return null; }
-		return this._items[index].path;
 	}
 
 	_getFocusedIndex() {
@@ -826,7 +714,122 @@ class Pane {
 	}
 }
 
-const {app} = require("electron").remote;
+/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
+const KEYS = {
+	"return": "enter",
+	"left": "arrowleft",
+	"up": "arrowup",
+	"right": "arrowright",
+	"down": "arrowdown",
+	"esc": "escape"
+};
+
+const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
+const REGISTRY = [];
+
+function handler(e) {
+	let available = REGISTRY.filter(reg => {
+		for (let m in reg.modifiers) {
+			if (reg.modifiers[m] != e[m]) { return false; }
+		}
+
+		if (reg.key != e.key.toLowerCase()) { return false; }
+
+		return true;
+	});
+
+	while (available.length) {
+		let executed = available.pop().func();
+		if (executed) { 
+			e.preventDefault();
+			return;
+		}
+	}
+}
+
+function parse(key) {
+	let result = {
+		func: null,
+		modifiers: {}
+	};
+
+	key = key.toLowerCase();
+
+	MODIFIERS.forEach(mod => {
+		let mkey = mod + "Key";
+		result.modifiers[mkey] = false;
+
+		let re = new RegExp(mod + "[+-]");
+		key = key.replace(re, () => {
+			result.modifiers[mkey] = true;
+			return "";
+		});
+	});
+
+	result.key = KEYS[key] || key;
+
+	return result;
+}
+
+function register$1(func, key) {
+	let item = parse(key);
+	item.func = func;
+	REGISTRY.push(item);
+}
+
+window.addEventListener("keydown", handler);
+
+const document$1 = window.document;
+const registry = Object.create(null);
+
+function syncDisabledAttribute(command) {
+	let enabled = registry[command].enabled;
+	let nodes = Array.from(document$1.querySelectorAll(`[data-command='${command}']`));
+
+	nodes.forEach(n => n.disabled = !enabled);
+}
+
+function register$$1(command, keys, func) {
+	function wrap() {
+		if (isEnabled(command)) {
+			func(command);
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	registry[command] = {
+		func: wrap,
+		enabled: true
+	};
+
+	[].concat(keys || []).forEach(key => register$1(wrap, key));
+
+	return command;
+}
+
+
+
+
+
+function isEnabled(command) {
+	return registry[command].enabled;
+}
+
+function execute(command) {
+	return registry[command].func();
+}
+
+document$1.body.addEventListener("click", e => {
+	let node = e.target;
+	while (node) {
+		let c = node.getAttribute("data-command");
+		if (c) { return execute(c); }
+		if (node == event.currentTarget) { break; }
+		node = node.parentNode;
+	}
+});
 
 const PANES = [];
 let index = -1;
@@ -862,35 +865,6 @@ register$$1("tab:next", "Ctrl+Tab", () => {
 
 register$$1("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
-});
-
-register$$1("list:up", "Backspace", () => {
-	let list = getActive().getList();
-	let parent = list.getPath().getParent();
-	parent && list.setPath(parent);
-});
-
-register$$1("list:top", "Ctrl+Backspace", () => {
-	let list = getActive().getList();
-	let path = list.getPath();
-	while (true) {
-		let parent = path.getParent();
-		if (parent) { 
-			path = parent;
-		} else {
-			break;
-		}
-	}
-	list.setPath(path);
-});
-
-register$$1("list:home", "Ctrl+H", () => {
-	let home = new Local(app.getPath("home"));
-	getActive().getList().setPath(home);
-});
-
-register$$1("list:input", "Ctrl+L", () => {
-	getActive().getList().focusInput();
 });
 
 let resolve;
@@ -939,39 +913,36 @@ function prompt(t, value = "") {
 	return new Promise(r => resolve = r);
 }
 
-window.FIXME = (...args) => console.error(...args);
+const {app} = require("electron").remote;
 
-String.prototype.fileLocaleCompare = function(other) {
-	for (var i=0;i<Math.max(this.length, other.length);i++) {
-		if (i >= this.length) { return -1; } /* this shorter */
-		if (i >= other.length) { return  1; } /* other shorter */
-		
-		let ch1 = this.charAt(i);
-		let ch2 = other.charAt(i);
-		let c1 = ch1.charCodeAt(0);
-		let c2 = ch2.charCodeAt(0);
-		
-		let special1 = (c1 < 128 && !ch1.match(/a-z/i)); /* non-letter char in this */
-		let special2 = (c2 < 128 && !ch2.match(/a-z/i)); /* non-letter char in other */
-		
-		if (special1 != special2) { return (special1 ? -1 : 1); } /* one has special, second does not */
-		
-		let r = ch1.localeCompare(ch2); /* locale compare these two normal letters */
-		if (r) { return r; }
+register$$1("list:up", "Backspace", () => {
+	let list = getActive().getList();
+	let parent = list.getPath().getParent();
+	parent && list.setPath(parent);
+});
+
+register$$1("list:top", "Ctrl+Backspace", () => {
+	let list = getActive().getList();
+	let path = list.getPath();
+	while (true) {
+		let parent = path.getParent();
+		if (parent) { 
+			path = parent;
+		} else {
+			break;
+		}
 	}
+	list.setPath(path);
+});
 
-	return 0; /* same length, same normal/special positions, same localeCompared normal chars */
-};
+register$$1("list:home", "Ctrl+H", () => {
+	let home = new Local(app.getPath("home"));
+	getActive().getList().setPath(home);
+});
 
-if (!("".padStart)) { 
-	String.prototype.padStart = function(len, what = " ") {
-		let result = this;
-		while (result.length < len) { result = `${what}${result}`; }
-		return result;
-	};
-}
-
-init();
+register$$1("list:input", "Ctrl+L", () => {
+	getActive().getList().focusInput();
+});
 
 register$$1("directory:new", "F7", () => {
 	let list = getActive().getList();
@@ -1005,5 +976,49 @@ register$$1("file:new", "Shift+F4", () => {
 		);
 	});
 });
+
+register$$1("file:edit", "F4", () => {
+	let file = getActive().getList().getFocusedPath();
+	if (!file.supports(EDIT)) { return; }
+
+	/* fixme configurable */
+	let child = require("child_process").spawn("/usr/bin/sublx", [file.getPath()]);
+
+	child.on("error", e => alert(window.eee = e));
+});
+
+window.FIXME = (...args) => console.error(...args);
+
+String.prototype.fileLocaleCompare = function(other) {
+	for (var i=0;i<Math.max(this.length, other.length);i++) {
+		if (i >= this.length) { return -1; } /* this shorter */
+		if (i >= other.length) { return  1; } /* other shorter */
+		
+		let ch1 = this.charAt(i);
+		let ch2 = other.charAt(i);
+		let c1 = ch1.charCodeAt(0);
+		let c2 = ch2.charCodeAt(0);
+		
+		let special1 = (c1 < 128 && !ch1.match(/a-z/i)); /* non-letter char in this */
+		let special2 = (c2 < 128 && !ch2.match(/a-z/i)); /* non-letter char in other */
+		
+		if (special1 != special2) { return (special1 ? -1 : 1); } /* one has special, second does not */
+		
+		let r = ch1.localeCompare(ch2); /* locale compare these two normal letters */
+		if (r) { return r; }
+	}
+
+	return 0; /* same length, same normal/special positions, same localeCompared normal chars */
+};
+
+if (!("".padStart)) { 
+	String.prototype.padStart = function(len, what = " ") {
+		let result = this;
+		while (result.length < len) { result = `${what}${result}`; }
+		return result;
+	};
+}
+
+init();
 
 }());

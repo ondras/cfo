@@ -1,7 +1,5 @@
-import * as command from "util/command.js";
 import * as panes from "panes.js";
-import prompt from "util/prompt.js";
-import { CREATE } from "path/path.js";
+import * as commands from "commands.js";
 
 window.FIXME = (...args) => console.error(...args);
 
@@ -36,36 +34,3 @@ if (!("".padStart)) {
 }
 
 panes.init();
-
-command.register("directory:new", "F7", () => {
-	let list = panes.getActive().getList();
-	let path = list.getPath();
-	if (!path.supports(CREATE)) { return; }
-
-	prompt(`Create new directory in "${path.getPath()}"`).then(name => {
-		if (!name) { return; }
-
-		let newPath = path.append(name);
-		newPath.create({dir:true}).then(
-			() => list.reload(newPath),
-			e => alert(e.message)
-		);
-	});
-});
-
-command.register("file:new", "Shift+F4", () => {
-	let list = panes.getActive().getList();
-	let path = list.getPath();
-	if (!path.supports(CREATE)) { return; }
-
-	/* fixme new.txt mit jako preferenci */
-	prompt(`Create new file in "${path.getPath()}"`, "new.txt").then(name => {
-		if (!name) { return; }
-
-		let newPath = path.append(name);
-		newPath.create({dir:false}).then(
-			() => list.reload(newPath),
-			e => alert(e.message)
-		);
-	});
-});

@@ -21,3 +21,4 @@ export default class Path {
 
 export const CHILDREN = 0; // list children
 export const CREATE = 1; // create descendants
+export const EDIT = 2; // edit file via the default text editor

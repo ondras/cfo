@@ -63,6 +63,12 @@ export default class List {
 		this._input.selectionEnd = this._input.value.length;
 	}
 
+	getFocusedPath() {
+		let index = this._getFocusedIndex();
+		if (index == -1) { return null; }
+		return this._items[index].path;
+	}
+
 	activate() {
 		if (this._active) { return; }
 		this._active = true;
@@ -77,7 +83,7 @@ export default class List {
 		this._active = false;
 		document.removeEventListener("keydown", this);
 
-		this._pathToBeFocused = this._getFocusedPath();
+		this._pathToBeFocused = this.getFocusedPath();
 		this._removeFocus();
 		this._input.blur();
 	}
@@ -150,7 +156,7 @@ export default class List {
 	}
 
 	_activatePath() {
-		let path = this._getFocusedPath();
+		let path = this.getFocusedPath();
 		if (!path) { return; }
 		path.activate(this);
 	}
@@ -206,12 +212,6 @@ export default class List {
 		return this._items.reduce((result, item, index) => {
 			return (item.node == node ? index : result);
 		}, -1);
-	}
-
-	_getFocusedPath() {
-		let index = this._getFocusedIndex();
-		if (index == -1) { return null; }
-		return this._items[index].path;
 	}
 
 	_getFocusedIndex() {

@@ -1,4 +1,4 @@
-import Path, {CHILDREN, CREATE} from "./path.js";
+import Path, {CHILDREN, CREATE, EDIT} from "./path.js";
 import * as format from "util/format.js";
 
 const fs = require("fs");
@@ -112,6 +112,10 @@ export default class Local extends Path {
 			case CREATE:
 				return this._meta.isDirectory;
 			break;
+
+			case EDIT:
+				return !this._meta.isDirectory;
+			break;
 		}
 	}
 
@@ -176,4 +180,3 @@ export default class Local extends Path {
 		});
 	}
 }
-
