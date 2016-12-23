@@ -28,6 +28,8 @@ export default class List {
 		this._pathToBeFocused = null; 
 		this._items = [];
 
+		this._prefix = ""; /* current search prefix */
+
 		let dom = TEMPLATE.content.cloneNode(true);
 
 		this._node = dom.querySelector(".list");
@@ -126,16 +128,46 @@ export default class List {
 
 	_handleKey(key) {
 		switch (key) {
-			case "Home": this._focusAt(0); break;
-			case "End": this._focusAt(this._items.length-1); break;
-			case "ArrowUp": this._focusBy(-1); break;
-			case "ArrowDown": this._focusBy(+1); break;
-			case "PageUp": this._focusByPage(-1); break;
-			case "PageDown": this._focusByPage(+1); break;
+			case "Home": 
+				this._prefix = "";
+				this._focusAt(0);
+			break;
+
+			case "End":
+				this._prefix = "";
+				this._focusAt(this._items.length-1);
+			break;
+
+			case "ArrowUp":
+				this._prefix = "";
+				this._focusBy(-1);
+			break;
+
+			case "ArrowDown":
+				this._prefix = "";
+				this._focusBy(+1);
+			break;
+
+			case "PageUp":
+				this._prefix = "";
+				this._focusByPage(-1);
+			break;
+
+			case "PageDown":
+				this._prefix = "";
+				this._focusByPage(+1);
+			break;
 
 			case "Enter": this._activatePath(); break;
 
+			case "Escape":
+				this._prefix = "";
+				let index = this._getFocusedIndex();
+				if (index > -1) { this._focusAt(index); } /* redraw without prefix highlight */
+			break;
+
 			default:
+				if (key.length == 1) { this._search(key.toLowerCase()); }
 				return false;
 			break;
 		}
@@ -243,7 +275,15 @@ export default class List {
 
 	_removeFocus() {
 		let index = this._getFocusedIndex();
-		if (index > -1) { this._items[index].node.classList.remove("focus"); }
+		if (index > -1) {
+			let tr = this._items[index].node;
+			tr.classList.remove("focus");
+
+			/* remove highlight */
+			let cell = tr.cells[0];
+			let strong = cell.querySelector("strong");
+			if (strong) { strong.parentNode.replaceChild(strong.firstChild, strong); }
+		}
 	}
 
 	_focusAt(index) {
@@ -251,7 +291,6 @@ export default class List {
 		index = Math.min(index, this._items.length-1);
 
 		let oldIndex = this._getFocusedIndex();
-		if (index == oldIndex) { return; }
 
 		this._removeFocus();
 
@@ -259,6 +298,23 @@ export default class List {
 			let node = this._items[index].node;
 			node.classList.add("focus");
 			html.scrollIntoView(node, this._scroll);
+
+			let plen = this._prefix.length;
+			let name = this._items[index].path.getName();
+
+			if (name && plen > 0) { /* highlight prefix */
+				let nameL = name.toLowerCase();
+				if (nameL.indexOf(this._prefix) == 0) {
+					let cell = node.cells[0];
+					let image = cell.querySelector("img");
+					html.clear(cell);
+					cell.appendChild(image);
+
+					let strong = html.node("strong", {}, name.substring(0, plen));
+					cell.appendChild(strong);
+					cell.appendChild(html.text(name.substring(plen)));
+				}
+			}
 
 			status.set(this._items[index].path.getDescription());
 		}
@@ -271,8 +327,24 @@ export default class List {
 		this._focusAt(focusIndex);
 	}
 
+	_search(ch) {
+		let str = `${this._prefix}${ch}`;
+
+		for (let i=0; i<this._items.length; i++) {
+			let name = this._items[i].path.getName();
+			if (!name) { continue; }
+			if (name.toLowerCase().indexOf(str) == 0) { /* found! */
+				this._prefix = str;
+				this._focusAt(i);
+				return;
+			}
+		}
+		/* not found, nothing */
+	}
+
 	_clear() {
 		this._items = [];
 		this._table.innerHTML = "";
+		this._prefix = "";
 	}
 }
