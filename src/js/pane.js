@@ -22,11 +22,7 @@ export default class Pane {
 		pubsub.subscribe("tab-change", this);
 		pubsub.subscribe("list-change", this);
 
-		let p = new LocalPath("/home/ondras/");
-		this._addList(p);
-
-		this._addList(p);
-
+		this.addList();
 	}
 
 	getNode() { return this._node; }
@@ -47,7 +43,10 @@ export default class Pane {
 
 	adjustTab(diff) {
 		let index = this._tabs.selectedIndex;
-		if (index > -1) { this._tabs.selectedIndex += diff; }
+		if (index > -1) { 
+			index = (index + diff + this._lists.length) % this._lists.length; /* js negative modulus */
+			this._tabs.selectedIndex = index;
+		}
 	}
 
 	getList() {
@@ -57,6 +56,41 @@ export default class Pane {
 
 	handleEvent(e) {
 		panes.activate(this);
+	}
+
+	addList(path) {
+		if (!path) { /* either duplicate or home */
+			let index = this._tabs.selectedIndex;
+			path = (index == -1 ? LocalPath.home() : this._lists[index].getPath());
+		}
+
+		let list = new List();
+		this._lists.push(list);
+
+		let label = this._tabs.add(list.getNode());
+		this._labels.push(label);
+
+		this._tabs.selectedIndex = this._labels.length-1;
+
+		list.setPath(path); 
+	}
+
+	removeList() {
+		if (this._lists.length < 2) { return; }
+
+		let index = this._tabs.selectedIndex;
+		if (index == -1) { return; }
+
+		let last = (index+1 == this._lists.length);
+		this._tabs.selectedIndex = -1; /* deselect */
+
+		this._labels.splice(index, 1);
+		this._tabs.remove(index);
+
+		let list = this._lists.splice(index, 1)[0];
+		list.destroy();
+
+		this._tabs.selectedIndex = (last ? index-1 : index);
 	}
 
 	handleMessage(message, publisher, data) {
@@ -82,16 +116,5 @@ export default class Pane {
 		}
 	}
 
-	_addList(path) {
-		let list = new List();
-		this._lists.push(list);
-
-		let label = this._tabs.add(list.getNode());
-		this._labels.push(label);
-
-		this._tabs.selectedIndex = this._lists.length-1;
-
-		list.setPath(path); 
-	}
 }
 

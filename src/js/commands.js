@@ -4,8 +4,6 @@ import * as panes from "panes.js";
 import * as command from "util/command.js";
 import LocalPath from "path/local.js";
 
-const {app} = require("electron").remote;
-
 command.register("list:up", "Backspace", () => {
 	let list = panes.getActive().getList();
 	let parent = list.getPath().getParent();
@@ -27,7 +25,7 @@ command.register("list:top", "Ctrl+Backspace", () => {
 });
 
 command.register("list:home", "Ctrl+H", () => {
-	let home = new LocalPath(app.getPath("home"));
+	let home = LocalPath.home();
 	panes.getActive().getList().setPath(home);
 });
 
@@ -76,4 +74,4 @@ command.register("file:edit", "F4", () => {
 	let child = require("child_process").spawn("/usr/bin/sublx", [file.getPath()]);
 
 	child.on("error", e => alert(e.message));
-});	
+});

@@ -36,3 +36,11 @@ command.register("tab:next", "Ctrl+Tab", () => {
 command.register("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
 });
+
+command.register("tab:new", "Ctrl+T", () => {
+	getActive().addList();
+});
+
+command.register("tab:close", "Ctrl+W", () => {
+	getActive().removeList();
+});

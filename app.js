@@ -55,7 +55,7 @@ function size(bytes) {
 
 const fs = require("fs");
 const path = require("path");
-const {shell} = require("electron");
+const {app, shell} = require("electron").remote;
 
 function statsToMetadata(stats) {
 	return {
@@ -125,6 +125,9 @@ function close(fd) {
 }
 
 class Local extends Path {
+	static home() {
+		return new this(app.getPath("home"));
+	}
 
 	constructor(p) {
 		super();
@@ -598,11 +601,18 @@ class Tabs {
 		return li;
 	}
 
+	remove(index) {
+		let content = this._node.children[index];
+		content.parentNode.removeChild(content);
+
+		let li = this._list.children[index];
+		li.parentNode.removeChild(li);
+	}
+
 	get selectedIndex() { return this._selectedIndex; }
 
 	set selectedIndex(index) {
 		if (index == this._selectedIndex) { return; }
-		index = (index + this._list.children.length) % this._list.children.length; /* js negative modulus */
 
 		let messageData = {
 			oldIndex: this._selectedIndex,
@@ -641,11 +651,7 @@ class Pane {
 		subscribe("tab-change", this);
 		subscribe("list-change", this);
 
-		let p = new Local("/home/ondras/");
-		this._addList(p);
-
-		this._addList(p);
-
+		this.addList();
 	}
 
 	getNode() { return this._node; }
@@ -666,7 +672,10 @@ class Pane {
 
 	adjustTab(diff) {
 		let index = this._tabs.selectedIndex;
-		if (index > -1) { this._tabs.selectedIndex += diff; }
+		if (index > -1) { 
+			index = (index + diff + this._lists.length) % this._lists.length; /* js negative modulus */
+			this._tabs.selectedIndex = index;
+		}
 	}
 
 	getList() {
@@ -676,6 +685,41 @@ class Pane {
 
 	handleEvent(e) {
 		activate(this);
+	}
+
+	addList(path) {
+		if (!path) { /* either duplicate or home */
+			let index = this._tabs.selectedIndex;
+			path = (index == -1 ? Local.home() : this._lists[index].getPath());
+		}
+
+		let list = new List();
+		this._lists.push(list);
+
+		let label = this._tabs.add(list.getNode());
+		this._labels.push(label);
+
+		this._tabs.selectedIndex = this._labels.length-1;
+
+		list.setPath(path); 
+	}
+
+	removeList() {
+		if (this._lists.length < 2) { return; }
+
+		let index = this._tabs.selectedIndex;
+		if (index == -1) { return; }
+
+		let last = (index+1 == this._lists.length);
+		this._tabs.selectedIndex = -1; /* deselect */
+
+		this._labels.splice(index, 1);
+		this._tabs.remove(index);
+
+		let list = this._lists.splice(index, 1)[0];
+		list.destroy();
+
+		this._tabs.selectedIndex = (last ? index-1 : index);
 	}
 
 	handleMessage(message, publisher, data) {
@@ -701,17 +745,6 @@ class Pane {
 		}
 	}
 
-	_addList(path) {
-		let list = new List();
-		this._lists.push(list);
-
-		let label = this._tabs.add(list.getNode());
-		this._labels.push(label);
-
-		this._tabs.selectedIndex = this._lists.length-1;
-
-		list.setPath(path); 
-	}
 }
 
 /* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
@@ -867,6 +900,14 @@ register$$1("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
 });
 
+register$$1("tab:new", "Ctrl+T", () => {
+	getActive().addList();
+});
+
+register$$1("tab:close", "Ctrl+W", () => {
+	getActive().removeList();
+});
+
 let resolve;
 
 const body = document.body;
@@ -913,8 +954,6 @@ function prompt(t, value = "") {
 	return new Promise(r => resolve = r);
 }
 
-const {app} = require("electron").remote;
-
 register$$1("list:up", "Backspace", () => {
 	let list = getActive().getList();
 	let parent = list.getPath().getParent();
@@ -936,7 +975,7 @@ register$$1("list:top", "Ctrl+Backspace", () => {
 });
 
 register$$1("list:home", "Ctrl+H", () => {
-	let home = new Local(app.getPath("home"));
+	let home = Local.home();
 	getActive().getList().setPath(home);
 });
 
@@ -984,7 +1023,7 @@ register$$1("file:edit", "F4", () => {
 	/* fixme configurable */
 	let child = require("child_process").spawn("/usr/bin/sublx", [file.getPath()]);
 
-	child.on("error", e => alert(window.eee = e));
+	child.on("error", e => alert(e.message));
 });
 
 window.FIXME = (...args) => console.error(...args);

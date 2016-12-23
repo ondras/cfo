@@ -3,7 +3,7 @@ import * as format from "util/format.js";
 
 const fs = require("fs");
 const path = require("path");
-const {shell} = require("electron");
+const {app, shell} = require("electron").remote;
 
 function statsToMetadata(stats) {
 	return {
@@ -73,6 +73,9 @@ function close(fd) {
 }
 
 export default class Local extends Path {
+	static home() {
+		return new this(app.getPath("home"));
+	}
 
 	constructor(p) {
 		super();

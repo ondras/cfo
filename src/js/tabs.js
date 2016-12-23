@@ -29,11 +29,18 @@ export default class Tabs {
 		return li;
 	}
 
+	remove(index) {
+		let content = this._node.children[index];
+		content.parentNode.removeChild(content);
+
+		let li = this._list.children[index];
+		li.parentNode.removeChild(li);
+	}
+
 	get selectedIndex() { return this._selectedIndex; }
 
 	set selectedIndex(index) {
 		if (index == this._selectedIndex) { return; }
-		index = (index + this._list.children.length) % this._list.children.length; /* js negative modulus */
 
 		let messageData = {
 			oldIndex: this._selectedIndex,
