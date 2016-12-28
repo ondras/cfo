@@ -1,5 +1,5 @@
-import prompt from "util/prompt.js";
-import { CREATE, EDIT } from "path/path.js";
+import prompt from "ui/prompt.js";
+import { CREATE, EDIT, RENAME } from "path/path.js";
 import * as panes from "panes.js";
 import * as command from "util/command.js";
 import LocalPath from "path/local.js";
@@ -74,4 +74,11 @@ command.register("file:edit", "F4", () => {
 	let child = require("child_process").spawn("/usr/bin/sublx", [file.getPath()]);
 
 	child.on("error", e => alert(e.message));
+});
+
+command.register("file:rename", "F2", () => {
+	let list = panes.getActive().getList();
+	let file = list.getFocusedPath();
+	if (!file.supports(RENAME)) { return; }
+	list.startEditing();
 });

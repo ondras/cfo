@@ -20,11 +20,68 @@ class Path {
 	}
 	append(leaf) {}
 	create(opts) {}
+	rename(newPath) {}
 }
 
 const CHILDREN = 0; // list children
 const CREATE = 1; // create descendants
 const EDIT = 2; // edit file via the default text editor
+const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
+
+const fs$1 = require("fs");
+const path$1 = require("path");
+
+function readlink(linkPath) {
+	return new Promise((resolve, reject) => {
+		fs$1.readlink(linkPath, (err, targetPath) => {
+			if (err) { reject(err); } else {
+				let linkDir = path$1.dirname(linkPath);
+				let finalPath = path$1.resolve(linkDir, targetPath);
+				resolve(finalPath);
+			}
+		});
+	});
+}
+
+function readdir(path) {
+	return new Promise((resolve, reject) => {
+		fs$1.readdir(path, (err, files) => {
+			if (err) { reject(err); } else { resolve(files); }
+		});
+	});
+}
+
+function mkdir(path, mode) {
+	return new Promise((resolve, reject) => {
+		fs$1.mkdir(path, mode, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	})
+}
+
+function open(path, flags, mode) {
+	return new Promise((resolve, reject) => {
+		fs$1.open(path, flags, mode, (err, fd) => {
+			if (err) { reject(err); } else { resolve(fd); }
+		});
+	});
+}
+
+function close(fd) {
+	return new Promise((resolve, reject) => {
+		fs$1.close(fd, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	})
+}
+
+function rename(oldPath, newPath) {
+	return new Promise((resolve, reject) => {
+		fs$1.rename(oldPath, newPath, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	})
+}
 
 const MASK = "rwxrwxrwx";
 
@@ -80,49 +137,6 @@ function getMetadata(path, link) {
 	})
 }
 
-function readlink(linkPath) {
-	return new Promise((resolve, reject) => {
-		fs.readlink(linkPath, (err, targetPath) => {
-			if (err) { reject(err); } else {
-				let linkDir = path.dirname(linkPath);
-				let finalPath = path.resolve(linkDir, targetPath);
-				resolve(finalPath);
-			}
-		});
-	});
-}
-
-function readdir(path) {
-	return new Promise((resolve, reject) => {
-		fs.readdir(path, (err, files) => {
-			if (err) { reject(err); } else { resolve(files); }
-		});
-	});
-}
-
-function mkdir(path, mode$$1) {
-	return new Promise((resolve, reject) => {
-		fs.mkdir(path, mode$$1, err => {
-			if (err) { reject(err); } else { resolve(); }
-		});
-	})
-}
-
-function open(path, flags, mode$$1) {
-	return new Promise((resolve, reject) => {
-		fs.open(path, flags, mode$$1, (err, fd) => {
-			if (err) { reject(err); } else { resolve(fd); }
-		});
-	});
-}
-
-function close(fd) {
-	return new Promise((resolve, reject) => {
-		fs.close(fd, err => {
-			if (err) { reject(err); } else { resolve(); }
-		});
-	})
-}
 
 class Local extends Path {
 	static home() {
@@ -171,6 +185,10 @@ class Local extends Path {
 			case EDIT:
 				return !this._meta.isDirectory;
 			break;
+
+			case RENAME:
+				return true;
+			break;
 		}
 	}
 
@@ -193,6 +211,10 @@ class Local extends Path {
 		} else {
 			return open(this._path, "wx").then(close);
 		}
+	}
+
+	rename(newPath) {
+		return rename(this._path, newPath.getPath());
 	}
 
 	getChildren() {
@@ -236,23 +258,6 @@ class Local extends Path {
 	}
 }
 
-/* fixme tezko rict, jestli cestu takto maskovat, kdyz o patro vys lze jit i klavesovou zkratkou... */
-class Up extends Path {
-	constructor(path) {
-		super();
-		this._path = path;
-	}
-
-	getImage() { return "up.png"; }
-	getDescription() { return this._path.getDescription(); }
-	getPath() { return this._path.getPath(); }
-	activate(list) { list.setPath(this._path); }
-
-	supports(what) {
-		return (what == CHILDREN);
-	}
-}
-
 function clear(node) {
 	node.innerHTML = "";
 }
@@ -278,6 +283,79 @@ function scrollIntoView(node, scrollable = node.offsetParent) {
 
 	if (top < 0) { scrollable.scrollTop += top; } /* upper edge above */
 	if (bottom < 0) { scrollable.scrollTop -= bottom; } /* lower edge below */
+}
+
+class QuickEdit {
+	constructor() {
+		this._resolve = null;
+		this._oldValue = "";
+
+		this._input = node("input", {type:"text"});
+		this._input.addEventListener("keydown", this);
+	}
+
+	start(value, cell) {
+		this._oldValue = value; /* remember so we can put it back on escape */
+
+		let image = cell.querySelector("img");
+		while (image.nextSibling) {
+			image.nextSibling.parentNode.removeChild(image.nextSibling);
+		}
+
+		let width = cell.offsetWidth - image.offsetWidth;
+
+		cell.appendChild(this._input);
+		this._input.style.width = `${width}px`;
+
+		this._input.value = value;
+		this._input.focus();
+		this._input.selectionStart = 0;
+
+		let r = value.match(/\.[^\.]+$/);
+		let len = value.length;
+		this._input.selectionEnd = (r && r[0] != value ? len-r[0].length : len);
+
+		return new Promise(resolve => this._resolve = resolve);
+	}
+
+	stop() {
+		if (!this._resolve) { return; }
+
+		this._input.parentNode.replaceChild(text(this._oldValue), this._input);
+		this._resolve = null;
+	}
+
+	handleEvent(e) {
+		e.stopPropagation();
+
+		switch (e.key) {
+			case "Enter":
+				this._resolve(this._input.value);
+				this.stop();
+			break;
+
+			case "Escape":
+				this.stop();
+			break;
+		}
+	}
+}
+
+/* fixme tezko rict, jestli cestu takto maskovat, kdyz o patro vys lze jit i klavesovou zkratkou... */
+class Up extends Path {
+	constructor(path) {
+		super();
+		this._path = path;
+	}
+
+	getImage() { return "up.png"; }
+	getDescription() { return this._path.getDescription(); }
+	getPath() { return this._path.getPath(); }
+	activate(list) { list.setPath(this._path); }
+
+	supports(what) {
+		return (what == CHILDREN);
+	}
 }
 
 const storage = Object.create(null);
@@ -335,6 +413,8 @@ class List {
 
 		this._table.addEventListener("click", this);
 		this._table.addEventListener("dblclick", this);
+
+		this._quickEdit = new QuickEdit();
 	}
 
 	destroy() {
@@ -369,11 +449,13 @@ class List {
 
 	activate() {
 		if (this._active) { return; }
+
 		this._active = true;
 		document.addEventListener("keydown", this);
 
 		this._focusPath(this._pathToBeFocused);
 		this._pathToBeFocused = null;
+		this._scroll.focus();
 	}
 
 	deactivate() {
@@ -381,9 +463,44 @@ class List {
 		this._active = false;
 		document.removeEventListener("keydown", this);
 
+		this._quickEdit.stop();
+
 		this._pathToBeFocused = this.getFocusedPath();
 		this._removeFocus();
 		this._input.blur();
+	}
+
+	startEditing() {
+		let index = this._getFocusedIndex();
+		if (index == -1) { return; }
+
+		let {node: node$$1, path} = this._items[index];
+		let name = path.getName();
+
+		this._quickEdit.start(name, node$$1.cells[0]).then(text$$1 => {
+			if (text$$1 == name || text$$1 == "") { return; }
+			let newPath = path.getParent().append(text$$1);
+
+			/* FIXME test na existenci! */
+			path.rename(newPath).then(
+				() => this.reload(newPath),
+				e => alert(e.message)
+			);
+
+/*
+			var data = _("rename.exists", newFile.getPath());
+			var title = _("rename.title");
+			if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
+			
+			try {
+				item.rename(newFile);
+				this.resync(newFile);
+			} catch (e) {
+				var data = _("error.rename", item.getPath(), newFile.getPath(), e.message);
+				this._fc.showAlert(data);
+			}
+*/
+		});
 	}
 
 	handleEvent(e) {
@@ -1096,6 +1213,13 @@ register$$1("file:edit", "F4", () => {
 	let child = require("child_process").spawn("/usr/bin/sublx", [file.getPath()]);
 
 	child.on("error", e => alert(e.message));
+});
+
+register$$1("file:rename", "F2", () => {
+	let list = getActive().getList();
+	let file = list.getFocusedPath();
+	if (!file.supports(RENAME)) { return; }
+	list.startEditing();
 });
 
 window.FIXME = (...args) => console.error(...args);

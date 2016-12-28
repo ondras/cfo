@@ -1,3 +1,4 @@
+import QuickEdit from "ui/quickedit.js";
 import Local from "path/local.js";
 import Up from "path/up.js";
 import {CHILDREN} from "path/path.js";
@@ -39,6 +40,8 @@ export default class List {
 
 		this._table.addEventListener("click", this);
 		this._table.addEventListener("dblclick", this);
+
+		this._quickEdit = new QuickEdit();
 	}
 
 	destroy() {
@@ -73,11 +76,13 @@ export default class List {
 
 	activate() {
 		if (this._active) { return; }
+
 		this._active = true;
 		document.addEventListener("keydown", this);
 
 		this._focusPath(this._pathToBeFocused);
 		this._pathToBeFocused = null;
+		this._scroll.focus();
 	}
 
 	deactivate() {
@@ -85,9 +90,44 @@ export default class List {
 		this._active = false;
 		document.removeEventListener("keydown", this);
 
+		this._quickEdit.stop();
+
 		this._pathToBeFocused = this.getFocusedPath();
 		this._removeFocus();
 		this._input.blur();
+	}
+
+	startEditing() {
+		let index = this._getFocusedIndex();
+		if (index == -1) { return; }
+
+		let {node, path} = this._items[index];
+		let name = path.getName();
+
+		this._quickEdit.start(name, node.cells[0]).then(text => {
+			if (text == name || text == "") { return; }
+			let newPath = path.getParent().append(text);
+
+			/* FIXME test na existenci! */
+			path.rename(newPath).then(
+				() => this.reload(newPath),
+				e => alert(e.message)
+			);
+
+/*
+			var data = _("rename.exists", newFile.getPath());
+			var title = _("rename.title");
+			if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
+			
+			try {
+				item.rename(newFile);
+				this.resync(newFile);
+			} catch (e) {
+				var data = _("error.rename", item.getPath(), newFile.getPath(), e.message);
+				this._fc.showAlert(data);
+			}
+*/
+		});
 	}
 
 	handleEvent(e) {

@@ -1,4 +1,5 @@
-import Path, {CHILDREN, CREATE, EDIT} from "./path.js";
+import Path, {CHILDREN, CREATE, EDIT, RENAME} from "./path.js";
+import {readlink, readdir, mkdir, open, close, rename } from "./local-fs.js";
 import * as format from "util/format.js";
 
 const fs = require("fs");
@@ -28,49 +29,6 @@ function getMetadata(path, link) {
 	})
 }
 
-function readlink(linkPath) {
-	return new Promise((resolve, reject) => {
-		fs.readlink(linkPath, (err, targetPath) => {
-			if (err) { reject(err); } else {
-				let linkDir = path.dirname(linkPath);
-				let finalPath = path.resolve(linkDir, targetPath);
-				resolve(finalPath);
-			}
-		});
-	});
-}
-
-function readdir(path) {
-	return new Promise((resolve, reject) => {
-		fs.readdir(path, (err, files) => {
-			if (err) { reject(err); } else { resolve(files); }
-		});
-	});
-}
-
-function mkdir(path, mode) {
-	return new Promise((resolve, reject) => {
-		fs.mkdir(path, mode, err => {
-			if (err) { reject(err); } else { resolve(); }
-		});
-	})
-}
-
-function open(path, flags, mode) {
-	return new Promise((resolve, reject) => {
-		fs.open(path, flags, mode, (err, fd) => {
-			if (err) { reject(err); } else { resolve(fd); }
-		});
-	});
-}
-
-function close(fd) {
-	return new Promise((resolve, reject) => {
-		fs.close(fd, err => {
-			if (err) { reject(err); } else { resolve(); }
-		});
-	})
-}
 
 export default class Local extends Path {
 	static home() {
@@ -119,6 +77,10 @@ export default class Local extends Path {
 			case EDIT:
 				return !this._meta.isDirectory;
 			break;
+
+			case RENAME:
+				return true;
+			break;
 		}
 	}
 
@@ -141,6 +103,10 @@ export default class Local extends Path {
 		} else {
 			return open(this._path, "wx").then(close);
 		}
+	}
+
+	rename(newPath) {
+		return rename(this._path, newPath.getPath());
 	}
 
 	getChildren() {
