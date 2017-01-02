@@ -1,15 +1,7 @@
-* {
-	box-sizing: inherit;
-}
-
 body {
-	box-sizing: border-box;
-	margin: 0;
 	height: 100vh;
 	display: flex;
 	flex-direction: column;
-	font: 12px ubuntu;
-	background-color: @bg;
 }
 
 #panes {
@@ -34,6 +26,7 @@ body.modal::after {
 }
 
 @import "variables.less";
+@import "common.less";
 @import "pane.less";
 @import "list.less";
 @import "tabs.less";

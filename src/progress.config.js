@@ -1,12 +1,11 @@
 import includePaths from "rollup-plugin-includepaths";
 
 let includePathsOptions = {
-	paths: ["src/js"]
+	paths: [`${__dirname}/js`]
 };
 
 export default {
-    entry: "src/js/app.js",
-    dest: "app.js",
+    entry: `${__dirname}/js/progress.js`,
     format: "iife",
     plugins: [ includePaths(includePathsOptions) ]
 };

@@ -1,4 +1,4 @@
-import Pane from "pane.js";
+import Pane from "ui/pane.js";
 import * as command from "util/command.js";
 
 const PANES = [];

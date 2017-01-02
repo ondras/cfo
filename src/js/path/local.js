@@ -1,5 +1,5 @@
 import Path, {CHILDREN, CREATE, EDIT, RENAME} from "./path.js";
-import {readlink, readdir, mkdir, open, close, rename } from "./local-fs.js";
+import {readlink, readdir, mkdir, open, close, rename } from "util/fs.js";
 import * as format from "util/format.js";
 
 const fs = require("fs");
@@ -54,10 +54,11 @@ export default class Local extends Path {
 		let d = this._path;
 		/* fixme relativni */
 		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
+
 		if (!this._meta.isDirectory) {
 			let size = this.getSize();
 			/* fixme vynuceny vypnuty autoformat */
-			if (size !== undefined) { d = `${d}, ${format.size(size)}`; }
+			if (size !== undefined) { d = `${d}, ${format.size(size)} bytes`; }
 		}
 		return d;
 	}
@@ -135,6 +136,13 @@ export default class Local extends Path {
 
 			return readlink(this._path).then(targetPath => {
 				this._target = targetPath;
+
+
+				/*
+				 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
+				 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
+				 */
+				return;
 
 				/* we need to get target isDirectory flag */
 				return getMetadata(this._target, false).then(meta => {

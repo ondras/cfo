@@ -15,8 +15,8 @@
   },
   "scripts": {
     "start": "electron .",
-    "js": "rollup -c",
-    "css": "lessc src/css/app.less > app.css"
+    "rollup": "rollup",
+    "lessc": "lessc"
   },
   "dependencies": {
     "electron": "^1.4.12"

@@ -162,10 +162,11 @@ class Local extends Path {
 		let d = this._path;
 		/* fixme relativni */
 		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
+
 		if (!this._meta.isDirectory) {
 			let size$$1 = this.getSize();
 			/* fixme vynuceny vypnuty autoformat */
-			if (size$$1 !== undefined) { d = `${d}, ${size(size$$1)}`; }
+			if (size$$1 !== undefined) { d = `${d}, ${size(size$$1)} bytes`; }
 		}
 		return d;
 	}
@@ -244,6 +245,13 @@ class Local extends Path {
 			return readlink(this._path).then(targetPath => {
 				this._target = targetPath;
 
+
+				/*
+				 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
+				 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
+				 */
+				return;
+
 				/* we need to get target isDirectory flag */
 				return getMetadata(this._target, false).then(meta => {
 					this._meta.isDirectory = meta.isDirectory;
@@ -255,6 +263,252 @@ class Local extends Path {
 				this._target = e;
 			});
 		});
+	}
+}
+
+/* Progress window - remote (data) part */
+
+const remote = require("electron").remote;
+
+const windowOptions = {
+	parent: remote.getCurrentWindow(),
+	resizable: false,
+	fullscreenable: false,
+	center: true,
+	width: 500,
+	height: 60,
+	useContentSize: true,
+};
+
+class Progress {
+	constructor(config) {
+		this._config = config;
+		this._data = null;
+		this._window = null;
+	}
+
+	open() {
+		let options = Object.assign({}, windowOptions, {title: this._config.title});
+		this._window = new remote.BrowserWindow(windowOptions);
+		this._window.loadURL(`file://${__dirname}/progress.html`);
+		this._window.openDevTools();
+
+		let webContents = this._window.webContents;
+		webContents.once("did-finish-load", () => {
+			webContents.send("config", this._config);
+			webContents.send("data", this._data);
+		});
+	}
+
+	close() {
+//		this._window && this._window.destroy();
+//		this._window = null;
+	}
+
+	update(data) {
+		if (this._window) {
+			this._window.webContents.send("data", data);
+		} else {
+			this._data = data;
+		}
+	}
+}
+
+
+/**
+ * Progressbar window 
+ * @param {object} [data]
+ * @param {string || null} [data.progress1]
+ * @param {string || null} [data.progress2]
+ * @param {string} [data.progress1-label]
+ * @param {string} [data.progress2-label]
+ * @param {string} [data.row1-label]
+ * @param {string} [data.row1-value]
+ * @param {string} [data.row2-label]
+ * @param {string} [data.row2-value]
+ * @param {string} [data.title]
+ * 
+ * @param {object} [mode]
+ * @param {string} [mode.progress1]
+ * @param {string} [mode.progress2]
+ *
+var Progress = function(owner, data, mode) {
+	this._loaded = false;
+	this._owner = owner;
+	this._ec = [];
+	this._data = {
+		"row1-label": "",
+		"row1-value": "",
+		"row2-label": "",
+		"row2-value": "",
+		"progress1-label": "",
+		"progress2-label": "",
+		"progress1": 0,
+		"progress2": 0
+	};
+	
+	this._mode = {
+		"progress1": "determined",
+		"progress2": "determined"
+	}
+	for (var p in mode) { this._mode[p] = mode[p]; }
+	
+	this.update(data);
+	this._win = window.openDialog("progress/progress.xul", "", "chrome,centerscreen");
+
+	this._win.addEventListener("load", this);
+	this._win.addEventListener("dialogcancel", this);
+}
+
+Progress.prototype.handleEvent = function(e) {
+	switch (e.type) {
+		case "load":
+			this._loaded = true;
+			
+			var doc = this._win.document;
+			for (var id in this._mode) { doc.getElementById(id).mode = this._mode[id]; }
+			
+			this._sync(this._data);
+			this._win.sizeToContent();
+		break;
+
+		case "dialogcancel":
+			this._win = null;
+			this._owner.abort();
+		break;
+	}
+}
+
+Progress.prototype.update = function(data) {
+	if (this._loaded) {
+		this._sync(data);
+	} else {
+		for (var p in data) { this._data[p] = data[p]; }
+	}
+}
+
+Progress.prototype.close = function() {
+	if (!this._win) { return; }
+
+	this._win.close();
+	this._win = null;
+}
+
+Progress.prototype.focus = function() {
+	this._win.focus();
+}
+
+Progress.prototype._sync = function(data) {
+	if (!this._win) { return; }
+	
+	var doc = this._win.document;
+	if (data.title) { doc.title = data.title; }
+	
+	for (var p in data) {
+		if (p == "title") { 
+			doc.title = data[p]; 
+		} else {
+			var value = data[p];
+			var elm = doc.getElementById(p);
+			if (value === null) {
+				elm.style.display = "none";
+			} else {
+				elm.style.display = "";
+				elm.value = value;
+			}
+		}
+	}
+}
+*/
+
+const TIMEOUT = 50;
+
+class Operation {
+	constructor() {
+		this._timeout = null;
+		this._progress = null;
+	}
+
+	run() {
+		this._timeout = setTimeout(() => this._showProgress(), TIMEOUT);
+		return Promise.resolve();
+	}
+
+	_end(result) {
+		clearTimeout(this._timeout);
+		this._progress && this._progress.close();
+		return result;
+	}
+
+	_showProgress() {
+		this._progress && this._progress.open();
+	}
+}
+
+function createRecord(path, parent) {
+	return {
+		path,
+		parent,
+		children: [],
+		count: 1,
+		size: 0
+	};
+}
+
+class Scan extends Operation {
+	constructor(path) {
+		super();
+
+		this._root = createRecord(path, null);
+
+		let options = {
+			title: "Directory scanning…",
+			row1: "Scanning:",
+			progress1: " "
+		};
+		this._progress = new Progress(options);
+	}
+
+	run() {
+		super.run();
+		return this._analyze(this._root).then(x => this._end(x));
+	}
+
+	_analyze(record) {
+		this._progress.update({row1: record.path.getPath()});
+
+		if (record.path.supports(CHILDREN)) { /* descend, recurse */
+			return this._analyzeDirectory(record).then(x => {
+				return new Promise(resolve => setTimeout(() => resolve(x), 150));
+			});
+		} else { /* compute */
+			return this._analyzeFile(record);
+		}
+	}
+
+	_analyzeDirectory(record) {
+		return record.path.getChildren().then(children => {
+			record.children = children.map(ch => createRecord(ch, record));
+			let promises = record.children.map(r => this._analyze(r));
+			return Promise.all(promises).then(() => record); /* fulfill with the record */
+		}); /* fixme reject */
+	}
+
+	_analyzeFile(record) {
+		return record.path.stat().then(() => {
+			record.size = record.path.getSize(); /* update this one */
+
+			let current = record;
+			while (current.parent) { /* update all parents */
+				current.parent.count += record.count;
+				current.parent.size += record.size;
+				current = current.parent;
+			}
+
+			return new Promise(resolve => setTimeout(resolve, 150));
+
+//			return record;
+		}); /* fixme reject */
 	}
 }
 
@@ -540,6 +794,8 @@ class List {
 	}
 
 	_handleKey(key) {
+		let index = this._getFocusedIndex();
+
 		switch (key) {
 			case "Home": 
 				this._prefix = "";
@@ -573,9 +829,32 @@ class List {
 
 			case "Enter": this._activatePath(); break;
 
+			case " ":
+				if (index == -1) { return; }
+				let item = this._items[index];
+
+				/* FIXME 
+				if (this._selection.selectionContains(item)) {
+					this._toggleDown();
+					return;
+				}
+				*/
+
+				new Scan(item.path).run().then(result => {
+					if (!result) { return; }
+					item.size = result.size;
+
+					clear(item.node);
+					this._buildRow(item);
+
+					this._prefix = "";
+					this._focusBy(+1);
+					// FIXME this._toggleDown();
+				});
+			break;
+
 			case "Escape":
 				this._prefix = "";
-				let index = this._getFocusedIndex();
 				if (index > -1) { this._focusAt(index); } /* redraw without prefix highlight */
 			break;
 
@@ -630,25 +909,32 @@ class List {
 	_build(paths) {
 		return paths.map(path => {
 			let node$$1 = this._table.insertRow();
+			let item = {node: node$$1, path};
 
-			let td = node$$1.insertCell();
-			let img = node("img", {src:path.getImage()});
-			td.appendChild(img);
-
-			let name = path.getName();
-			if (name) td.appendChild(text(name));
-
-			let size$$1 = path.getSize();
-			node$$1.insertCell().innerHTML = (size$$1 === undefined ? "" : size(size$$1));
-
-			let date$$1 = path.getDate();
-			node$$1.insertCell().innerHTML = (date$$1 === undefined ? "" : date(date$$1));
-
-			let mode$$1 = path.getMode();
-			node$$1.insertCell().innerHTML = (mode$$1 === undefined ? "" : mode(mode$$1));
-
-			return {node: node$$1, path};
+			this._buildRow(item);
+			return item;
 		});
+	}
+
+	_buildRow(item) {
+		let {node: node$$1, path} = item;
+
+		let td = node$$1.insertCell();
+		let img = node("img", {src:path.getImage()});
+		td.appendChild(img);
+
+		let name = path.getName();
+		if (name) { td.appendChild(text(name)); }
+
+		let size$$1 = path.getSize();
+		if (size$$1 === undefined) { size$$1 = item.size; } /* computed value (for directories) */
+		node$$1.insertCell().innerHTML = (size$$1 === undefined ? "" : size(size$$1));
+
+		let date$$1 = path.getDate();
+		node$$1.insertCell().innerHTML = (date$$1 === undefined ? "" : date(date$$1));
+
+		let mode$$1 = path.getMode();
+		node$$1.insertCell().innerHTML = (mode$$1 === undefined ? "" : mode(mode$$1));
 	}
 
 	_nodeToIndex(node$$1) {

@@ -1,6 +1,9 @@
+import Scan from "operation/scan.js";
 import QuickEdit from "ui/quickedit.js";
+
 import Local from "path/local.js";
 import Up from "path/up.js";
+
 import {CHILDREN} from "path/path.js";
 import * as html from "util/html.js";
 import * as format from "util/format.js";
@@ -167,6 +170,8 @@ export default class List {
 	}
 
 	_handleKey(key) {
+		let index = this._getFocusedIndex();
+
 		switch (key) {
 			case "Home": 
 				this._prefix = "";
@@ -200,9 +205,32 @@ export default class List {
 
 			case "Enter": this._activatePath(); break;
 
+			case " ":
+				if (index == -1) { return; }
+				let item = this._items[index];
+
+				/* FIXME 
+				if (this._selection.selectionContains(item)) {
+					this._toggleDown();
+					return;
+				}
+				*/
+
+				new Scan(item.path).run().then(result => {
+					if (!result) { return; }
+					item.size = result.size;
+
+					html.clear(item.node);
+					this._buildRow(item);
+
+					this._prefix = "";
+					this._focusBy(+1);
+					// FIXME this._toggleDown();
+				});
+			break;
+
 			case "Escape":
 				this._prefix = "";
-				let index = this._getFocusedIndex();
 				if (index > -1) { this._focusAt(index); } /* redraw without prefix highlight */
 			break;
 
@@ -257,25 +285,32 @@ export default class List {
 	_build(paths) {
 		return paths.map(path => {
 			let node = this._table.insertRow();
+			let item = {node, path};
 
-			let td = node.insertCell();
-			let img = html.node("img", {src:path.getImage()});
-			td.appendChild(img);
-
-			let name = path.getName();
-			if (name) td.appendChild(html.text(name));
-
-			let size = path.getSize();
-			node.insertCell().innerHTML = (size === undefined ? "" : format.size(size));
-
-			let date = path.getDate();
-			node.insertCell().innerHTML = (date === undefined ? "" : format.date(date));
-
-			let mode = path.getMode();
-			node.insertCell().innerHTML = (mode === undefined ? "" : format.mode(mode));
-
-			return {node, path};
+			this._buildRow(item);
+			return item;
 		});
+	}
+
+	_buildRow(item) {
+		let {node, path} = item;
+
+		let td = node.insertCell();
+		let img = html.node("img", {src:path.getImage()});
+		td.appendChild(img);
+
+		let name = path.getName();
+		if (name) { td.appendChild(html.text(name)); }
+
+		let size = path.getSize();
+		if (size === undefined) { size = item.size; } /* computed value (for directories) */
+		node.insertCell().innerHTML = (size === undefined ? "" : format.size(size));
+
+		let date = path.getDate();
+		node.insertCell().innerHTML = (date === undefined ? "" : format.date(date));
+
+		let mode = path.getMode();
+		node.insertCell().innerHTML = (mode === undefined ? "" : format.mode(mode));
 	}
 
 	_nodeToIndex(node) {

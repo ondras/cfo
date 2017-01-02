@@ -1,6 +1,6 @@
 import LocalPath from "path/local.js";
-import List from "list.js";
-import Tabs from "tabs.js";
+import List from "ui/list.js";
+import Tabs from "ui/tabs.js";
 
 import * as panes from "panes.js";
 import * as pubsub from "util/pubsub.js";

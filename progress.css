@@ -1,0 +1,18 @@
+table {
+  width: 300px;
+  table-layout: fixed;
+}
+td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+* {
+  box-sizing: inherit;
+}
+body {
+  box-sizing: border-box;
+  margin: 0;
+  font: 12px ubuntu;
+  background-color: #e8e8e8;
+}

@@ -1,14 +1,7 @@
-* {
-  box-sizing: inherit;
-}
 body {
-  box-sizing: border-box;
-  margin: 0;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  font: 12px ubuntu;
-  background-color: #e8e8e8;
 }
 #panes {
   flex: 1;
@@ -27,6 +20,15 @@ body.modal::after {
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.4);
+}
+* {
+  box-sizing: inherit;
+}
+body {
+  box-sizing: border-box;
+  margin: 0;
+  font: 12px ubuntu;
+  background-color: #e8e8e8;
 }
 .pane {
   width: 50%;
