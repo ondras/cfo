@@ -23,7 +23,6 @@ export default class Progress {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
 		this._window = new remote.BrowserWindow(windowOptions);
 		this._window.loadURL(`file://${__dirname}/progress.html`);
-		this._window.openDevTools();
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
@@ -33,8 +32,8 @@ export default class Progress {
 	}
 
 	close() {
-//		this._window && this._window.destroy();
-//		this._window = null;
+		this._window && this._window.destroy();
+		this._window = null;
 	}
 
 	update(data) {

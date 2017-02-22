@@ -12,22 +12,22 @@ const progress2 = document.querySelector("#progress-2");
 const DOM = {
 	row1: {
 		node: row1,
-		label: row1.querySelector(".label"),
-		value: row1.querySelector(".value")
+		label: row1.querySelector("dt"),
+		value: row1.querySelector("dd")
 	},
 	row2: {
 		node: row2,
-		label: row2.querySelector(".label"),
-		value: row2.querySelector(".value")
+		label: row2.querySelector("dt"),
+		value: row2.querySelector("dd")
 	},
 	progress1: {
 		node: progress1,
-		label: progress1.querySelector(".label"),
+		label: progress1.querySelector("dt"),
 		value: progress1.querySelector("progress")
 	},
 	progress2: {
 		node: progress2,
-		label: progress2.querySelector(".label"),
+		label: progress2.querySelector("dt"),
 		value: progress2.querySelector("progress")
 	}
 }

@@ -62,9 +62,7 @@ export default class Scan extends Operation {
 				current = current.parent;
 			}
 
-			return new Promise(resolve => setTimeout(resolve, 150));
-
-//			return record;
+			return record;
 		}); /* fixme reject */
 	}
 }

@@ -1,15 +1,22 @@
-body {
-}
+dl {
+	margin: 1em;
 
-table {
-	width: 300px;
-	table-layout: fixed;
-}
+	div {
+		display: flex;
+		flex-direction: row;
 
-td {
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+		dt {
+			flex-basis: 100px;
+		}
+
+		dd {
+			margin: 0;
+			flex: 1;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+	}
 }
 
 @import "variables.less";

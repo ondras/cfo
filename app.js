@@ -291,7 +291,6 @@ class Progress {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
 		this._window = new remote.BrowserWindow(windowOptions);
 		this._window.loadURL(`file://${__dirname}/progress.html`);
-		this._window.openDevTools();
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
@@ -301,8 +300,8 @@ class Progress {
 	}
 
 	close() {
-//		this._window && this._window.destroy();
-//		this._window = null;
+		this._window && this._window.destroy();
+		this._window = null;
 	}
 
 	update(data) {
@@ -505,9 +504,7 @@ class Scan extends Operation {
 				current = current.parent;
 			}
 
-			return new Promise(resolve => setTimeout(resolve, 150));
-
-//			return record;
+			return record;
 		}); /* fixme reject */
 	}
 }
