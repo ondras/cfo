@@ -24,20 +24,20 @@ export default class Scan extends Operation {
 			progress1: " "
 		}
 		this._progress = new Progress(options);
+		this._progress.onClose = () => this.abort();
 	}
 
 	run() {
-		super.run();
+		super.run(); // schedule progress window
 		return this._analyze(this._root).then(x => this._end(x));
 	}
 
 	_analyze(record) {
+		if (this._aborted) { return Promise.resolve(null); }
 		this._progress.update({row1: record.path.getPath()});
 
 		if (record.path.supports(CHILDREN)) { /* descend, recurse */
-			return this._analyzeDirectory(record).then(x => {
-				return new Promise(resolve => setTimeout(() => resolve(x), 150));
-			});
+			return this._analyzeDirectory(record);
 		} else { /* compute */
 			return this._analyzeFile(record);
 		}
@@ -47,8 +47,8 @@ export default class Scan extends Operation {
 		return record.path.getChildren().then(children => {
 			record.children = children.map(ch => createRecord(ch, record));
 			let promises = record.children.map(r => this._analyze(r));
-			return Promise.all(promises).then(() => record); /* fulfill with the record */
-		}); /* fixme reject */
+			return Promise.all(promises).then(() => this._aborted ? null : record); /* fulfill with the record */
+		}, e => this._handleError(e, record));
 	}
 
 	_analyzeFile(record) {
@@ -63,6 +63,20 @@ export default class Scan extends Operation {
 			}
 
 			return record;
-		}); /* fixme reject */
+		}, e => this._handleError(e, record));
+	}
+
+	_handleError(e, record) {
+		let text = e.message;
+		let title = "Error reading file/directory";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let config = { text, title, buttons };
+		return this._processIssue("scan", config).then(result => {
+			switch (result) {
+				case "retry": return this._analyze(record); break;
+				case "abort": this.abort(); return null; break;
+				default: return record; break;
+			}
+		});
 	}
 }

@@ -1,62 +1,50 @@
-/* Progress window - remote (data) part */
+/* Issue window - remote (data) part */
 
 const remote = require("electron").remote;
-const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
 const windowOptions = {
 	parent: remote.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
+	alwaysOnTop: true,
 	center: true,
 	width: 500,
 	height: 60,
 	useContentSize: true,
 }
 
-export default class Progress {
+export default class Issue {
 	constructor(config) {
 		this._config = config;
-		this._data = null;
 		this._window = null;
-		this._timeout = null;
+		this._resolve = null;
 	}
 
 	open() {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
 		this._window = new remote.BrowserWindow(options);
-		this._window.loadURL(`file://${__dirname}/progress.html`);
+		this._window.loadURL(`file://${__dirname}/issue.html`);
+		window.iii = this;
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
 			// fixme can throw when called after the window is closed
 			webContents.send("config", this._config);
-			webContents.send("data", this._data);
+		});
+
+		remote.ipcMain.once("action", (e, action) => {
+			let w = this._window;
+			this._window = null;
+			w.close();
+			this._resolve(action);
 		});
 
 		this._window.on("closed", () => {
 			if (!this._window) { return; } // closed programatically, ignore
 			this._window = null;
-			this.onClose();
+			this._resolve("abort");
 		});
+
+		return new Promise(resolve => this._resolve = resolve);
 	}
-
-	close() {
-		let w = this._window;
-		if (!w) { return; }
-		this._window = null;
-		w.destroy();
-	}
-
-	update(data) {
-		this._data = data;
-		if (!this._window || this._timeout) { return; }
-
-		this._timeout = setTimeout(() => {
-			// fixme can throw when called after the window is closed (but before the "closed" event) 
-			this._timeout = null;
-			this._window && this._window.webContents.send("data", this._data);
-		}, TIMEOUT);
-	}
-
-	onClose() {}
 }

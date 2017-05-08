@@ -1,7 +1,7 @@
 {
   "name": "cfo",
   "version": "0.0.0",
-  "main": "main.js",
+  "main": "index.js",
   "window": {
     "toolbar": false,
     "width": 800,

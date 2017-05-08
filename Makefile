@@ -1,18 +1,27 @@
-ALL := app.js app.css progress.js progress.css
+ALL := app.js app.css progress.js progress.css issue.js issue.css
+JS := $(shell find src/js -name '*.js')
+ROLLUP := npm -s run rollup -- -c src/rollup.config.js
+LESSC := npm -s run lessc --
 
 all: $(ALL)
 
-app.js: $(shell find src/js -name '*.js')
-	npm -s run rollup -- -c src/app.config.js > $@
+app.js: $(JS)
+	$(ROLLUP) src/js/app.js > $@
 
 app.css: src/css/*
-	npm -s run lessc -- src/css/app.less > $@
+	$(LESSC) src/css/app.less > $@
 
-progress.js: $(shell find src/js -name '*.js')
-	npm -s run rollup -- -c src/progress.config.js > $@
+progress.js: $(JS)
+	$(ROLLUP) src/js/progress.js > $@
 
 progress.css: src/css/*
-	npm -s run lessc -- src/css/progress.less > $@
+	$(LESSC) src/css/progress.less > $@
+
+issue.js: $(JS)
+	$(ROLLUP) src/js/issue.js > $@
+
+issue.css: src/css/*
+	$(LESSC) src/css/issue.less > $@
 
 clean:
 	rm -rf $(ALL)

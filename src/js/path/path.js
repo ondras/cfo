@@ -18,9 +18,11 @@ export default class Path {
 	append(leaf) {}
 	create(opts) {}
 	rename(newPath) {}
+	delete() {}
 }
 
 export const CHILDREN = 0; // list children
 export const CREATE = 1; // create descendants
 export const EDIT = 2; // edit file via the default text editor
 export const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
+export const DELETE = 4; // self-explanatory

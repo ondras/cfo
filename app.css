@@ -1,26 +1,3 @@
-body {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-#panes {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-}
-footer {
-  padding: 3px;
-}
-body.modal::after {
-  content: "";
-  display: block;
-  position: fixed;
-  left: 0;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-}
 * {
   box-sizing: inherit;
 }
@@ -29,6 +6,17 @@ body {
   margin: 0;
   font: 12px ubuntu;
   background-color: #e8e8e8;
+}
+.dialog {
+  z-index: 1;
+  position: fixed;
+  max-width: 50%;
+  left: 50%;
+  top: 30%;
+  transform: translate(-50%, -50%);
+  background-color: #e8e8e8;
+  padding: 1em;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
 }
 .pane {
   width: 50%;
@@ -87,18 +75,30 @@ body {
 .tabs li.active {
   font-weight: bold;
 }
-#prompt {
-  z-index: 1;
-  position: fixed;
-  max-width: 50%;
-  left: 50%;
-  top: 30%;
-  transform: translate(-50%, -50%);
-  background-color: #e8e8e8;
-  padding: 1em;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
-}
 #prompt input {
   display: block;
   width: 100%;
+}
+body {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+#panes {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+}
+footer {
+  padding: 3px;
+}
+body.modal::after {
+  content: "";
+  display: block;
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
 }

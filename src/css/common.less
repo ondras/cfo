@@ -8,3 +8,15 @@ body {
 	font: 12px ubuntu;
 	background-color: @bg;
 }
+
+.dialog {
+	z-index: 1;
+	position: fixed;
+	max-width: 50%;
+	left: 50%;
+	top: 30%;
+	transform: translate(-50%, -50%);
+	background-color: @bg;
+	padding: 1em;
+	box-shadow: 0 0 8px rgba(0, 0, 0, 0.9);	
+}

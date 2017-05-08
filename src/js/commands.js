@@ -1,8 +1,11 @@
 import prompt from "ui/prompt.js";
-import { CREATE, EDIT, RENAME } from "path/path.js";
+import confirm from "ui/confirm.js";
+
+import { CREATE, EDIT, RENAME, DELETE } from "path/path.js";
 import * as panes from "panes.js";
 import * as command from "util/command.js";
 import LocalPath from "path/local.js";
+import Delete from "operation/delete.js";
 
 command.register("list:up", "Backspace", () => {
 	let list = panes.getActive().getList();
@@ -76,9 +79,23 @@ command.register("file:edit", "F4", () => {
 	child.on("error", e => alert(e.message));
 });
 
+command.register("file:delete", "Delete", () => {
+	let path = panes.getActive().getList().getFocusedPath();
+	if (!path.supports(DELETE)) { return; }
+
+	confirm(`Really delete "${path.getPath()}" ?`).then(result => {
+		if (!result) { return; }
+		new Delete(path).run(); // fixme then
+	});
+});
+
 command.register("file:rename", "F2", () => {
 	let list = panes.getActive().getList();
 	let file = list.getFocusedPath();
 	if (!file.supports(RENAME)) { return; }
 	list.startEditing();
+});
+
+command.register("app:devtools", "F12", () => {
+	require("electron").remote.getCurrentWindow().toggleDevTools();
 });

@@ -21,12 +21,14 @@ class Path {
 	append(leaf) {}
 	create(opts) {}
 	rename(newPath) {}
+	delete() {}
 }
 
 const CHILDREN = 0; // list children
 const CREATE = 1; // create descendants
 const EDIT = 2; // edit file via the default text editor
 const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
+const DELETE = 4; // self-explanatory
 
 const fs$1 = require("fs");
 const path$1 = require("path");
@@ -56,7 +58,7 @@ function mkdir(path, mode) {
 		fs$1.mkdir(path, mode, err => {
 			if (err) { reject(err); } else { resolve(); }
 		});
-	})
+	});
 }
 
 function open(path, flags, mode) {
@@ -81,6 +83,22 @@ function rename(oldPath, newPath) {
 			if (err) { reject(err); } else { resolve(); }
 		});
 	})
+}
+
+function unlink(path) {
+	return new Promise((resolve, reject) => {
+		fs$1.unlink(path, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	});
+}
+
+function rmdir(path) {
+	return new Promise((resolve, reject) => {
+		fs$1.rmdir(path, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	});
 }
 
 const MASK = "rwxrwxrwx";
@@ -188,6 +206,7 @@ class Local extends Path {
 			break;
 
 			case RENAME:
+			case DELETE:
 				return true;
 			break;
 		}
@@ -216,6 +235,10 @@ class Local extends Path {
 
 	rename(newPath) {
 		return rename(this._path, newPath.getPath());
+	}
+
+	delete() {
+		return this._meta.isDirectory ? rmdir(this._path) : unlink(this._path);
 	}
 
 	getChildren() {
@@ -269,6 +292,7 @@ class Local extends Path {
 /* Progress window - remote (data) part */
 
 const remote = require("electron").remote;
+const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
 const windowOptions = {
 	parent: remote.getCurrentWindow(),
@@ -285,152 +309,117 @@ class Progress {
 		this._config = config;
 		this._data = null;
 		this._window = null;
+		this._timeout = null;
 	}
 
 	open() {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
-		this._window = new remote.BrowserWindow(windowOptions);
+		this._window = new remote.BrowserWindow(options);
 		this._window.loadURL(`file://${__dirname}/progress.html`);
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
+			// fixme can throw when called after the window is closed
 			webContents.send("config", this._config);
 			webContents.send("data", this._data);
+		});
+
+		this._window.on("closed", () => {
+			if (!this._window) { return; } // closed programatically, ignore
+			this._window = null;
+			this.onClose();
 		});
 	}
 
 	close() {
-		this._window && this._window.destroy();
+		let w = this._window;
+		if (!w) { return; }
 		this._window = null;
+		w.destroy();
 	}
 
 	update(data) {
-		if (this._window) {
-			this._window.webContents.send("data", data);
-		} else {
-			this._data = data;
-		}
+		this._data = data;
+		if (!this._window || this._timeout) { return; }
+
+		this._timeout = setTimeout(() => {
+			// fixme can throw when called after the window is closed (but before the "closed" event) 
+			this._timeout = null;
+			this._window && this._window.webContents.send("data", this._data);
+		}, TIMEOUT);
+	}
+
+	onClose() {}
+}
+
+/* Issue window - remote (data) part */
+
+const remote$1 = require("electron").remote;
+
+const windowOptions$1 = {
+	parent: remote$1.getCurrentWindow(),
+	resizable: false,
+	fullscreenable: false,
+	alwaysOnTop: true,
+	center: true,
+	width: 500,
+	height: 60,
+	useContentSize: true,
+};
+
+class Issue {
+	constructor(config) {
+		this._config = config;
+		this._window = null;
+		this._resolve = null;
+	}
+
+	open() {
+		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
+		this._window = new remote$1.BrowserWindow(options);
+		this._window.loadURL(`file://${__dirname}/issue.html`);
+		window.iii = this;
+
+		let webContents = this._window.webContents;
+		webContents.once("did-finish-load", () => {
+			// fixme can throw when called after the window is closed
+			webContents.send("config", this._config);
+		});
+
+		remote$1.ipcMain.once("action", (e, action) => {
+			let w = this._window;
+			this._window = null;
+			w.close();
+			this._resolve(action);
+		});
+
+		this._window.on("closed", () => {
+			if (!this._window) { return; } // closed programatically, ignore
+			this._window = null;
+			this._resolve("abort");
+		});
+
+		return new Promise(resolve => this._resolve = resolve);
 	}
 }
 
-
-/**
- * Progressbar window 
- * @param {object} [data]
- * @param {string || null} [data.progress1]
- * @param {string || null} [data.progress2]
- * @param {string} [data.progress1-label]
- * @param {string} [data.progress2-label]
- * @param {string} [data.row1-label]
- * @param {string} [data.row1-value]
- * @param {string} [data.row2-label]
- * @param {string} [data.row2-value]
- * @param {string} [data.title]
- * 
- * @param {object} [mode]
- * @param {string} [mode.progress1]
- * @param {string} [mode.progress2]
- *
-var Progress = function(owner, data, mode) {
-	this._loaded = false;
-	this._owner = owner;
-	this._ec = [];
-	this._data = {
-		"row1-label": "",
-		"row1-value": "",
-		"row2-label": "",
-		"row2-value": "",
-		"progress1-label": "",
-		"progress2-label": "",
-		"progress1": 0,
-		"progress2": 0
-	};
-	
-	this._mode = {
-		"progress1": "determined",
-		"progress2": "determined"
-	}
-	for (var p in mode) { this._mode[p] = mode[p]; }
-	
-	this.update(data);
-	this._win = window.openDialog("progress/progress.xul", "", "chrome,centerscreen");
-
-	this._win.addEventListener("load", this);
-	this._win.addEventListener("dialogcancel", this);
-}
-
-Progress.prototype.handleEvent = function(e) {
-	switch (e.type) {
-		case "load":
-			this._loaded = true;
-			
-			var doc = this._win.document;
-			for (var id in this._mode) { doc.getElementById(id).mode = this._mode[id]; }
-			
-			this._sync(this._data);
-			this._win.sizeToContent();
-		break;
-
-		case "dialogcancel":
-			this._win = null;
-			this._owner.abort();
-		break;
-	}
-}
-
-Progress.prototype.update = function(data) {
-	if (this._loaded) {
-		this._sync(data);
-	} else {
-		for (var p in data) { this._data[p] = data[p]; }
-	}
-}
-
-Progress.prototype.close = function() {
-	if (!this._win) { return; }
-
-	this._win.close();
-	this._win = null;
-}
-
-Progress.prototype.focus = function() {
-	this._win.focus();
-}
-
-Progress.prototype._sync = function(data) {
-	if (!this._win) { return; }
-	
-	var doc = this._win.document;
-	if (data.title) { doc.title = data.title; }
-	
-	for (var p in data) {
-		if (p == "title") { 
-			doc.title = data[p]; 
-		} else {
-			var value = data[p];
-			var elm = doc.getElementById(p);
-			if (value === null) {
-				elm.style.display = "none";
-			} else {
-				elm.style.display = "";
-				elm.value = value;
-			}
-		}
-	}
-}
-*/
-
-const TIMEOUT = 50;
+const TIMEOUT$1 = 500;
 
 class Operation {
 	constructor() {
 		this._timeout = null;
 		this._progress = null;
+		this._aborted = false;
+		this._issues = {}; // list of potential issues and user resolutions
 	}
 
 	run() {
-		this._timeout = setTimeout(() => this._showProgress(), TIMEOUT);
+		this._timeout = setTimeout(() => this._showProgress(), TIMEOUT$1);
 		return Promise.resolve();
+	}
+
+	abort() {
+		this._aborted = true;
 	}
 
 	_end(result) {
@@ -440,7 +429,18 @@ class Operation {
 	}
 
 	_showProgress() {
-		this._progress && this._progress.open();
+//		this._progress && this._progress.open(); fixme interferuje s issue
+	}
+
+	_processIssue(type, config) {
+		if (type in this._issues) {
+			return Promise.resolve(this._issues[type]);
+		} else {
+			return new Issue(config).open().then(result => {
+				if (result.match("-all")) { this._issues[type] = result; } // remember for futher occurences
+				return result;
+			});
+		}
 	}
 }
 
@@ -466,20 +466,20 @@ class Scan extends Operation {
 			progress1: " "
 		};
 		this._progress = new Progress(options);
+		this._progress.onClose = () => this.abort();
 	}
 
 	run() {
-		super.run();
+		super.run(); // schedule progress window
 		return this._analyze(this._root).then(x => this._end(x));
 	}
 
 	_analyze(record) {
+		if (this._aborted) { return Promise.resolve(null); }
 		this._progress.update({row1: record.path.getPath()});
 
 		if (record.path.supports(CHILDREN)) { /* descend, recurse */
-			return this._analyzeDirectory(record).then(x => {
-				return new Promise(resolve => setTimeout(() => resolve(x), 150));
-			});
+			return this._analyzeDirectory(record);
 		} else { /* compute */
 			return this._analyzeFile(record);
 		}
@@ -489,8 +489,8 @@ class Scan extends Operation {
 		return record.path.getChildren().then(children => {
 			record.children = children.map(ch => createRecord(ch, record));
 			let promises = record.children.map(r => this._analyze(r));
-			return Promise.all(promises).then(() => record); /* fulfill with the record */
-		}); /* fixme reject */
+			return Promise.all(promises).then(() => this._aborted ? null : record); /* fulfill with the record */
+		}, e => this._handleError(e, record));
 	}
 
 	_analyzeFile(record) {
@@ -505,7 +505,21 @@ class Scan extends Operation {
 			}
 
 			return record;
-		}); /* fixme reject */
+		}, e => this._handleError(e, record));
+	}
+
+	_handleError(e, record) {
+		let text = e.message;
+		let title = "Error reading file/directory";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let config = { text, title, buttons };
+		return this._processIssue("scan", config).then(result => {
+			switch (result) {
+				case "retry": return this._analyze(record); break;
+				case "abort": this.abort(); return null; break;
+				default: return record; break;
+			}
+		});
 	}
 }
 
@@ -768,7 +782,7 @@ class List {
 			case "keydown":
 				if (e.target == this._input) { 
 					this._handleInputKey(e.key);
-				} else {
+				} else if (!e.ctrlKey) { // nechceme aby ctrl+l hledalo od "l"
 					let handled = this._handleKey(e.key);
 					if (handled) { e.preventDefault(); }
 				}
@@ -1383,7 +1397,7 @@ register$$1("tab:close", "Ctrl+W", () => {
 let resolve;
 
 const body = document.body;
-const form = node("form", {id:"prompt"});
+const form = node("form", {id:"prompt", className:"dialog"});
 const text$1 = node("p");
 const input = node("input", {type:"text"});
 const ok = node("button", {type:"submit"}, "OK");
@@ -1397,6 +1411,10 @@ form.appendChild(cancel);
 form.addEventListener("submit", e => {
 	e.preventDefault();
 	close$1(input.value);
+});
+
+cancel.addEventListener("click", e => {
+	close$1(false);
 });
 
 function onKeyDown(e) {
@@ -1425,6 +1443,125 @@ function prompt(t, value = "") {
 
 	return new Promise(r => resolve = r);
 }
+
+let resolve$1;
+
+const body$1 = document.body;
+const form$1 = node("form", {id:"confirm", className:"dialog"});
+const text$2 = node("p");
+const ok$1 = node("button", {type:"submit"}, "OK");
+const cancel$1 = node("button", {type:"button"}, "Cancel");
+
+form$1.appendChild(text$2);
+form$1.appendChild(ok$1);
+form$1.appendChild(cancel$1);
+
+form$1.addEventListener("submit", e => {
+	e.preventDefault();
+	close$2(true);
+});
+
+cancel$1.addEventListener("click", e => {
+	close$2(false);
+});
+
+function onKeyDown$1(e) {
+	if (e.key == "Escape") { close$2(false); }
+	e.stopPropagation();
+}
+
+function close$2(value) {
+	window.removeEventListener("keydown", onKeyDown$1, true);
+	body$1.classList.remove("modal");
+	form$1.parentNode.removeChild(form$1);
+	resolve$1(value);
+}
+
+function confirm(t) {
+	clear(text$2);
+	text$2.appendChild(text(t));
+
+	body$1.classList.add("modal");
+	body$1.appendChild(form$1);
+	window.addEventListener("keydown", onKeyDown$1, true);
+	ok$1.focus();
+
+	return new Promise(r => resolve$1 = r);
+}
+
+class Delete extends Operation {
+	constructor(path) {
+		super();
+		this._path = path;
+		this._record = null;
+	}
+
+	run() {
+		return new Scan(this._path).run().then(root => {
+			if (!root) { return Promise.resolve(false); }
+			this._startDeleting(root);
+		});
+	}
+
+	_startDeleting(record) {
+		this._record = record;
+
+		let options = {
+			title: "Deleting…",
+			row1: "Total:",
+			progress1: " "
+
+		};
+		this._progress = new Progress(options);
+		this._progress.onClose = () => this.abort();
+
+		super.run(); // schedule progress window
+
+		return this._doDelete();
+	}
+
+	_doDelete() {
+		// descend to first deletable node
+		while (this._record.children.length > 0) {
+			this._record = this._record.children[0];
+		}
+
+		// show where are we
+		var path = this._record.path;
+		this._progress.update({row1:path.getPath()});
+
+		return path.delete().then(() => {
+			this._record = this._record.parent;
+			if (this._record) {
+				this._record.children.shift();
+				return this._doDelete();
+			}
+			return true;
+		}, e => this._handleError(e));
+	}
+
+	_handleError(e) {
+		let text = e.message;
+		let title = "Error deleting file/directory";
+		let buttons = ["retry", "abort"];
+		let config = { text, title, buttons };
+		return this._processIssue("delete", config).then(result => {
+			switch (result) {
+				case "retry": return this._doDelete(); break;
+				case "abort": this.abort(); return null; break;
+			}
+		});
+	}
+}
+
+/*
+	
+	this._count.total = root.count;
+	this._currentNode = root;
+	
+	this._run();
+}
+*/
 
 register$$1("list:up", "Backspace", () => {
 	let list = getActive().getList();
@@ -1498,11 +1635,25 @@ register$$1("file:edit", "F4", () => {
 	child.on("error", e => alert(e.message));
 });
 
+register$$1("file:delete", "Delete", () => {
+	let path = getActive().getList().getFocusedPath();
+	if (!path.supports(DELETE)) { return; }
+
+	confirm(`Really delete "${path.getPath()}" ?`).then(result => {
+		if (!result) { return; }
+		new Delete(path).run(); // fixme then
+	});
+});
+
 register$$1("file:rename", "F2", () => {
 	let list = getActive().getList();
 	let file = list.getFocusedPath();
 	if (!file.supports(RENAME)) { return; }
 	list.startEditing();
+});
+
+register$$1("app:devtools", "F12", () => {
+	require("electron").remote.getCurrentWindow().toggleDevTools();
 });
 
 window.FIXME = (...args) => console.error(...args);

@@ -3,20 +3,18 @@ import * as html from "util/html.js";
 let resolve;
 
 const body = document.body;
-const form = html.node("form", {id:"prompt", className:"dialog"});
+const form = html.node("form", {id:"confirm", className:"dialog"});
 const text = html.node("p");
-const input = html.node("input", {type:"text"});
 const ok = html.node("button", {type:"submit"}, "OK");
 const cancel = html.node("button", {type:"button"}, "Cancel");
 
 form.appendChild(text);
-form.appendChild(input);
 form.appendChild(ok);
 form.appendChild(cancel);
 
 form.addEventListener("submit", e => {
 	e.preventDefault();
-	close(input.value);
+	close(true);
 });
 
 cancel.addEventListener("click", e => {
@@ -24,7 +22,7 @@ cancel.addEventListener("click", e => {
 });
 
 function onKeyDown(e) {
-	if (e.key == "Escape") { close(null); }
+	if (e.key == "Escape") { close(false); }
 	e.stopPropagation();
 }
 
@@ -35,17 +33,14 @@ function close(value) {
 	resolve(value);
 }
 
-export default function prompt(t, value = "") {
+export default function confirm(t) {
 	html.clear(text);
 	text.appendChild(html.text(t));
-	input.value = value;
 
 	body.classList.add("modal");
 	body.appendChild(form);
 	window.addEventListener("keydown", onKeyDown, true);
-	input.selectionStart = 0;
-	input.selectionEnd = input.value.length;
-	input.focus();
+	ok.focus();
 
 	return new Promise(r => resolve = r);
 }

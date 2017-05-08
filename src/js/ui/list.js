@@ -147,7 +147,7 @@ export default class List {
 			case "keydown":
 				if (e.target == this._input) { 
 					this._handleInputKey(e.key);
-				} else {
+				} else if (!e.ctrlKey) { // nechceme aby ctrl+l hledalo od "l"
 					let handled = this._handleKey(e.key);
 					if (handled) { e.preventDefault(); }
 				}

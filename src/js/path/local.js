@@ -1,5 +1,5 @@
-import Path, {CHILDREN, CREATE, EDIT, RENAME} from "./path.js";
-import {readlink, readdir, mkdir, open, close, rename } from "util/fs.js";
+import Path, {CHILDREN, CREATE, EDIT, RENAME, DELETE } from "./path.js";
+import {readlink, readdir, mkdir, open, close, rename, unlink, rmdir} from "util/fs.js";
 import * as format from "util/format.js";
 
 const fs = require("fs");
@@ -80,6 +80,7 @@ export default class Local extends Path {
 			break;
 
 			case RENAME:
+			case DELETE:
 				return true;
 			break;
 		}
@@ -108,6 +109,10 @@ export default class Local extends Path {
 
 	rename(newPath) {
 		return rename(this._path, newPath.getPath());
+	}
+
+	delete() {
+		return this._meta.isDirectory ? rmdir(this._path) : unlink(this._path);
 	}
 
 	getChildren() {

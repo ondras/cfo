@@ -5,7 +5,6 @@ let includePathsOptions = {
 };
 
 export default {
-    entry: `${__dirname}/js/progress.js`,
-    format: "iife",
-    plugins: [ includePaths(includePathsOptions) ]
+	format: "iife",
+	plugins: [ includePaths(includePathsOptions) ]
 };

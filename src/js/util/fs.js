@@ -26,7 +26,7 @@ export function mkdir(path, mode) {
 		fs.mkdir(path, mode, err => {
 			if (err) { reject(err); } else { resolve(); }
 		});
-	})
+	});
 }
 
 export function open(path, flags, mode) {
@@ -51,4 +51,20 @@ export function rename(oldPath, newPath) {
 			if (err) { reject(err); } else { resolve(); }
 		});
 	})
+}
+
+export function unlink(path) {
+	return new Promise((resolve, reject) => {
+		fs.unlink(path, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	});
+}
+
+export function rmdir(path) {
+	return new Promise((resolve, reject) => {
+		fs.rmdir(path, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	});
 }

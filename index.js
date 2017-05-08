@@ -16,5 +16,4 @@ app.on("ready", () => {
 	win.setMenu(null);
 
 	win.loadURL(`file://${__dirname}/index.html`);
-	win.openDevTools();
 });

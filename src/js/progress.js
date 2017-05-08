@@ -1,6 +1,7 @@
 /* Progress window - local (ui) part */
 
 import * as html from "util/html.js";
+import * as command from "util/command.js";
 
 const electron = require("electron");
 
@@ -72,4 +73,8 @@ electron.ipcRenderer.on("data", (e, data) => {
 		html.clear(node);
 		node.appendChild(html.text(data.row2));
 	}
+});
+
+command.register("window:close", "Escape", () => {
+	window.close();
 });
