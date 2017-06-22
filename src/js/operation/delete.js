@@ -12,7 +12,7 @@ export default class Delete extends Operation {
 	run() {
 		return new Scan(this._path).run().then(root => {
 			if (!root) { return Promise.resolve(false); }
-			this._startDeleting(root);
+			return this._startDeleting(root);
 		});
 	}
 
@@ -34,8 +34,10 @@ export default class Delete extends Operation {
 	}
 
 	_doDelete() {
+		if (this._aborted) { return Promise.resolve(false); }
+
 		// descend to first deletable node
-		while (this._record.children.length > 0) {
+		while (this._record.children && this._record.children.length > 0) {
 			this._record = this._record.children[0];
 		}
 

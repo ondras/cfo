@@ -6,7 +6,7 @@ function createRecord(path, parent) {
 	return {
 		path,
 		parent,
-		children: [],
+		children: null,
 		count: 1,
 		size: 0
 	};

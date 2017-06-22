@@ -19,6 +19,6 @@
     "lessc": "lessc"
   },
   "dependencies": {
-    "electron": "^1.4.12"
+    "electron": "^1.6.11"
   }
 }

@@ -19,6 +19,8 @@ export default class Path {
 	create(opts) {}
 	rename(newPath) {}
 	delete() {}
+
+	createStream(type) {}
 }
 
 export const CHILDREN = 0; // list children

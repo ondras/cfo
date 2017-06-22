@@ -1,50 +1,185 @@
-/*
+// FIXME maintain timestamp, permissions
+import Progress from "ui/progress.js";
+import Operation from "./operation.js";
+import Scan from "./scan.js";
+import {CHILDREN} from "path/path.js";
 
-Operation.Copy = function(sourcePath, targetPath) {
-	Operation.call(this);
-	
-	this._sourcePath = sourcePath;
-	this._targetPath = targetPath;
-	this._prefix = "copy";
-	
-	this._init();
-}
-
-Operation.Copy.prototype = Object.create(Operation.prototype);
-
-Operation.Copy.prototype.run = function() {
-	new Operation.Scan(this._sourcePath).run().then(this._scanDone.bind(this));
-	return this._promise;	
-}
-
-Operation.Copy.prototype._init = function() {
-	this._issues.read = false;
-	this._issues.write = false;
-	this._issues.create = false;
-	this._issues.overwrite = false;
-	this._issues.ln = false;
-	
-	this._current = {
-		is: null,
-		os: null,
-		bytesDone: 0,
-		size: 0
-	};
-
-	this._count = {
-		total: 0,
-		done: 0
+export default class Copy extends Operation {
+	constructor(sourcePath, targetPath) {
+		super();
+		this._sourcePath = sourcePath;
+		this._targetPath = targetPath;
+		this._record = null;
 	}
-} 
 
-Operation.Copy.prototype._scanDone = function(root) {
-	if (!root) { return; } // FIXME urcite? co nejaky callback? 
-	this._count.total = root.size;
+	run() {
+		return new Scan(this._sourcePath).run().then(root => {
+			if (!root) { return Promise.resolve(false); }
+			return this._startCopying(root);
+		});
+	}
+
+	_startCopying(root) {
+		let options = {
+			title: "Copying…",
+			row1: "Total:",
+			progress1: " "
+
+		}
+		this._progress = new Progress(options);
+		this._progress.onClose = () => this.abort();
+
+		super.run(); // schedule progress window
+
+		return this._copy(root, this._targetPath);
+	}
+
+	/**
+	 * @param {object} record Source record
+	 * @param {Path} targetPath Target path without the appended part
+	 */
+	_copy(record, targetPath) {
+		console.log("copying", record.path, "to", targetPath);
+		if (this._aborted) { return Promise.resolve(false); }
+
+		// show where are we FIXME stats etc
+		var path = record.path;
+		this._progress.update({row1:path.getPath()});
+
+		/* create new proper target name */
+		targetPath = targetPath.append(record.path.getName());
+
+		/* FIXME symlinks */
+
+		if (record.children !== null) {
+			return this._copyDirectory(record, targetPath);
+		} else {
+			return this._copyFile(record, targetPath);
+		}
+	}
+
+	// Create a new (non-existant) target path for currently processed source node
+	_createCurrentTarget(record) {
+		// copy to the same file/dir: create a "copy of" clone 
+		// FIXME exists
+		/*
+		if (currentTarget.is(record.path)) {
+			var name = newPath.getName();
+			var parent = newPath.getParent();
+			while (newPath.exists()) { 
+				name = "Copy of " + name;
+				newPath = parent.append(name);
+			}
+			record.targetName = name; // remember as a "renamed" target name for potential children
+		}
+*/
+		return currentTarget;
+	}
+
+	/**
+	 * Copy a directory record to target directory path
+	 * @param {object} record
+	 * @param {Path} targetPath already appended target path
+	 */
+	_copyDirectory(record, targetPath) {
+		return this._createDirectory(targetPath).then(created => {
+			if (!created) { return false; }
+			return this._copyChild(record, targetPath); // recurse to first child
+		});
+	}
+
+	_copyChild(record, targetPath) {
+		if (record.children.length == 0) { return true; }
+
+		return this._copy(record.children[0], targetPath).then(copied => {
+			record.children.shift();
+			return this._copyChild(record, targetPath); // recurse to other children
+		});
+	}
+
+	_createDirectory(path) {
+		let createImpl = () => {
+			return path.create({dir:true}).then(
+				() => true,
+				e => this._handleCreateError(e, path)
+			);
+		}
+
+		return path.stat().then(
+			() => { /* exists! */
+				if (path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
+				return createImpl(); /* already exists as a file, will throw an exception */
+			},
+			createImpl /* does not exist, good */
+		);
+	}
+
+	/**
+	 * Copy a filter record to target file path
+	 * @param {object} record
+	 * @param {Path} targetPath already appended target path
+	 */
+	_copyFile(record, targetPath) {
+		/* FIXME exists */
+
+		let readStream = record.path.createStream("r");
+		let writeStream = targetPath.createStream("w");
+		readStream.pipe(writeStream);
+
+		return new Promise(resolve => {
+			let handleError = e => {
+				return this._handleCopyError(e, record, targetPath).then(resolve);
+			}
+
+			writeStream.on("finish", () => resolve(true));
+			readStream.on("error", handleError);
+			writeStream.on("error", handleError);
+
+			readStream.on("data", buffer => console.log(buffer.length));
+		});
+	}
+
+	_handleCreateError(e, path) {
+		let text = e.message;
+		let title = "Error creating directory";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let config = { text, title, buttons };
+		return this._processIssue("create", config).then(result => {
+			switch (result) {
+				case "retry": return this._createDirectory(path); break;
+				case "abort": this.abort(); return false; break;
+				default: return false; break;
+			}
+		});
+	}
+
+	_handleCopyError(e, record, targetPath) {
+		let text = e.message;
+		let title = "Error copying file";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let config = { text, title, buttons };
+		return this._processIssue("copy", config).then(result => {
+			switch (result) {
+				case "retry": return this._copyFile(record, targetPath); break;
+				case "abort": this.abort(); return false; break;
+				default: return false; break;
+			}
+		});
+	}
+
+}
+
+/*
 	
-	this._node = root;
+	this._count.total = root.count;
+	this._currentNode = root;
 	
 	this._run();
 }
+*/
+
+
+/*
 
 Operation.Copy.prototype._showProgress = function() {
 	var data = {
@@ -118,34 +253,6 @@ Operation.Copy.prototype._iterate = function() {
 	this._updateProgress({"progress1": this._count.done / this._count.total * 100});
 }
 
-// Create a new (non-existant) target path for currently processed source node
-Operation.Copy.prototype._newPath = function(node) {
-	// one-to-one copy with new name
-	if (!this._targetPath.exists() && this._targetPath instanceof Path.Local) { return this._targetPath; }
-	
-	var names = [];
-	var current = node;
-	while (current) {
-		names.unshift(current.targetName || current.path.getName()); // pick either renamed target name, or current leaf name 
-		current = current.parent;
-	};
-	
-	var newPath = this._targetPath;
-	while (names.length) { newPath = newPath.append(names.shift()); }
-
-	// copy to the same file/dir: create a "copy of" clone 
-	if (newPath.equals(node.path)) {
-		var name = newPath.getName();
-		var parent = newPath.getParent();
-		while (newPath.exists()) { 
-			name = "Copy of " + name;
-			newPath = parent.append(name);
-		}
-		node.targetName = name; // remember as a "renamed" target name for potential children
-	}
-
-	return newPath;
-}
 
 
 // @returns {bool} whether the path was created
@@ -188,57 +295,6 @@ Operation.Copy.prototype._createPath = function(newPath, directory, ts) {
 	return this._repeatedAttempt(func, newPath.getPath(), "create");
 }
 
-// We finished copying this node; figure out what's next
-Operation.Copy.prototype._scheduleNext = function() {
-	var current = this._node;
-	
-	while (current.parent && !current.children.length) {
-		this._nodeFinished(current);
-		if (this._state == Operation.ABORTED) { return; }
-
-		// one step up
-		var parent = current.parent;
-		var index = parent.children.indexOf(current);
-		parent.children.splice(index, 1);
-		current = parent;
-	}
-	
-	if (current.children.length) { // still work to do here 
-		this._node = current.children[0];
-	} else { // finished 
-		this._state = Operation.FINISHED;
-		this._nodeFinished(current);
-	}
-}
-
-// This node is finished (including all children). Used only to remove after moving.
-Operation.Copy.prototype._nodeFinished = function(node) {}
-
-// Start copying contents from oldPath to newPath
-Operation.Copy.prototype._copyContents = function(oldPath, newPath) {
-	if (newPath instanceof Path.Zip) { // FIXME? 
-		newPath.createFromPath(oldPath);
-		this._scheduleNext(); 
-		return;
-	}
-	
-	var size = oldPath.getSize() || 0;
-	var os;
-	var func = function() { os = newPath.outputStream(oldPath.getPermissions()); }
-	var created = this._repeatedAttempt(func, newPath.getPath(), "create");
-	if (this._state == Operation.ABORTED) { return; }
-	
-	if (!created) {
-		this._count.done += size;
-		return;
-	}
-
-	this._current.is = oldPath.inputStream();
-	this._current.os = os;
-	this._current.bytesDone = 0;
-	this._current.size = size;
-}
-
 // Try to copy symlink
 Operation.Copy.prototype._copySymlink = function(oldPath, newPath) {
 	// try to locate "ln" 
@@ -275,15 +331,6 @@ Operation.Copy.prototype._copySymlink = function(oldPath, newPath) {
 
 	// if we succeeded, if we did not - this one is done 
 	this._scheduleNext(); 
-}
-
-Operation.Copy.prototype._done = function() {
-	if (this._current.is) {
-		this._current.is.close();
-		this._current.os.close();
-	}
-	
-	return Operation.prototype._done.apply(this, arguments);
 }
 
 */

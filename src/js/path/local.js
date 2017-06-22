@@ -132,6 +132,14 @@ export default class Local extends Path {
 		});
 	}
 
+	createStream(type) {
+		switch (type) {
+			case "r": return fs.createReadStream(this._path); break;
+			case "w": return fs.createWriteStream(this._path); break;
+			default: throw new Error(`Unknown stream type "${type}"`); break;
+		}
+	}
+
 	stat() {
 		return getMetadata(this._path, true).then(meta => {
 			Object.assign(this._meta, meta);

@@ -14,6 +14,10 @@ export function getActive() {
 	return PANES[index];
 }
 
+export function getInactive() {
+	return PANES[(index+1) % 2];
+}
+
 export function init() {
 	PANES.push(new Pane());
 	PANES.push(new Pane());

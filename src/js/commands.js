@@ -6,6 +6,7 @@ import * as panes from "panes.js";
 import * as command from "util/command.js";
 import LocalPath from "path/local.js";
 import Delete from "operation/delete.js";
+import Copy from "operation/copy.js";
 
 command.register("list:up", "Backspace", () => {
 	let list = panes.getActive().getList();
@@ -74,18 +75,21 @@ command.register("file:edit", "F4", () => {
 	if (!file.supports(EDIT)) { return; }
 
 	/* fixme configurable */
-	let child = require("child_process").spawn("/usr/bin/sublx", [file.getPath()]);
+	let child = require("child_process").spawn("/usr/bin/subl", [file.getPath()]);
 
 	child.on("error", e => alert(e.message));
 });
 
-command.register("file:delete", "Delete", () => {
-	let path = panes.getActive().getList().getFocusedPath();
+command.register("file:delete", ["Delete", "F8"], () => {
+	let list = panes.getActive().getList();
+	let path = list.getFocusedPath();
 	if (!path.supports(DELETE)) { return; }
 
 	confirm(`Really delete "${path.getPath()}" ?`).then(result => {
 		if (!result) { return; }
-		new Delete(path).run(); // fixme then
+		new Delete(path).run().then(deleted => {
+			list.reload();
+		});
 	});
 });
 
@@ -94,6 +98,23 @@ command.register("file:rename", "F2", () => {
 	let file = list.getFocusedPath();
 	if (!file.supports(RENAME)) { return; }
 	list.startEditing();
+});
+
+command.register("file:copy", "F5", () => {
+	let sourceList = panes.getActive().getList();
+	let sourcePath = sourceList.getFocusedPath();
+	let targetList = panes.getInactive().getList();
+	let targetPath = targetList.getPath();
+
+	/* fixme parent->child test */
+
+	prompt(`Copy "${sourcePath.getPath()}" to:`, targetPath.getPath()).then(name => {
+		if (!name) { return; }
+		targetPath = new LocalPath(name); // fixme other path types
+		new Copy(sourcePath, targetPath).run().then(copied => {
+			targetList.reload();
+		}); 
+	});
 });
 
 command.register("app:devtools", "F12", () => {
