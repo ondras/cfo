@@ -74,19 +74,10 @@ function register$1(func, key) {
 
 window.addEventListener("keydown", handler);
 
-const storage = Object.create(null);
-
 const document$1 = window.document;
 const registry = Object.create(null);
 
-function syncDisabledAttribute(command) {
-	let enabled = registry[command].enabled;
-	let nodes = Array.from(document$1.querySelectorAll(`[data-command='${command}']`));
-
-	nodes.forEach(n => n.disabled = !enabled);
-}
-
-function register$$1(command, keys, func) {
+function register(command, keys, func) {
 	function wrap() {
 		if (isEnabled(command)) {
 			func(command);
@@ -202,7 +193,7 @@ electron.ipcRenderer.on("data", (e, data) => {
 	}
 });
 
-register$$1("window:close", "Escape", () => {
+register("window:close", "Escape", () => {
 	window.close();
 });
 

@@ -6,19 +6,16 @@ export default class Delete extends Operation {
 	constructor(path) {
 		super();
 		this._path = path;
-		this._record = null;
 	}
 
-	run() {
-		return new Scan(this._path).run().then(root => {
-			if (!root) { return Promise.resolve(false); }
-			return this._startDeleting(root);
-		});
+	async run() {
+		let scan = new Scan(this._path);
+		let root = await scan.run(); 
+		if (!root) { return false; }
+		return this._startDeleting(root);
 	}
 
-	_startDeleting(record) {
-		this._record = record;
-
+	async _startDeleting(record) {
 		let options = {
 			title: "Deleting…",
 			row1: "Total:",
@@ -30,50 +27,44 @@ export default class Delete extends Operation {
 
 		super.run(); // schedule progress window
 
-		return this._doDelete();
+		return this._delete(record);
 	}
 
-	_doDelete() {
-		if (this._aborted) { return Promise.resolve(false); }
+	async _delete(record) {
+		if (this._aborted) { return false; }
 
-		// descend to first deletable node
-		while (this._record.children && this._record.children.length > 0) {
-			this._record = this._record.children[0];
+		let deleted = true;
+
+		if (record.children !== null) {
+			for (let child of record.children) {
+				let childDeleted = await this._delete(child); 
+				if (!childDeleted) { deleted = false; }
+			}
 		}
 
+		if (!deleted) { return false; }
+
 		// show where are we FIXME stats etc
-		var path = this._record.path;
+		var path = record.path;
 		this._progress.update({row1:path.getPath()});
 
-		return path.delete().then(() => {
-			this._record = this._record.parent;
-			if (this._record) {
-				this._record.children.shift();
-				return this._doDelete();
-			}
+		try {
+			await path.delete();
 			return true;
-		}, e => this._handleError(e));
+		} catch (e) {
+			return this._handleError(e, record);
+		}
 	}
 
-	_handleError(e) {
+	async _handleError(e, record) {
 		let text = e.message;
 		let title = "Error deleting file/directory";
-		let buttons = ["retry", "abort"];
-		let config = { text, title, buttons };
-		return this._processIssue("delete", config).then(result => {
-			switch (result) {
-				case "retry": return this._doDelete(); break;
-				case "abort": this.abort(); return null; break;
-			}
-		});
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let result = await this._processIssue("delete", { text, title, buttons });
+		switch (result) {
+			case "retry": return this._delete(record); break;
+			case "abort": this.abort(); return false; break;
+			default: return false; break;
+		}
 	}
 }
-
-/*
-	
-	this._count.total = root.count;
-	this._currentNode = root;
-	
-	this._run();
-}
-*/

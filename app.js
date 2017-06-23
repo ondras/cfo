@@ -14,14 +14,14 @@ class Path {
 
 	supports(what) {}
 	getParent() {}
-	getChildren() {}
+	async getChildren() {}
 	activate(list) {
 		if (this.supports(CHILDREN)) { list.setPath(this); }
 	}
 	append(leaf) {}
-	create(opts) {}
-	rename(newPath) {}
-	delete() {}
+	async create(opts) {}
+	async rename(newPath) {}
+	async delete() {}
 
 	createStream(type) {}
 }
@@ -144,7 +144,7 @@ function statsToMetadata(stats) {
 	}
 }
 
-function getMetadata(path, link) {
+function getMetadata(path, options = {}) {
 	return new Promise((resolve, reject) => {
 		let cb = (err, stats) => {
 			if (err) { 
@@ -153,8 +153,8 @@ function getMetadata(path, link) {
 				resolve(statsToMetadata(stats));
 			}
 		};
-		link ? fs.lstat(path, cb) : fs.stat(path, cb);
-	})
+		options.link ? fs.lstat(path, cb) : fs.stat(path, cb);
+	});
 }
 
 
@@ -227,37 +227,39 @@ class Local extends Path {
 		return new this.constructor(newPath);
 	}
 
-	create(opts = {}) {
+	async create(opts = {}) {
 		if (opts.dir) {
 			return mkdir(this._path);
 		} else {
-			return open(this._path, "wx").then(close);
+			let handle = await open(this._path, "wx");
+			return close(handle);
 		}
 	}
 
-	rename(newPath) {
+	async rename(newPath) {
 		return rename(this._path, newPath.getPath());
 	}
 
-	delete() {
+	async delete() {
 		return this._meta.isDirectory ? rmdir(this._path) : unlink(this._path);
 	}
 
-	getChildren() {
-		return readdir(this._path).then(names => {
-			let paths = names
-				.map(name => path.resolve(this._path, name))
-				.map(name => new this.constructor(name));
+	async getChildren() {
+		let names = await readdir(this._path);
+		let paths = names
+			.map(name => path.resolve(this._path, name))
+			.map(name => new this.constructor(name));
 
-			// safe stat: always fulfills with the path
-			let stat = p => { 
-				let id = () => p;
-				return p.stat().then(id, id);
-			};
+		// safe stat: always fulfills with the path
+		let stat = async p => { 
+			try {
+				await p.stat();
+			} catch (e) {}
+			return p;
+		};
 
-			let promises = paths.map(stat);
-			return Promise.all(promises);
-		});
+		let promises = paths.map(stat);
+		return Promise.all(promises);
 	}
 
 	createStream(type) {
@@ -268,34 +270,33 @@ class Local extends Path {
 		}
 	}
 
-	stat() {
-		return getMetadata(this._path, true).then(meta => {
-			Object.assign(this._meta, meta);
-			if (!meta.isSymbolicLink) { return; }
+	async stat() {
+		let meta = await getMetadata(this._path, {link:true});
+		Object.assign(this._meta, meta);
+		if (!meta.isSymbolicLink) { return; }
 
-			/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
+		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
+		try {
+			let targetPath = await readlink(this._path);
+			this._target = targetPath;
 
-			return readlink(this._path).then(targetPath => {
-				this._target = targetPath;
 
+			/*
+			 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
+			 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
+			 */
+			return;
 
-				/*
-				 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
-				 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
-				 */
-				return;
-
-				/* we need to get target isDirectory flag */
-				return getMetadata(this._target, false).then(meta => {
-					this._meta.isDirectory = meta.isDirectory;
-				}, e => { /* failed to stat link target */
-					delete this._meta.isDirectory;
-				});
-
-			}, e => { /* failed to readlink */
-				this._target = e;
+			/* we need to get target isDirectory flag */
+			return getMetadata(this._target, {link:false}).then(meta => {
+				this._meta.isDirectory = meta.isDirectory;
+			}, e => { /* failed to stat link target */
+				delete this._meta.isDirectory;
 			});
-		});
+
+		} catch (e) { /* failed to readlink */
+			this._target = e;
+		}
 	}
 }
 
@@ -423,33 +424,31 @@ class Operation {
 		this._issues = {}; // list of potential issues and user resolutions
 	}
 
-	run() {
+	async run() {
 		this._timeout = setTimeout(() => this._showProgress(), TIMEOUT$1);
-		return Promise.resolve();
 	}
 
 	abort() {
 		this._aborted = true;
 	}
 
-	_end(result) {
+	_end() {
 		clearTimeout(this._timeout);
 		this._progress && this._progress.close();
-		return result;
 	}
 
 	_showProgress() {
 //		this._progress && this._progress.open(); fixme interferuje s issue
 	}
 
-	_processIssue(type, config) {
+	async _processIssue(type, config) {
 		if (type in this._issues) {
-			return Promise.resolve(this._issues[type]);
+			return this._issues[type];
 		} else {
-			return new Issue(config).open().then(result => {
-				if (result.match("-all")) { this._issues[type] = result; } // remember for futher occurences
-				return result;
-			});
+			let issue = new Issue(config);
+			let result = await issue.open();
+			if (result.match("-all")) { this._issues[type] = result; } // remember for futher occurences
+			return result;
 		}
 	}
 }
@@ -479,13 +478,15 @@ class Scan extends Operation {
 		this._progress.onClose = () => this.abort();
 	}
 
-	run() {
+	async run() {
 		super.run(); // schedule progress window
-		return this._analyze(this._root).then(x => this._end(x));
+		await this._analyze(this._root);
+		this._end();
+		return (this._aborted ? null : this._root);
 	}
 
-	_analyze(record) {
-		if (this._aborted) { return Promise.resolve(null); }
+	async _analyze(record) {
+		if (this._aborted) { return; }
 		this._progress.update({row1: record.path.getPath()});
 
 		if (record.path.supports(CHILDREN)) { /* descend, recurse */
@@ -495,16 +496,21 @@ class Scan extends Operation {
 		}
 	}
 
-	_analyzeDirectory(record) {
-		return record.path.getChildren().then(children => {
+	async _analyzeDirectory(record) {
+		try {
+			let children = await record.path.getChildren();
 			record.children = children.map(ch => createRecord(ch, record));
 			let promises = record.children.map(r => this._analyze(r));
-			return Promise.all(promises).then(() => this._aborted ? null : record); /* fulfill with the record */
-		}, e => this._handleError(e, record));
+			return Promise.all(promises);
+		} catch (e) {
+			return this._handleError(e, record);
+		}
 	}
 
-	_analyzeFile(record) {
-		return record.path.stat().then(() => {
+	async _analyzeFile(record) {
+		try {
+			await record.path.stat();
+
 			record.size = record.path.getSize(); /* update this one */
 
 			let current = record;
@@ -514,22 +520,22 @@ class Scan extends Operation {
 				current = current.parent;
 			}
 
-			return record;
-		}, e => this._handleError(e, record));
+		} catch (e) {
+			return this._handleError(e, record);
+		}
 	}
 
-	_handleError(e, record) {
+	async _handleError(e, record) {
 		let text = e.message;
 		let title = "Error reading file/directory";
 		let buttons = ["retry", "skip", "skip-all", "abort"];
-		let config = { text, title, buttons };
-		return this._processIssue("scan", config).then(result => {
-			switch (result) {
-				case "retry": return this._analyze(record); break;
-				case "abort": this.abort(); return null; break;
-				default: return record; break;
-			}
-		});
+		let result = await this._processIssue("scan", { text, title, buttons });
+
+		switch (result) {
+			case "retry": return this._analyze(record); break;
+			case "abort": this.abort(); return false; break;
+			default: return false; break;
+		}
 	}
 }
 
@@ -745,37 +751,31 @@ class List {
 		this._input.blur();
 	}
 
-	startEditing() {
+	async startEditing() {
 		let index = this._getFocusedIndex();
 		if (index == -1) { return; }
 
 		let {node: node$$1, path} = this._items[index];
 		let name = path.getName();
 
-		this._quickEdit.start(name, node$$1.cells[0]).then(text$$1 => {
-			if (text$$1 == name || text$$1 == "") { return; }
-			let newPath = path.getParent().append(text$$1);
+		let text$$1 = await this._quickEdit.start(name, node$$1.cells[0]);
+		if (text$$1 == name || text$$1 == "") { return; }
+		let newPath = path.getParent().append(text$$1);
 
-			/* FIXME test na existenci! */
-			path.rename(newPath).then(
-				() => this.reload(newPath),
-				e => alert(e.message)
-			);
+		/* FIXME test na existenci! */
+		try {
+			await path.rename(newPath);
+			this.reload(newPath);
+		} catch (e) {
+			alert(e.message);
+		}
 
 /*
-			var data = _("rename.exists", newFile.getPath());
-			var title = _("rename.title");
-			if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
-			
-			try {
-				item.rename(newFile);
-				this.resync(newFile);
-			} catch (e) {
-				var data = _("error.rename", item.getPath(), newFile.getPath(), e.message);
-				this._fc.showAlert(data);
-			}
+		var data = _("rename.exists", newFile.getPath());
+		var title = _("rename.title");
+		if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
+		
 */
-		});
 	}
 
 	handleEvent(e) {
@@ -814,7 +814,7 @@ class List {
 		}
 	}
 
-	_handleKey(key) {
+	async _handleKey(key) {
 		let index = this._getFocusedIndex();
 
 		switch (key) {
@@ -861,17 +861,17 @@ class List {
 				}
 				*/
 
-				new Scan(item.path).run().then(result => {
-					if (!result) { return; }
-					item.size = result.size;
+				let scan = new Scan(item.path);
+				let result = await scan.run();
+				if (!result) { return; }
+				item.size = result.size;
 
-					clear(item.node);
-					this._buildRow(item);
+				clear(item.node);
+				this._buildRow(item);
 
-					this._prefix = "";
-					this._focusBy(+1);
-					// FIXME this._toggleDown();
-				});
+				this._prefix = "";
+				this._focusBy(+1);
+				// FIXME this._toggleDown();
 			break;
 
 			case "Escape":
@@ -888,16 +888,19 @@ class List {
 		return true;
 	}
 
-	_loadPathContents(path) {
+	async _loadPathContents(path) {
 		this._path = path;
-		/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
-		return path.stat().then(() => path.getChildren()).then(paths => {
+
+		try {
+			/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
+			await path.stat();
+			let paths = await path.getChildren();
 			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
 			this._show(paths);
-		}, e => {
+		} catch (e) {
 			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
 			alert(e.message);
-		});
+		}
 	}
 
 	_activatePath() {
@@ -1311,14 +1314,7 @@ window.addEventListener("keydown", handler);
 const document$1 = window.document;
 const registry = Object.create(null);
 
-function syncDisabledAttribute(command) {
-	let enabled = registry[command].enabled;
-	let nodes = Array.from(document$1.querySelectorAll(`[data-command='${command}']`));
-
-	nodes.forEach(n => n.disabled = !enabled);
-}
-
-function register$$1(command, keys, func) {
+function register(command, keys, func) {
 	function wrap() {
 		if (isEnabled(command)) {
 			func(command);
@@ -1387,24 +1383,24 @@ function init() {
 	activate(PANES[0]);
 }
 
-register$$1("pane:toggle", "Tab", () => {
+register("pane:toggle", "Tab", () => {
 	let i = (index + 1) % PANES.length;
 	activate(PANES[i]);
 });
 
-register$$1("tab:next", "Ctrl+Tab", () => {
+register("tab:next", "Ctrl+Tab", () => {
 	getActive().adjustTab(+1);
 });
 
-register$$1("tab:prev", "Ctrl+Shift+Tab", () => {
+register("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
 });
 
-register$$1("tab:new", "Ctrl+T", () => {
+register("tab:new", "Ctrl+T", () => {
 	getActive().addList();
 });
 
-register$$1("tab:close", "Ctrl+W", () => {
+register("tab:close", "Ctrl+W", () => {
 	getActive().removeList();
 });
 
@@ -1507,19 +1503,16 @@ class Delete extends Operation {
 	constructor(path) {
 		super();
 		this._path = path;
-		this._record = null;
 	}
 
-	run() {
-		return new Scan(this._path).run().then(root => {
-			if (!root) { return Promise.resolve(false); }
-			return this._startDeleting(root);
-		});
+	async run() {
+		let scan = new Scan(this._path);
+		let root = await scan.run(); 
+		if (!root) { return false; }
+		return this._startDeleting(root);
 	}
 
-	_startDeleting(record) {
-		this._record = record;
-
+	async _startDeleting(record) {
 		let options = {
 			title: "Deleting…",
 			row1: "Total:",
@@ -1531,53 +1524,47 @@ class Delete extends Operation {
 
 		super.run(); // schedule progress window
 
-		return this._doDelete();
+		return this._delete(record);
 	}
 
-	_doDelete() {
-		if (this._aborted) { return Promise.resolve(false); }
+	async _delete(record) {
+		if (this._aborted) { return false; }
 
-		// descend to first deletable node
-		while (this._record.children && this._record.children.length > 0) {
-			this._record = this._record.children[0];
+		let deleted = true;
+
+		if (record.children !== null) {
+			for (let child of record.children) {
+				let childDeleted = await this._delete(child); 
+				if (!childDeleted) { deleted = false; }
+			}
 		}
 
+		if (!deleted) { return false; }
+
 		// show where are we FIXME stats etc
-		var path = this._record.path;
+		var path = record.path;
 		this._progress.update({row1:path.getPath()});
 
-		return path.delete().then(() => {
-			this._record = this._record.parent;
-			if (this._record) {
-				this._record.children.shift();
-				return this._doDelete();
-			}
+		try {
+			await path.delete();
 			return true;
-		}, e => this._handleError(e));
+		} catch (e) {
+			return this._handleError(e, record);
+		}
 	}
 
-	_handleError(e) {
+	async _handleError(e, record) {
 		let text = e.message;
 		let title = "Error deleting file/directory";
-		let buttons = ["retry", "abort"];
-		let config = { text, title, buttons };
-		return this._processIssue("delete", config).then(result => {
-			switch (result) {
-				case "retry": return this._doDelete(); break;
-				case "abort": this.abort(); return null; break;
-			}
-		});
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let result = await this._processIssue("delete", { text, title, buttons });
+		switch (result) {
+			case "retry": return this._delete(record); break;
+			case "abort": this.abort(); return false; break;
+			default: return false; break;
+		}
 	}
 }
-
-/*
-	
-	this._count.total = root.count;
-	this._currentNode = root;
-	
-	this._run();
-}
-*/
 
 // FIXME maintain timestamp, permissions
 class Copy extends Operation {
@@ -1588,14 +1575,14 @@ class Copy extends Operation {
 		this._record = null;
 	}
 
-	run() {
-		return new Scan(this._sourcePath).run().then(root => {
-			if (!root) { return Promise.resolve(false); }
-			return this._startCopying(root);
-		});
+	async run() {
+		let scan = new Scan(this._sourcePath);
+		let root = await scan.run();
+		if (!root) { return false; }
+		return this._startCopying(root);
 	}
 
-	_startCopying(root) {
+	async _startCopying(root) {
 		let options = {
 			title: "Copying…",
 			row1: "Total:",
@@ -1614,9 +1601,9 @@ class Copy extends Operation {
 	 * @param {object} record Source record
 	 * @param {Path} targetPath Target path without the appended part
 	 */
-	_copy(record, targetPath) {
+	async _copy(record, targetPath) {
 		console.log("copying", record.path, "to", targetPath);
-		if (this._aborted) { return Promise.resolve(false); }
+		if (this._aborted) { return false; }
 
 		// show where are we FIXME stats etc
 		var path = record.path;
@@ -1657,37 +1644,30 @@ class Copy extends Operation {
 	 * @param {object} record
 	 * @param {Path} targetPath already appended target path
 	 */
-	_copyDirectory(record, targetPath) {
-		return this._createDirectory(targetPath).then(created => {
-			if (!created) { return false; }
-			return this._copyChild(record, targetPath); // recurse to first child
-		});
+	async _copyDirectory(record, targetPath) {
+		let created = await this._createDirectory(targetPath);
+		if (!created) { return false; }
+
+		let copied = true;
+		for (let child of record.children) {
+			let childCopied = await this._copy(child, targetPath);
+			if (!childCopied) { copied = false; }
+		}
+		return copied;
 	}
 
-	_copyChild(record, targetPath) {
-		if (record.children.length == 0) { return true; }
+	async _createDirectory(path) {
+		try { // FIXME exists() ?
+			await path.stat();
+			if (path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
+		} catch (e) {} /* does not exist, good */
 
-		return this._copy(record.children[0], targetPath).then(copied => {
-			record.children.shift();
-			return this._copyChild(record, targetPath); // recurse to other children
-		});
-	}
-
-	_createDirectory(path) {
-		let createImpl = () => {
-			return path.create({dir:true}).then(
-				() => true,
-				e => this._handleCreateError(e, path)
-			);
-		};
-
-		return path.stat().then(
-			() => { /* exists! */
-				if (path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
-				return createImpl(); /* already exists as a file, will throw an exception */
-			},
-			createImpl /* does not exist, good */
-		);
+		try {
+			await path.create({dir:true});
+			return true;	
+		} catch (e) {
+			return this._handleCreateError(e, path);
+		}
 	}
 
 	/**
@@ -1695,7 +1675,7 @@ class Copy extends Operation {
 	 * @param {object} record
 	 * @param {Path} targetPath already appended target path
 	 */
-	_copyFile(record, targetPath) {
+	async _copyFile(record, targetPath) {
 		/* FIXME exists */
 
 		let readStream = record.path.createStream("r");
@@ -1703,8 +1683,9 @@ class Copy extends Operation {
 		readStream.pipe(writeStream);
 
 		return new Promise(resolve => {
-			let handleError = e => {
-				return this._handleCopyError(e, record, targetPath).then(resolve);
+			let handleError = async e => {
+				let copied = await this._handleCopyError(e, record, targetPath);
+				resolve(copied);
 			};
 
 			writeStream.on("finish", () => resolve(true));
@@ -1715,34 +1696,30 @@ class Copy extends Operation {
 		});
 	}
 
-	_handleCreateError(e, path) {
+	async _handleCreateError(e, path) {
 		let text = e.message;
 		let title = "Error creating directory";
 		let buttons = ["retry", "skip", "skip-all", "abort"];
-		let config = { text, title, buttons };
-		return this._processIssue("create", config).then(result => {
-			switch (result) {
-				case "retry": return this._createDirectory(path); break;
-				case "abort": this.abort(); return false; break;
-				default: return false; break;
-			}
-		});
+		let result = await this._processIssue("create", { text, title, buttons });
+
+		switch (result) {
+			case "retry": return this._createDirectory(path); break;
+			case "abort": this.abort(); return false; break;
+			default: return false; break;
+		}
 	}
 
-	_handleCopyError(e, record, targetPath) {
+	async _handleCopyError(e, record, targetPath) {
 		let text = e.message;
 		let title = "Error copying file";
 		let buttons = ["retry", "skip", "skip-all", "abort"];
-		let config = { text, title, buttons };
-		return this._processIssue("copy", config).then(result => {
-			switch (result) {
-				case "retry": return this._copyFile(record, targetPath); break;
-				case "abort": this.abort(); return false; break;
-				default: return false; break;
-			}
-		});
+		let result = await this._processIssue("copy", { text, title, buttons });
+		switch (result) {
+			case "retry": return this._copyFile(record, targetPath); break;
+			case "abort": this.abort(); return false; break;
+			default: return false; break;
+		}
 	}
-
 }
 
 /*
@@ -1911,13 +1888,13 @@ Operation.Copy.prototype._copySymlink = function(oldPath, newPath) {
 
 */
 
-register$$1("list:up", "Backspace", () => {
+register("list:up", "Backspace", () => {
 	let list = getActive().getList();
 	let parent = list.getPath().getParent();
 	parent && list.setPath(parent);
 });
 
-register$$1("list:top", "Ctrl+Backspace", () => {
+register("list:top", "Ctrl+Backspace", () => {
 	let list = getActive().getList();
 	let path = list.getPath();
 	while (true) {
@@ -1931,49 +1908,52 @@ register$$1("list:top", "Ctrl+Backspace", () => {
 	list.setPath(path);
 });
 
-register$$1("list:home", "Ctrl+H", () => {
+register("list:home", "Ctrl+H", () => {
 	let home = Local.home();
 	getActive().getList().setPath(home);
 });
 
-register$$1("list:input", "Ctrl+L", () => {
+register("list:input", "Ctrl+L", () => {
 	getActive().getList().focusInput();
 });
 
-register$$1("directory:new", "F7", () => {
+register("directory:new", "F7", async () => {
 	let list = getActive().getList();
 	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
-	prompt(`Create new directory in "${path.getPath()}"`).then(name => {
-		if (!name) { return; }
+	let name = await prompt(`Create new directory in "${path.getPath()}"`);
+	if (!name) { return; }
 
-		let newPath = path.append(name);
-		newPath.create({dir:true}).then(
-			() => list.reload(newPath),
-			e => alert(e.message)
-		);
-	});
+	let newPath = path.append(name);
+	
+	try {
+		await newPath.create({dir:true});
+		list.reload(newPath);
+	} catch (e) {
+		alert(e.message);
+	}
 });
 
-register$$1("file:new", "Shift+F4", () => {
+register("file:new", "Shift+F4", async () => {
 	let list = getActive().getList();
 	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
 	/* fixme new.txt mit jako preferenci */
-	prompt(`Create new file in "${path.getPath()}"`, "new.txt").then(name => {
-		if (!name) { return; }
+	let name = await prompt(`Create new file in "${path.getPath()}"`, "new.txt");
+	if (!name) { return; }
 
-		let newPath = path.append(name);
-		newPath.create({dir:false}).then(
-			() => list.reload(newPath),
-			e => alert(e.message)
-		);
-	});
+	let newPath = path.append(name);
+	try {
+		await newPath.create({dir:false});
+		list.reload(newPath);
+	} catch (e) {
+		alert(e.message);
+	}
 });
 
-register$$1("file:edit", "F4", () => {
+register("file:edit", "F4", () => {
 	let file = getActive().getList().getFocusedPath();
 	if (!file.supports(EDIT)) { return; }
 
@@ -1983,27 +1963,26 @@ register$$1("file:edit", "F4", () => {
 	child.on("error", e => alert(e.message));
 });
 
-register$$1("file:delete", ["Delete", "F8"], () => {
+register("file:delete", ["Delete", "F8"], async () => {
 	let list = getActive().getList();
 	let path = list.getFocusedPath();
 	if (!path.supports(DELETE)) { return; }
 
-	confirm(`Really delete "${path.getPath()}" ?`).then(result => {
-		if (!result) { return; }
-		new Delete(path).run().then(deleted => {
-			list.reload();
-		});
-	});
+	let result = await confirm(`Really delete "${path.getPath()}" ?`);
+	if (!result) { return; }
+	let d = new Delete(path);
+	let deleted = await d.run();
+	if (deleted) { list.reload(); }
 });
 
-register$$1("file:rename", "F2", () => {
+register("file:rename", "F2", () => {
 	let list = getActive().getList();
 	let file = list.getFocusedPath();
 	if (!file.supports(RENAME)) { return; }
 	list.startEditing();
 });
 
-register$$1("file:copy", "F5", () => {
+register("file:copy", "F5", async () => {
 	let sourceList = getActive().getList();
 	let sourcePath = sourceList.getFocusedPath();
 	let targetList = getInactive().getList();
@@ -2011,16 +1990,15 @@ register$$1("file:copy", "F5", () => {
 
 	/* fixme parent->child test */
 
-	prompt(`Copy "${sourcePath.getPath()}" to:`, targetPath.getPath()).then(name => {
-		if (!name) { return; }
-		targetPath = new Local(name); // fixme other path types
-		new Copy(sourcePath, targetPath).run().then(copied => {
-			targetList.reload();
-		}); 
-	});
+	let name = await prompt(`Copy "${sourcePath.getPath()}" to:`, targetPath.getPath());
+	if (!name) { return; }
+	targetPath = new Local(name); // fixme other path types
+	let copy = new Copy(sourcePath, targetPath);
+	let copied = await copy.run();
+	if (copied) { targetList.reload(); }
 });
 
-register$$1("app:devtools", "F12", () => {
+register("app:devtools", "F12", () => {
 	require("electron").remote.getCurrentWindow().toggleDevTools();
 });
 

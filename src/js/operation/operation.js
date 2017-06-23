@@ -10,33 +10,31 @@ export default class Operation {
 		this._issues = {}; // list of potential issues and user resolutions
 	}
 
-	run() {
+	async run() {
 		this._timeout = setTimeout(() => this._showProgress(), TIMEOUT);
-		return Promise.resolve();
 	}
 
 	abort() {
 		this._aborted = true;
 	}
 
-	_end(result) {
+	_end() {
 		clearTimeout(this._timeout);
 		this._progress && this._progress.close();
-		return result;
 	}
 
 	_showProgress() {
 //		this._progress && this._progress.open(); fixme interferuje s issue
 	}
 
-	_processIssue(type, config) {
+	async _processIssue(type, config) {
 		if (type in this._issues) {
-			return Promise.resolve(this._issues[type]);
+			return this._issues[type];
 		} else {
-			return new Issue(config).open().then(result => {
-				if (result.match("-all")) { this._issues[type] = result; } // remember for futher occurences
-				return result;
-			});
+			let issue = new Issue(config);
+			let result = await issue.open();
+			if (result.match("-all")) { this._issues[type] = result; } // remember for futher occurences
+			return result;
 		}
 	}
 }

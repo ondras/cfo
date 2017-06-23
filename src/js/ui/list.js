@@ -100,37 +100,31 @@ export default class List {
 		this._input.blur();
 	}
 
-	startEditing() {
+	async startEditing() {
 		let index = this._getFocusedIndex();
 		if (index == -1) { return; }
 
 		let {node, path} = this._items[index];
 		let name = path.getName();
 
-		this._quickEdit.start(name, node.cells[0]).then(text => {
-			if (text == name || text == "") { return; }
-			let newPath = path.getParent().append(text);
+		let text = await this._quickEdit.start(name, node.cells[0]);
+		if (text == name || text == "") { return; }
+		let newPath = path.getParent().append(text);
 
-			/* FIXME test na existenci! */
-			path.rename(newPath).then(
-				() => this.reload(newPath),
-				e => alert(e.message)
-			);
+		/* FIXME test na existenci! */
+		try {
+			await path.rename(newPath);
+			this.reload(newPath);
+		} catch (e) {
+			alert(e.message);
+		}
 
 /*
-			var data = _("rename.exists", newFile.getPath());
-			var title = _("rename.title");
-			if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
-			
-			try {
-				item.rename(newFile);
-				this.resync(newFile);
-			} catch (e) {
-				var data = _("error.rename", item.getPath(), newFile.getPath(), e.message);
-				this._fc.showAlert(data);
-			}
+		var data = _("rename.exists", newFile.getPath());
+		var title = _("rename.title");
+		if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
+		
 */
-		});
 	}
 
 	handleEvent(e) {
@@ -169,7 +163,7 @@ export default class List {
 		}
 	}
 
-	_handleKey(key) {
+	async _handleKey(key) {
 		let index = this._getFocusedIndex();
 
 		switch (key) {
@@ -216,17 +210,17 @@ export default class List {
 				}
 				*/
 
-				new Scan(item.path).run().then(result => {
-					if (!result) { return; }
-					item.size = result.size;
+				let scan = new Scan(item.path);
+				let result = await scan.run();
+				if (!result) { return; }
+				item.size = result.size;
 
-					html.clear(item.node);
-					this._buildRow(item);
+				html.clear(item.node);
+				this._buildRow(item);
 
-					this._prefix = "";
-					this._focusBy(+1);
-					// FIXME this._toggleDown();
-				});
+				this._prefix = "";
+				this._focusBy(+1);
+				// FIXME this._toggleDown();
 			break;
 
 			case "Escape":
@@ -243,16 +237,19 @@ export default class List {
 		return true;
 	}
 
-	_loadPathContents(path) {
+	async _loadPathContents(path) {
 		this._path = path;
-		/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
-		return path.stat().then(() => path.getChildren()).then(paths => {
+
+		try {
+			/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
+			await path.stat();
+			let paths = await path.getChildren();
 			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
 			this._show(paths);
-		}, e => {
+		} catch (e) {
 			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
 			alert(e.message);
-		});
+		}
 	}
 
 	_activatePath() {

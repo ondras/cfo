@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "less": "^2.7.1",
-    "rollup": "^0.36.4",
+    "rollup": "^0.43.0",
     "rollup-plugin-includepaths": "^0.1.7"
   },
   "scripts": {
@@ -19,6 +19,6 @@
     "lessc": "lessc"
   },
   "dependencies": {
-    "electron": "^1.6.11"
+    "electron": "^1.7.3"
   }
 }

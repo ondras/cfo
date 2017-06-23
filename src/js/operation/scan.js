@@ -27,13 +27,15 @@ export default class Scan extends Operation {
 		this._progress.onClose = () => this.abort();
 	}
 
-	run() {
+	async run() {
 		super.run(); // schedule progress window
-		return this._analyze(this._root).then(x => this._end(x));
+		await this._analyze(this._root);
+		this._end();
+		return (this._aborted ? null : this._root);
 	}
 
-	_analyze(record) {
-		if (this._aborted) { return Promise.resolve(null); }
+	async _analyze(record) {
+		if (this._aborted) { return; }
 		this._progress.update({row1: record.path.getPath()});
 
 		if (record.path.supports(CHILDREN)) { /* descend, recurse */
@@ -43,16 +45,21 @@ export default class Scan extends Operation {
 		}
 	}
 
-	_analyzeDirectory(record) {
-		return record.path.getChildren().then(children => {
+	async _analyzeDirectory(record) {
+		try {
+			let children = await record.path.getChildren();
 			record.children = children.map(ch => createRecord(ch, record));
 			let promises = record.children.map(r => this._analyze(r));
-			return Promise.all(promises).then(() => this._aborted ? null : record); /* fulfill with the record */
-		}, e => this._handleError(e, record));
+			return Promise.all(promises);
+		} catch (e) {
+			return this._handleError(e, record);
+		}
 	}
 
-	_analyzeFile(record) {
-		return record.path.stat().then(() => {
+	async _analyzeFile(record) {
+		try {
+			await record.path.stat();
+
 			record.size = record.path.getSize(); /* update this one */
 
 			let current = record;
@@ -62,21 +69,21 @@ export default class Scan extends Operation {
 				current = current.parent;
 			}
 
-			return record;
-		}, e => this._handleError(e, record));
+		} catch (e) {
+			return this._handleError(e, record);
+		}
 	}
 
-	_handleError(e, record) {
+	async _handleError(e, record) {
 		let text = e.message;
 		let title = "Error reading file/directory";
 		let buttons = ["retry", "skip", "skip-all", "abort"];
-		let config = { text, title, buttons };
-		return this._processIssue("scan", config).then(result => {
-			switch (result) {
-				case "retry": return this._analyze(record); break;
-				case "abort": this.abort(); return null; break;
-				default: return record; break;
-			}
-		});
+		let result = await this._processIssue("scan", { text, title, buttons });
+
+		switch (result) {
+			case "retry": return this._analyze(record); break;
+			case "abort": this.abort(); return false; break;
+			default: return false; break;
+		}
 	}
 }

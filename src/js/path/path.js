@@ -11,14 +11,14 @@ export default class Path {
 
 	supports(what) {}
 	getParent() {}
-	getChildren() {}
+	async getChildren() {}
 	activate(list) {
 		if (this.supports(CHILDREN)) { list.setPath(this); }
 	}
 	append(leaf) {}
-	create(opts) {}
-	rename(newPath) {}
-	delete() {}
+	async create(opts) {}
+	async rename(newPath) {}
+	async delete() {}
 
 	createStream(type) {}
 }

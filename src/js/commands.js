@@ -37,37 +37,40 @@ command.register("list:input", "Ctrl+L", () => {
 	panes.getActive().getList().focusInput();
 });
 
-command.register("directory:new", "F7", () => {
+command.register("directory:new", "F7", async () => {
 	let list = panes.getActive().getList();
 	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
-	prompt(`Create new directory in "${path.getPath()}"`).then(name => {
-		if (!name) { return; }
+	let name = await prompt(`Create new directory in "${path.getPath()}"`);
+	if (!name) { return; }
 
-		let newPath = path.append(name);
-		newPath.create({dir:true}).then(
-			() => list.reload(newPath),
-			e => alert(e.message)
-		);
-	});
+	let newPath = path.append(name);
+	
+	try {
+		await newPath.create({dir:true});
+		list.reload(newPath);
+	} catch (e) {
+		alert(e.message);
+	}
 });
 
-command.register("file:new", "Shift+F4", () => {
+command.register("file:new", "Shift+F4", async () => {
 	let list = panes.getActive().getList();
 	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
 	/* fixme new.txt mit jako preferenci */
-	prompt(`Create new file in "${path.getPath()}"`, "new.txt").then(name => {
-		if (!name) { return; }
+	let name = await prompt(`Create new file in "${path.getPath()}"`, "new.txt");
+	if (!name) { return; }
 
-		let newPath = path.append(name);
-		newPath.create({dir:false}).then(
-			() => list.reload(newPath),
-			e => alert(e.message)
-		);
-	});
+	let newPath = path.append(name);
+	try {
+		await newPath.create({dir:false});
+		list.reload(newPath);
+	} catch (e) {
+		alert(e.message);
+	}
 });
 
 command.register("file:edit", "F4", () => {
@@ -80,17 +83,16 @@ command.register("file:edit", "F4", () => {
 	child.on("error", e => alert(e.message));
 });
 
-command.register("file:delete", ["Delete", "F8"], () => {
+command.register("file:delete", ["Delete", "F8"], async () => {
 	let list = panes.getActive().getList();
 	let path = list.getFocusedPath();
 	if (!path.supports(DELETE)) { return; }
 
-	confirm(`Really delete "${path.getPath()}" ?`).then(result => {
-		if (!result) { return; }
-		new Delete(path).run().then(deleted => {
-			list.reload();
-		});
-	});
+	let result = await confirm(`Really delete "${path.getPath()}" ?`);
+	if (!result) { return; }
+	let d = new Delete(path);
+	let deleted = await d.run();
+	if (deleted) { list.reload(); }
 });
 
 command.register("file:rename", "F2", () => {
@@ -100,7 +102,7 @@ command.register("file:rename", "F2", () => {
 	list.startEditing();
 });
 
-command.register("file:copy", "F5", () => {
+command.register("file:copy", "F5", async () => {
 	let sourceList = panes.getActive().getList();
 	let sourcePath = sourceList.getFocusedPath();
 	let targetList = panes.getInactive().getList();
@@ -108,13 +110,12 @@ command.register("file:copy", "F5", () => {
 
 	/* fixme parent->child test */
 
-	prompt(`Copy "${sourcePath.getPath()}" to:`, targetPath.getPath()).then(name => {
-		if (!name) { return; }
-		targetPath = new LocalPath(name); // fixme other path types
-		new Copy(sourcePath, targetPath).run().then(copied => {
-			targetList.reload();
-		}); 
-	});
+	let name = await prompt(`Copy "${sourcePath.getPath()}" to:`, targetPath.getPath());
+	if (!name) { return; }
+	targetPath = new LocalPath(name); // fixme other path types
+	let copy = new Copy(sourcePath, targetPath);
+	let copied = await copy.run();
+	if (copied) { targetList.reload(); }
 });
 
 command.register("app:devtools", "F12", () => {

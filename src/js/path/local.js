@@ -16,7 +16,7 @@ function statsToMetadata(stats) {
 	}
 }
 
-function getMetadata(path, link) {
+function getMetadata(path, options = {}) {
 	return new Promise((resolve, reject) => {
 		let cb = (err, stats) => {
 			if (err) { 
@@ -25,8 +25,8 @@ function getMetadata(path, link) {
 				resolve(statsToMetadata(stats));
 			}
 		}
-		link ? fs.lstat(path, cb) : fs.stat(path, cb);
-	})
+		options.link ? fs.lstat(path, cb) : fs.stat(path, cb);
+	});
 }
 
 
@@ -99,37 +99,39 @@ export default class Local extends Path {
 		return new this.constructor(newPath);
 	}
 
-	create(opts = {}) {
+	async create(opts = {}) {
 		if (opts.dir) {
 			return mkdir(this._path);
 		} else {
-			return open(this._path, "wx").then(close);
+			let handle = await open(this._path, "wx")
+			return close(handle);
 		}
 	}
 
-	rename(newPath) {
+	async rename(newPath) {
 		return rename(this._path, newPath.getPath());
 	}
 
-	delete() {
+	async delete() {
 		return this._meta.isDirectory ? rmdir(this._path) : unlink(this._path);
 	}
 
-	getChildren() {
-		return readdir(this._path).then(names => {
-			let paths = names
-				.map(name => path.resolve(this._path, name))
-				.map(name => new this.constructor(name));
+	async getChildren() {
+		let names = await readdir(this._path);
+		let paths = names
+			.map(name => path.resolve(this._path, name))
+			.map(name => new this.constructor(name));
 
-			// safe stat: always fulfills with the path
-			let stat = p => { 
-				let id = () => p;
-				return p.stat().then(id, id);
-			}
+		// safe stat: always fulfills with the path
+		let stat = async p => { 
+			try {
+				await p.stat();
+			} catch (e) {};
+			return p;
+		}
 
-			let promises = paths.map(stat);
-			return Promise.all(promises);
-		});
+		let promises = paths.map(stat);
+		return Promise.all(promises);
 	}
 
 	createStream(type) {
@@ -140,33 +142,32 @@ export default class Local extends Path {
 		}
 	}
 
-	stat() {
-		return getMetadata(this._path, true).then(meta => {
-			Object.assign(this._meta, meta);
-			if (!meta.isSymbolicLink) { return; }
+	async stat() {
+		let meta = await getMetadata(this._path, {link:true});
+		Object.assign(this._meta, meta);
+		if (!meta.isSymbolicLink) { return; }
 
-			/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
+		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
+		try {
+			let targetPath = await readlink(this._path);
+			this._target = targetPath;
 
-			return readlink(this._path).then(targetPath => {
-				this._target = targetPath;
 
+			/*
+			 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
+			 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
+			 */
+			return;
 
-				/*
-				 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
-				 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
-				 */
-				return;
-
-				/* we need to get target isDirectory flag */
-				return getMetadata(this._target, false).then(meta => {
-					this._meta.isDirectory = meta.isDirectory;
-				}, e => { /* failed to stat link target */
-					delete this._meta.isDirectory;
-				});
-
-			}, e => { /* failed to readlink */
-				this._target = e;
+			/* we need to get target isDirectory flag */
+			return getMetadata(this._target, {link:false}).then(meta => {
+				this._meta.isDirectory = meta.isDirectory;
+			}, e => { /* failed to stat link target */
+				delete this._meta.isDirectory;
 			});
-		});
+
+		} catch (e) { /* failed to readlink */
+			this._target = e;
+		}
 	}
 }
