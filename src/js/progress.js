@@ -34,25 +34,25 @@ const DOM = {
 }
 
 electron.ipcRenderer.on("config", (e, data) => {
-	if (data.row1) {
+	if ("row1" in data) {
 		DOM.row1.label.appendChild(html.text(data.row1));
 	} else {
 		DOM.row1.node.style.display = "none";
 	}
 
-	if (data.row2) {
+	if ("row2" in data) {
 		DOM.row2.label.appendChild(html.text(data.row2));
 	} else {
 		DOM.row2.node.style.display = "none";
 	}
 
-	if (data.progress1) {
+	if ("progress1" in data) {
 		DOM.progress1.label.appendChild(html.text(data.progress1));
 	} else {
 		DOM.progress1.node.style.display = "none";
 	}
 
-	if (data.progress2) {
+	if ("progress2" in data) {
 		DOM.progress2.label.appendChild(html.text(data.progress2));
 	} else {
 		DOM.progress2.node.style.display = "none";
@@ -62,16 +62,26 @@ electron.ipcRenderer.on("config", (e, data) => {
 electron.ipcRenderer.on("data", (e, data) => {
 	let node;
 
-	if (data.row1) {
+	if ("row1" in data) {
 		node = DOM.row1.value;
 		html.clear(node);
 		node.appendChild(html.text(data.row1));
 	}
 
-	if (data.row2) {
+	if ("row2" in data) {
 		node = DOM.row2.value;
 		html.clear(node);
 		node.appendChild(html.text(data.row2));
+	}
+
+	if ("progress1" in data) {
+		node = DOM.progress1.value;
+		node.value = data.progress1;
+	}
+
+	if ("progress2" in data) {
+		node = DOM.progress2.value;
+		node.value = data.progress2;
 	}
 });
 

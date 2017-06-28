@@ -9,22 +9,31 @@ export default class Copy extends Operation {
 		super();
 		this._sourcePath = sourcePath;
 		this._targetPath = targetPath;
-		this._record = null;
+		this._stats = {
+			done: 0,
+			total: 0
+		}
 	}
 
 	async run() {
 		let scan = new Scan(this._sourcePath);
 		let root = await scan.run();
 		if (!root) { return false; }
-		return this._startCopying(root);
+
+		this._stats.total = root.size;
+		let result = await this._startCopying(root);
+
+		this._end();
+		return result;
 	}
 
 	async _startCopying(root) {
 		let options = {
-			title: "Copying…",
-			row1: "Total:",
-			progress1: " "
-
+			title: "Copying in progress",
+			row1: "Copying:",
+			row2: "To:",
+			progress1: "File:",
+			progress2: "Total:"
 		}
 		this._progress = new Progress(options);
 		this._progress.onClose = () => this.abort();
@@ -39,12 +48,7 @@ export default class Copy extends Operation {
 	 * @param {Path} targetPath Target path without the appended part
 	 */
 	async _copy(record, targetPath) {
-		console.log("copying", record.path, "to", targetPath);
 		if (this._aborted) { return false; }
-
-		// show where are we FIXME stats etc
-		var path = record.path;
-		this._progress.update({row1:path.getPath()});
 
 		/* create new proper target name */
 		targetPath = targetPath.append(record.path.getName());
@@ -115,9 +119,12 @@ export default class Copy extends Operation {
 	async _copyFile(record, targetPath) {
 		/* FIXME exists */
 
+		this._progress.update({row1:record.path.getPath(), row2:targetPath.getPath(), progress1:0});
 		let readStream = record.path.createStream("r");
 		let writeStream = targetPath.createStream("w");
 		readStream.pipe(writeStream);
+
+		let done = 0;
 
 		return new Promise(resolve => {
 			let handleError = async e => {
@@ -129,8 +136,15 @@ export default class Copy extends Operation {
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
 
-			readStream.on("data", buffer => console.log(buffer.length));
-		});
+			readStream.on("data", buffer => {
+				done += buffer.length;
+				this._stats.done += buffer.length;
+
+				let progress1 = 100*done/record.size; 
+				let progress2 = 100*this._stats.done/this._stats.total;
+				this._progress.update({progress1, progress2});
+			}); /* on data */
+		}); /* file copy promise */
 	}
 
 	async _handleCreateError(e, path) {

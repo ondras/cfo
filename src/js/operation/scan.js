@@ -2,10 +2,9 @@ import Progress from "ui/progress.js";
 import Operation from "./operation.js";
 import {CHILDREN} from "path/path.js";
 
-function createRecord(path, parent) {
+function createRecord(path) {
 	return {
 		path,
-		parent,
 		children: null,
 		count: 1,
 		size: 0
@@ -16,12 +15,12 @@ export default class Scan extends Operation {
 	constructor(path) {
 		super();
 
-		this._root = createRecord(path, null);
+		this._path = path;
 
 		let options = {
-			title: "Directory scanning…",
+			title: "Directory scan in progress",
 			row1: "Scanning:",
-			progress1: " "
+			progress1: ""
 		}
 		this._progress = new Progress(options);
 		this._progress.onClose = () => this.abort();
@@ -29,61 +28,64 @@ export default class Scan extends Operation {
 
 	async run() {
 		super.run(); // schedule progress window
-		await this._analyze(this._root);
+		let result = await this._analyze(this._path);
 		this._end();
-		return (this._aborted ? null : this._root);
+		return result;
 	}
 
-	async _analyze(record) {
-		if (this._aborted) { return; }
-		this._progress.update({row1: record.path.getPath()});
+	async _analyze(path) {
+		if (this._aborted) { return null; }
+		this._progress.update({row1: path.getPath()});
 
-		if (record.path.supports(CHILDREN)) { /* descend, recurse */
-			return this._analyzeDirectory(record);
+		if (path.supports(CHILDREN)) { /* descend, recurse */
+			return this._analyzeDirectory(path);
 		} else { /* compute */
-			return this._analyzeFile(record);
+			return this._analyzeFile(path);
 		}
 	}
 
-	async _analyzeDirectory(record) {
+	async _analyzeDirectory(path) {
 		try {
-			let children = await record.path.getChildren();
-			record.children = children.map(ch => createRecord(ch, record));
-			let promises = record.children.map(r => this._analyze(r));
-			return Promise.all(promises);
+			let record = createRecord(path);
+			record.children = [];
+
+			let children = await path.getChildren();
+			let promises = children.map(childPath => this._analyze(childPath));
+			children = await Promise.all(promises);
+
+			children.forEach(child => {
+				record.children.push(child);
+				if (!child) { return; }
+				record.count += child.count;
+				record.size += child.size;
+			});
+			return record;
 		} catch (e) {
-			return this._handleError(e, record);
+			return this._handleError(e, path);
 		}
 	}
 
-	async _analyzeFile(record) {
+	async _analyzeFile(path) {
 		try {
-			await record.path.stat();
-
+			await path.stat();
+			let record = createRecord(path);
 			record.size = record.path.getSize(); /* update this one */
-
-			let current = record;
-			while (current.parent) { /* update all parents */
-				current.parent.count += record.count;
-				current.parent.size += record.size;
-				current = current.parent;
-			}
-
+			return record;
 		} catch (e) {
-			return this._handleError(e, record);
+			return this._handleError(e, path);
 		}
 	}
 
-	async _handleError(e, record) {
+	async _handleError(e, path) {
 		let text = e.message;
 		let title = "Error reading file/directory";
 		let buttons = ["retry", "skip", "skip-all", "abort"];
 		let result = await this._processIssue("scan", { text, title, buttons });
 
 		switch (result) {
-			case "retry": return this._analyze(record); break;
-			case "abort": this.abort(); return false; break;
-			default: return false; break;
+			case "retry": return this._analyze(path); break;
+			case "abort": this.abort(); return null; break;
+			default: return null; break;
 		}
 	}
 }

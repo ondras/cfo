@@ -6,21 +6,29 @@ export default class Delete extends Operation {
 	constructor(path) {
 		super();
 		this._path = path;
+		this._stats = {
+			total: 0,
+			done: 0
+		}
 	}
 
 	async run() {
 		let scan = new Scan(this._path);
 		let root = await scan.run(); 
 		if (!root) { return false; }
-		return this._startDeleting(root);
+
+		this._stats.total = root.count;
+		let result = await this._startDeleting(root);
+
+		this._end();
+		return result;
 	}
 
 	async _startDeleting(record) {
 		let options = {
-			title: "Deleting…",
-			row1: "Total:",
-			progress1: " "
-
+			title: "Deletion in progress",
+			row1: "Deleting:",
+			progress1: "Total:"
 		}
 		this._progress = new Progress(options);
 		this._progress.onClose = () => this.abort();
@@ -46,10 +54,11 @@ export default class Delete extends Operation {
 
 		// show where are we FIXME stats etc
 		var path = record.path;
-		this._progress.update({row1:path.getPath()});
+		this._progress.update({row1:path.getPath(), progress1:100*this._stats.done/this._stats.total});
 
 		try {
 			await path.delete();
+			this._stats.done++;
 			return true;
 		} catch (e) {
 			return this._handleError(e, record);

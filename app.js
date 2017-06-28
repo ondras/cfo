@@ -392,6 +392,7 @@ class Progress {
 	}
 
 	update(data) {
+		console.log(data);
 		this._data = data;
 		if (!this._window || this._timeout) { return; }
 
@@ -497,10 +498,9 @@ class Operation {
 	}
 }
 
-function createRecord(path, parent) {
+function createRecord(path) {
 	return {
 		path,
-		parent,
 		children: null,
 		count: 1,
 		size: 0
@@ -511,12 +511,12 @@ class Scan extends Operation {
 	constructor(path) {
 		super();
 
-		this._root = createRecord(path, null);
+		this._path = path;
 
 		let options = {
-			title: "Directory scanning…",
+			title: "Directory scan in progress",
 			row1: "Scanning:",
-			progress1: " "
+			progress1: ""
 		};
 		this._progress = new Progress(options);
 		this._progress.onClose = () => this.abort();
@@ -524,62 +524,64 @@ class Scan extends Operation {
 
 	async run() {
 		super.run(); // schedule progress window
-		await this._analyze(this._root);
+		let result = await this._analyze(this._path);
 		this._end();
-		return (this._aborted ? null : this._root);
+		return result;
 	}
 
-	async _analyze(record) {
-		await sleep(500);
-		if (this._aborted) { return; }
-		this._progress.update({row1: record.path.getPath()});
+	async _analyze(path) {
+		if (this._aborted) { return null; }
+		this._progress.update({row1: path.getPath()});
 
-		if (record.path.supports(CHILDREN)) { /* descend, recurse */
-			return this._analyzeDirectory(record);
+		if (path.supports(CHILDREN)) { /* descend, recurse */
+			return this._analyzeDirectory(path);
 		} else { /* compute */
-			return this._analyzeFile(record);
+			return this._analyzeFile(path);
 		}
 	}
 
-	async _analyzeDirectory(record) {
+	async _analyzeDirectory(path) {
 		try {
-			let children = await record.path.getChildren();
-			record.children = children.map(ch => createRecord(ch, record));
-			let promises = record.children.map(r => this._analyze(r));
-			return Promise.all(promises);
+			let record = createRecord(path);
+			record.children = [];
+
+			let children = await path.getChildren();
+			let promises = children.map(childPath => this._analyze(childPath));
+			children = await Promise.all(promises);
+
+			children.forEach(child => {
+				record.children.push(child);
+				if (!child) { return; }
+				record.count += child.count;
+				record.size += child.size;
+			});
+			return record;
 		} catch (e) {
-			return this._handleError(e, record);
+			return this._handleError(e, path);
 		}
 	}
 
-	async _analyzeFile(record) {
+	async _analyzeFile(path) {
 		try {
-			await record.path.stat();
-
+			await path.stat();
+			let record = createRecord(path);
 			record.size = record.path.getSize(); /* update this one */
-
-			let current = record;
-			while (current.parent) { /* update all parents */
-				current.parent.count += record.count;
-				current.parent.size += record.size;
-				current = current.parent;
-			}
-
+			return record;
 		} catch (e) {
-			return this._handleError(e, record);
+			return this._handleError(e, path);
 		}
 	}
 
-	async _handleError(e, record) {
+	async _handleError(e, path) {
 		let text = e.message;
 		let title = "Error reading file/directory";
 		let buttons = ["retry", "skip", "skip-all", "abort"];
 		let result = await this._processIssue("scan", { text, title, buttons });
 
 		switch (result) {
-			case "retry": return this._analyze(record); break;
-			case "abort": this.abort(); return false; break;
-			default: return false; break;
+			case "retry": return this._analyze(path); break;
+			case "abort": this.abort(); return null; break;
+			default: return null; break;
 		}
 	}
 }
@@ -1548,21 +1550,29 @@ class Delete extends Operation {
 	constructor(path) {
 		super();
 		this._path = path;
+		this._stats = {
+			total: 0,
+			done: 0
+		};
 	}
 
 	async run() {
 		let scan = new Scan(this._path);
 		let root = await scan.run(); 
 		if (!root) { return false; }
-		return this._startDeleting(root);
+
+		this._stats.total = root.count;
+		let result = await this._startDeleting(root);
+
+		this._end();
+		return result;
 	}
 
 	async _startDeleting(record) {
 		let options = {
-			title: "Deleting…",
-			row1: "Total:",
-			progress1: " "
-
+			title: "Deletion in progress",
+			row1: "Deleting:",
+			progress1: "Total:"
 		};
 		this._progress = new Progress(options);
 		this._progress.onClose = () => this.abort();
@@ -1588,10 +1598,11 @@ class Delete extends Operation {
 
 		// show where are we FIXME stats etc
 		var path = record.path;
-		this._progress.update({row1:path.getPath()});
+		this._progress.update({row1:path.getPath(), progress1:100*this._stats.done/this._stats.total});
 
 		try {
 			await path.delete();
+			this._stats.done++;
 			return true;
 		} catch (e) {
 			return this._handleError(e, record);
@@ -1617,22 +1628,31 @@ class Copy extends Operation {
 		super();
 		this._sourcePath = sourcePath;
 		this._targetPath = targetPath;
-		this._record = null;
+		this._stats = {
+			done: 0,
+			total: 0
+		};
 	}
 
 	async run() {
 		let scan = new Scan(this._sourcePath);
 		let root = await scan.run();
 		if (!root) { return false; }
-		return this._startCopying(root);
+
+		this._stats.total = root.size;
+		let result = await this._startCopying(root);
+
+		this._end();
+		return result;
 	}
 
 	async _startCopying(root) {
 		let options = {
-			title: "Copying…",
-			row1: "Total:",
-			progress1: " "
-
+			title: "Copying in progress",
+			row1: "Copying:",
+			row2: "To:",
+			progress1: "File:",
+			progress2: "Total:"
 		};
 		this._progress = new Progress(options);
 		this._progress.onClose = () => this.abort();
@@ -1648,11 +1668,8 @@ class Copy extends Operation {
 	 */
 	async _copy(record, targetPath) {
 		console.log("copying", record.path, "to", targetPath);
+		await sleep(500);
 		if (this._aborted) { return false; }
-
-		// show where are we FIXME stats etc
-		var path = record.path;
-		this._progress.update({row1:path.getPath()});
 
 		/* create new proper target name */
 		targetPath = targetPath.append(record.path.getName());
@@ -1723,9 +1740,12 @@ class Copy extends Operation {
 	async _copyFile(record, targetPath) {
 		/* FIXME exists */
 
+		this._progress.update({row1:record.path.getPath(), row2:targetPath.getPath(), progress1:0});
 		let readStream = record.path.createStream("r");
 		let writeStream = targetPath.createStream("w");
 		readStream.pipe(writeStream);
+
+		let done = 0;
 
 		return new Promise(resolve => {
 			let handleError = async e => {
@@ -1737,8 +1757,15 @@ class Copy extends Operation {
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
 
-			readStream.on("data", buffer => console.log(buffer.length));
-		});
+			readStream.on("data", buffer => {
+				done += buffer.length;
+				this._stats.done += buffer.length;
+
+				let progress1 = 100*done/record.size; 
+				let progress2 = 100*this._stats.done/this._stats.total;
+				this._progress.update({progress1, progress2});
+			}); /* on data */
+		}); /* file copy promise */
 	}
 
 	async _handleCreateError(e, path) {
