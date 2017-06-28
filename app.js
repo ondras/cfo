@@ -300,6 +300,43 @@ class Local extends Path {
 	}
 }
 
+let issues = [];
+let progresses = [];
+let current = null;
+
+function sync() {
+	let active = null;
+	if (progresses.length) { active = progresses[0]; }
+	if (issues.length) { active = issues[0]; }
+	if (current && current != active) { current.hide(); }
+	current = active;
+	if (current) { current.show(); }
+}
+
+function addIssue(window) {
+	issues.unshift(window);
+	sync();
+}
+
+function removeIssue(window) {
+	let index = issues.indexOf(window);
+	issues.splice(index, 1);
+	if (current == window) { current = null; } // will hide/close itself
+	sync();
+}
+
+function addProgress(window) {
+	progresses.unshift(window);
+	sync();
+}
+
+function removeProgress(window) {
+	let index = progresses.indexOf(window);
+	progresses.splice(index, 1);
+	if (current == window) { current = null; } // will hide/close itself
+	sync();
+}
+
 /* Progress window - remote (data) part */
 
 const remote = require("electron").remote;
@@ -312,7 +349,8 @@ const windowOptions = {
 	center: true,
 	width: 500,
 	height: 60,
-	useContentSize: true,
+	show: false,
+	useContentSize: true
 };
 
 class Progress {
@@ -337,14 +375,18 @@ class Progress {
 
 		this._window.on("closed", () => {
 			if (!this._window) { return; } // closed programatically, ignore
+			removeProgress(this._window);
 			this._window = null;
 			this.onClose();
 		});
+
+		addProgress(this._window);
 	}
 
 	close() {
 		let w = this._window;
 		if (!w) { return; }
+		removeProgress(w);
 		this._window = null;
 		w.destroy();
 	}
@@ -366,7 +408,6 @@ class Progress {
 /* Issue window - remote (data) part */
 
 const remote$1 = require("electron").remote;
-
 const windowOptions$1 = {
 	parent: remote$1.getCurrentWindow(),
 	resizable: false,
@@ -375,7 +416,8 @@ const windowOptions$1 = {
 	center: true,
 	width: 500,
 	height: 60,
-	useContentSize: true,
+	show: false,
+	useContentSize: true
 };
 
 class Issue {
@@ -389,7 +431,6 @@ class Issue {
 		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
 		this._window = new remote$1.BrowserWindow(options);
 		this._window.loadURL(`file://${__dirname}/issue.html`);
-		window.iii = this;
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
@@ -399,6 +440,7 @@ class Issue {
 
 		remote$1.ipcMain.once("action", (e, action) => {
 			let w = this._window;
+			removeIssue(w);
 			this._window = null;
 			w.close();
 			this._resolve(action);
@@ -406,10 +448,12 @@ class Issue {
 
 		this._window.on("closed", () => {
 			if (!this._window) { return; } // closed programatically, ignore
+			removeIssue(this._window);
 			this._window = null;
 			this._resolve("abort");
 		});
 
+		addIssue(this._window);
 		return new Promise(resolve => this._resolve = resolve);
 	}
 }
@@ -438,7 +482,7 @@ class Operation {
 	}
 
 	_showProgress() {
-//		this._progress && this._progress.open(); fixme interferuje s issue
+		this._progress && this._progress.open();
 	}
 
 	async _processIssue(type, config) {
@@ -486,6 +530,7 @@ class Scan extends Operation {
 	}
 
 	async _analyze(record) {
+		await sleep(500);
 		if (this._aborted) { return; }
 		this._progress.update({row1: record.path.getPath()});
 
@@ -2003,6 +2048,7 @@ register("app:devtools", "F12", () => {
 });
 
 window.FIXME = (...args) => console.error(...args);
+window.sleep = (delay = 1000) => new Promise(r => setTimeout(r, delay));
 
 String.prototype.fileLocaleCompare = function(other) {
 	for (var i=0;i<Math.max(this.length, other.length);i++) {

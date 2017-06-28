@@ -24,7 +24,7 @@ export default class Operation {
 	}
 
 	_showProgress() {
-//		this._progress && this._progress.open(); fixme interferuje s issue
+		this._progress && this._progress.open();
 	}
 
 	async _processIssue(type, config) {

@@ -2,6 +2,7 @@ import * as panes from "panes.js";
 import * as commands from "commands.js";
 
 window.FIXME = (...args) => console.error(...args);
+window.sleep = (delay = 1000) => new Promise(r => setTimeout(r, delay));
 
 String.prototype.fileLocaleCompare = function(other) {
 	for (var i=0;i<Math.max(this.length, other.length);i++) {

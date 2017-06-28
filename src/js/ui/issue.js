@@ -1,7 +1,8 @@
 /* Issue window - remote (data) part */
 
-const remote = require("electron").remote;
+import * as wm from "util/windowmanager.js";
 
+const remote = require("electron").remote;
 const windowOptions = {
 	parent: remote.getCurrentWindow(),
 	resizable: false,
@@ -10,7 +11,8 @@ const windowOptions = {
 	center: true,
 	width: 500,
 	height: 60,
-	useContentSize: true,
+	show: false,
+	useContentSize: true
 }
 
 export default class Issue {
@@ -24,7 +26,6 @@ export default class Issue {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
 		this._window = new remote.BrowserWindow(options);
 		this._window.loadURL(`file://${__dirname}/issue.html`);
-		window.iii = this;
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
@@ -34,6 +35,7 @@ export default class Issue {
 
 		remote.ipcMain.once("action", (e, action) => {
 			let w = this._window;
+			wm.removeIssue(w);
 			this._window = null;
 			w.close();
 			this._resolve(action);
@@ -41,10 +43,12 @@ export default class Issue {
 
 		this._window.on("closed", () => {
 			if (!this._window) { return; } // closed programatically, ignore
+			wm.removeIssue(this._window);
 			this._window = null;
 			this._resolve("abort");
 		});
 
+		wm.addIssue(this._window);
 		return new Promise(resolve => this._resolve = resolve);
 	}
 }

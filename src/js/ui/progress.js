@@ -1,5 +1,7 @@
 /* Progress window - remote (data) part */
 
+import * as wm from "util/windowmanager.js";
+
 const remote = require("electron").remote;
 const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
@@ -10,7 +12,8 @@ const windowOptions = {
 	center: true,
 	width: 500,
 	height: 60,
-	useContentSize: true,
+	show: false,
+	useContentSize: true
 }
 
 export default class Progress {
@@ -35,14 +38,18 @@ export default class Progress {
 
 		this._window.on("closed", () => {
 			if (!this._window) { return; } // closed programatically, ignore
+			wm.removeProgress(this._window);
 			this._window = null;
 			this.onClose();
 		});
+
+		wm.addProgress(this._window);
 	}
 
 	close() {
 		let w = this._window;
 		if (!w) { return; }
+		wm.removeProgress(w);
 		this._window = null;
 		w.destroy();
 	}
