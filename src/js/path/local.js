@@ -1,5 +1,5 @@
 import Path, {CHILDREN, CREATE, EDIT, RENAME, DELETE } from "./path.js";
-import {readlink, readdir, mkdir, open, close, rename, unlink, rmdir} from "util/fs.js";
+import {readlink, readdir, mkdir, open, close, rename, unlink, rmdir, utimes} from "util/fs.js";
 import * as format from "util/format.js";
 
 const fs = require("fs");
@@ -104,7 +104,7 @@ export default class Local extends Path {
 		if (opts.dir) {
 			return mkdir(this._path);
 		} else {
-			let handle = await open(this._path, "wx")
+			let handle = await open(this._path, "wx", opts.mode);
 			return close(handle);
 		}
 	}
@@ -115,6 +115,11 @@ export default class Local extends Path {
 
 	async delete() {
 		return (this._meta.isDirectory ? rmdir(this._path) : unlink(this._path));
+	}
+
+	async setDate(date) {
+		let ts = date.getTime()/1000;
+		return utimes(this._path, ts, ts);
 	}
 
 	async getChildren() {
@@ -131,10 +136,10 @@ export default class Local extends Path {
 		return Promise.all(promises);
 	}
 
-	createStream(type) {
+	createStream(type, opts) {
 		switch (type) {
-			case "r": return fs.createReadStream(this._path); break;
-			case "w": return fs.createWriteStream(this._path); break;
+			case "r": return fs.createReadStream(this._path, opts); break;
+			case "w": return fs.createWriteStream(this._path, opts); break;
 			default: throw new Error(`Unknown stream type "${type}"`); break;
 		}
 	}

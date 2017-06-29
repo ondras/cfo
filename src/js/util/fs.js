@@ -68,3 +68,11 @@ export function rmdir(path) {
 		});
 	});
 }
+
+export function utimes(path, atime, mtime) {
+	return new Promise((resolve, reject) => {
+		fs.utimes(path, atime, mtime, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	});
+}

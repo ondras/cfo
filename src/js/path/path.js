@@ -24,7 +24,8 @@ export default class Path {
 	async create(opts) {}
 	async rename(newPath) {}
 	async delete() {}
-	createStream(type) {}
+	async setDate(date) {}
+	createStream(type, opts) {}
 
 	activate(list) {
 		if (this.supports(CHILDREN)) { list.setPath(this); }

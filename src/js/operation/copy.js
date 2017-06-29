@@ -1,4 +1,3 @@
-// FIXME maintain timestamp, permissions
 import Progress from "ui/progress.js";
 import Operation from "./operation.js";
 import Scan from "./scan.js";
@@ -77,25 +76,27 @@ export default class Copy extends Operation {
 	 * @param {Path} targetPath already appended target path
 	 */
 	async _copyDirectory(record, targetPath) {
-		let created = await this._createDirectory(targetPath);
+		let created = await this._createDirectory(targetPath, record.path.getMode());
 		if (!created) { return; }
 
 		for (let child of record.children) {
 			await this._copy(child, targetPath);
 		}
+
+		return targetPath.setDate(record.path.getDate());
 	}
 
 	/**
 	 * @returns {Promise<bool>}
 	 */
-	async _createDirectory(path) {
+	async _createDirectory(path, mode) {
 		if (path.exists() && path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
 
 		try {
-			await path.create({dir:true});
+			await path.create({dir:true, mode});
 			return true;	
 		} catch (e) {
-			return this._handleCreateError(e, path);
+			return this._handleCreateError(e, path, mode);
 		}
 	}
 
@@ -129,19 +130,23 @@ export default class Copy extends Operation {
 			}
 		}
 
+		let opts = { mode:record.path.getMode() };
 		let readStream = record.path.createStream("r");
-		let writeStream = targetPath.createStream("w");
+		let writeStream = targetPath.createStream("w", opts);
 		readStream.pipe(writeStream);
 
-		return new Promise(resolve => {
+		await new Promise(resolve => {
 			let handleError = async e => {
 				await this._handleCopyError(e, record, targetPath);
 				resolve();
 			}
-
-			writeStream.on("finish", resolve);
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
+
+			writeStream.on("finish", async e => {
+				await targetPath.setDate(record.path.getDate());
+				resolve();
+			});
 
 			readStream.on("data", buffer => {
 				done += buffer.length;
@@ -161,14 +166,14 @@ export default class Copy extends Operation {
 		return this._processIssue("overwrite", { text, title, buttons });
 	}
 
-	async _handleCreateError(e, path) {
+	async _handleCreateError(e, path, mode) {
 		let text = e.message;
 		let title = "Error creating directory";
 		let buttons = ["retry", "skip", "skip-all", "abort"];
 		let result = await this._processIssue("create", { text, title, buttons });
 
 		switch (result) {
-			case "retry": return this._createDirectory(path); break;
+			case "retry": return this._createDirectory(path, mode); break;
 			case "abort": this.abort(); break;
 		}
 

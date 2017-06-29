@@ -27,7 +27,8 @@ class Path {
 	async create(opts) {}
 	async rename(newPath) {}
 	async delete() {}
-	createStream(type) {}
+	async setDate(date) {}
+	createStream(type, opts) {}
 
 	activate(list) {
 		if (this.supports(CHILDREN)) { list.setPath(this); }
@@ -106,6 +107,14 @@ function unlink(path) {
 function rmdir(path) {
 	return new Promise((resolve, reject) => {
 		fs$1.rmdir(path, err => {
+			if (err) { reject(err); } else { resolve(); }
+		});
+	});
+}
+
+function utimes(path, atime, mtime) {
+	return new Promise((resolve, reject) => {
+		fs$1.utimes(path, atime, mtime, err => {
 			if (err) { reject(err); } else { resolve(); }
 		});
 	});
@@ -240,7 +249,7 @@ class Local extends Path {
 		if (opts.dir) {
 			return mkdir(this._path);
 		} else {
-			let handle = await open(this._path, "wx");
+			let handle = await open(this._path, "wx", opts.mode);
 			return close(handle);
 		}
 	}
@@ -251,6 +260,11 @@ class Local extends Path {
 
 	async delete() {
 		return (this._meta.isDirectory ? rmdir(this._path) : unlink(this._path));
+	}
+
+	async setDate(date$$1) {
+		let ts = date$$1.getTime()/1000;
+		return utimes(this._path, ts, ts);
 	}
 
 	async getChildren() {
@@ -267,10 +281,10 @@ class Local extends Path {
 		return Promise.all(promises);
 	}
 
-	createStream(type) {
+	createStream(type, opts) {
 		switch (type) {
-			case "r": return fs.createReadStream(this._path); break;
-			case "w": return fs.createWriteStream(this._path); break;
+			case "r": return fs.createReadStream(this._path, opts); break;
+			case "w": return fs.createWriteStream(this._path, opts); break;
 			default: throw new Error(`Unknown stream type "${type}"`); break;
 		}
 	}
@@ -1624,7 +1638,6 @@ class Delete extends Operation {
 	}
 }
 
-// FIXME maintain timestamp, permissions
 class Copy extends Operation {
 	constructor(sourcePath, targetPath) {
 		super();
@@ -1698,25 +1711,27 @@ class Copy extends Operation {
 	 * @param {Path} targetPath already appended target path
 	 */
 	async _copyDirectory(record, targetPath) {
-		let created = await this._createDirectory(targetPath);
+		let created = await this._createDirectory(targetPath, record.path.getMode());
 		if (!created) { return; }
 
 		for (let child of record.children) {
 			await this._copy(child, targetPath);
 		}
+
+		return targetPath.setDate(record.path.getDate());
 	}
 
 	/**
 	 * @returns {Promise<bool>}
 	 */
-	async _createDirectory(path) {
+	async _createDirectory(path, mode) {
 		if (path.exists() && path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
 
 		try {
-			await path.create({dir:true});
+			await path.create({dir:true, mode});
 			return true;	
 		} catch (e) {
-			return this._handleCreateError(e, path);
+			return this._handleCreateError(e, path, mode);
 		}
 	}
 
@@ -1750,19 +1765,23 @@ class Copy extends Operation {
 			}
 		}
 
+		let opts = { mode:record.path.getMode() };
 		let readStream = record.path.createStream("r");
-		let writeStream = targetPath.createStream("w");
+		let writeStream = targetPath.createStream("w", opts);
 		readStream.pipe(writeStream);
 
-		return new Promise(resolve => {
+		await new Promise(resolve => {
 			let handleError = async e => {
 				await this._handleCopyError(e, record, targetPath);
 				resolve();
 			};
-
-			writeStream.on("finish", resolve);
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
+
+			writeStream.on("finish", async e => {
+				await targetPath.setDate(record.path.getDate());
+				resolve();
+			});
 
 			readStream.on("data", buffer => {
 				done += buffer.length;
@@ -1782,14 +1801,14 @@ class Copy extends Operation {
 		return this._processIssue("overwrite", { text, title, buttons });
 	}
 
-	async _handleCreateError(e, path) {
+	async _handleCreateError(e, path, mode) {
 		let text = e.message;
 		let title = "Error creating directory";
 		let buttons = ["retry", "skip", "skip-all", "abort"];
 		let result = await this._processIssue("create", { text, title, buttons });
 
 		switch (result) {
-			case "retry": return this._createDirectory(path); break;
+			case "retry": return this._createDirectory(path, mode); break;
 			case "abort": this.abort(); break;
 		}
 
