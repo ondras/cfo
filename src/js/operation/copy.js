@@ -8,6 +8,10 @@ export default class Copy extends Operation {
 		super();
 		this._sourcePath = sourcePath;
 		this._targetPath = targetPath;
+		this._texts = {
+			title: "Copying in progress",
+			row1: "Copying:"
+		}
 		this._stats = {
 			done: 0,
 			total: 0
@@ -26,8 +30,8 @@ export default class Copy extends Operation {
 
 	async _startCopying(root) {
 		let options = {
-			title: "Copying in progress",
-			row1: "Copying:",
+			title: this._texts.title,
+			row1: this._texts.row1,
 			row2: "To:",
 			progress1: "File:",
 			progress2: "Total:"
@@ -64,10 +68,13 @@ export default class Copy extends Operation {
 		/* FIXME symlinks */
 
 		if (record.children !== null) {
-			return this._copyDirectory(record, targetPath);
+			await this._copyDirectory(record, targetPath);
 		} else {
-			return this._copyFile(record, targetPath);
+			await this._copyFile(record, targetPath);
 		}
+
+		await targetPath.setDate(record.path.getDate());
+		return this._recordCopied(record);
 	}
 
 	/**
@@ -82,8 +89,6 @@ export default class Copy extends Operation {
 		for (let child of record.children) {
 			await this._copy(child, targetPath);
 		}
-
-		return targetPath.setDate(record.path.getDate());
 	}
 
 	/**
@@ -101,7 +106,7 @@ export default class Copy extends Operation {
 	}
 
 	/**
-	 * Copy a filter record to target file path
+	 * Copy a file record to target file path
 	 * @param {object} record
 	 * @param {Path} targetPath already appended target path
 	 */
@@ -143,10 +148,7 @@ export default class Copy extends Operation {
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
 
-			writeStream.on("finish", async e => {
-				await targetPath.setDate(record.path.getDate());
-				resolve();
-			});
+			writeStream.on("finish", resolve);
 
 			readStream.on("data", buffer => {
 				done += buffer.length;
@@ -158,6 +160,8 @@ export default class Copy extends Operation {
 			}); /* on data */
 		}); /* file copy promise */
 	}
+
+	async _recordCopied(record) {} /* used only for moving */
 
 	async _handleFileExists(path) {
 		let text = `Target file ${path.getPath()} already exists`;

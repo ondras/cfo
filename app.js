@@ -1643,6 +1643,10 @@ class Copy extends Operation {
 		super();
 		this._sourcePath = sourcePath;
 		this._targetPath = targetPath;
+		this._texts = {
+			title: "Copying in progress",
+			row1: "Copying:"
+		};
 		this._stats = {
 			done: 0,
 			total: 0
@@ -1661,8 +1665,8 @@ class Copy extends Operation {
 
 	async _startCopying(root) {
 		let options = {
-			title: "Copying in progress",
-			row1: "Copying:",
+			title: this._texts.title,
+			row1: this._texts.row1,
 			row2: "To:",
 			progress1: "File:",
 			progress2: "Total:"
@@ -1699,10 +1703,13 @@ class Copy extends Operation {
 		/* FIXME symlinks */
 
 		if (record.children !== null) {
-			return this._copyDirectory(record, targetPath);
+			await this._copyDirectory(record, targetPath);
 		} else {
-			return this._copyFile(record, targetPath);
+			await this._copyFile(record, targetPath);
 		}
+
+		await targetPath.setDate(record.path.getDate());
+		return this._recordCopied(record);
 	}
 
 	/**
@@ -1717,8 +1724,6 @@ class Copy extends Operation {
 		for (let child of record.children) {
 			await this._copy(child, targetPath);
 		}
-
-		return targetPath.setDate(record.path.getDate());
 	}
 
 	/**
@@ -1736,7 +1741,7 @@ class Copy extends Operation {
 	}
 
 	/**
-	 * Copy a filter record to target file path
+	 * Copy a file record to target file path
 	 * @param {object} record
 	 * @param {Path} targetPath already appended target path
 	 */
@@ -1778,10 +1783,7 @@ class Copy extends Operation {
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
 
-			writeStream.on("finish", async e => {
-				await targetPath.setDate(record.path.getDate());
-				resolve();
-			});
+			writeStream.on("finish", resolve);
 
 			readStream.on("data", buffer => {
 				done += buffer.length;
@@ -1793,6 +1795,8 @@ class Copy extends Operation {
 			}); /* on data */
 		}); /* file copy promise */
 	}
+
+	async _recordCopied(record) {} /* used only for moving */
 
 	async _handleFileExists(path) {
 		let text = `Target file ${path.getPath()} already exists`;
@@ -1866,6 +1870,48 @@ Operation.Copy.prototype._copySymlink = function(oldPath, newPath) {
 }
 
 */
+
+class Move extends Copy {
+	constructor(sourcePath, targetPath) {
+		super(sourcePath, targetPath);
+		this._texts = {
+			title: "Moving in progress",
+			row1: "Moving:"
+		};
+	}
+
+	async _startCopying(root) {
+		if (root.path.supports(RENAME)) {
+			let targetPath = this._targetPath;
+			await targetPath.stat();
+			if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
+			try {
+				await root.path.rename(targetPath);
+				return;
+			} catch (e) {} // quick rename failed, need to copy+delete
+		}
+		super._startCopying(root);
+	}
+
+	async _recordCopied(record) {
+		try {
+			await record.path.delete();
+		} catch (e) {
+			return this._handleDeleteError(e, record);
+		}
+	}
+
+	async _handleDeleteError(e, record) {
+		let text = e.message;
+		let title = "Error deleting file";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let result = await this._processIssue("delete", { text, title, buttons });
+		switch (result) {
+			case "retry": return this._recordCopied(record); break;
+			case "abort": this.abort(); break;
+		}
+	}
+}
 
 register("list:up", "Backspace", () => {
 	let list = getActive().getList();
@@ -1974,6 +2020,23 @@ register("file:copy", "F5", async () => {
 	targetPath = new Local(name); // fixme other path types
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
+	targetList.reload();
+});
+
+register("file:move", "F6", async () => {
+	let sourceList = getActive().getList();
+	let sourcePath = sourceList.getFocusedPath();
+	let targetList = getInactive().getList();
+	let targetPath = targetList.getPath();
+
+	/* fixme parent->child test */
+
+	let name = await prompt(`Move "${sourcePath.getPath()}" to:`, targetPath.getPath());
+	if (!name) { return; }
+	targetPath = new Local(name); // fixme other path types
+	let move = new Move(sourcePath, targetPath);
+	await move.run();
+	sourceList.reload();
 	targetList.reload();
 });
 

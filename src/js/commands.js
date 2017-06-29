@@ -7,6 +7,7 @@ import * as command from "util/command.js";
 import LocalPath from "path/local.js";
 import Delete from "operation/delete.js";
 import Copy from "operation/copy.js";
+import Move from "operation/move.js";
 
 command.register("list:up", "Backspace", () => {
 	let list = panes.getActive().getList();
@@ -115,6 +116,23 @@ command.register("file:copy", "F5", async () => {
 	targetPath = new LocalPath(name); // fixme other path types
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
+	targetList.reload();
+});
+
+command.register("file:move", "F6", async () => {
+	let sourceList = panes.getActive().getList();
+	let sourcePath = sourceList.getFocusedPath();
+	let targetList = panes.getInactive().getList();
+	let targetPath = targetList.getPath();
+
+	/* fixme parent->child test */
+
+	let name = await prompt(`Move "${sourcePath.getPath()}" to:`, targetPath.getPath());
+	if (!name) { return; }
+	targetPath = new LocalPath(name); // fixme other path types
+	let move = new Move(sourcePath, targetPath);
+	await move.run();
+	sourceList.reload();
 	targetList.reload();
 });
 
