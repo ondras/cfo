@@ -4,6 +4,7 @@
 class Path {
 	is(other) { return other.getPath() == this.getPath(); }
 
+	/* sync getters */
 	getPath() {}
 	getName() {}
 	getImage() {}
@@ -11,19 +12,26 @@ class Path {
 	getSize() {}
 	getMode() {}
 	getDescription() {}
-
-	supports(what) {}
 	getParent() {}
-	async getChildren() {}
-	activate(list) {
-		if (this.supports(CHILDREN)) { list.setPath(this); }
-	}
 	append(leaf) {}
+
+	/* never fails */
+	async stat() {}
+
+	/* these can be called only after stat */
+	exists() {}
+	supports(what) {}
+	async getChildren() {}
+
+	/* misc */
 	async create(opts) {}
 	async rename(newPath) {}
 	async delete() {}
-
 	createStream(type) {}
+
+	activate(list) {
+		if (this.supports(CHILDREN)) { list.setPath(this); }
+	}
 }
 
 const CHILDREN = 0; // list children
@@ -177,6 +185,7 @@ class Local extends Path {
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
 	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
+	exists() { return ("isDirectory" in this._meta); }
 
 	getDescription() {
 		let d = this._path;
@@ -241,7 +250,7 @@ class Local extends Path {
 	}
 
 	async delete() {
-		return this._meta.isDirectory ? rmdir(this._path) : unlink(this._path);
+		return (this._meta.isDirectory ? rmdir(this._path) : unlink(this._path));
 	}
 
 	async getChildren() {
@@ -250,15 +259,11 @@ class Local extends Path {
 			.map(name => path.resolve(this._path, name))
 			.map(name => new this.constructor(name));
 
-		// safe stat: always fulfills with the path
-		let stat = async p => { 
-			try {
-				await p.stat();
-			} catch (e) {}
-			return p;
-		};
+		let promises = paths.map(async path => {
+			await path.stat();
+			return path;
+		});
 
-		let promises = paths.map(stat);
 		return Promise.all(promises);
 	}
 
@@ -271,15 +276,18 @@ class Local extends Path {
 	}
 
 	async stat() {
-		let meta = await getMetadata(this._path, {link:true});
-		Object.assign(this._meta, meta);
-		if (!meta.isSymbolicLink) { return; }
+		try {
+			this._meta = await getMetadata(this._path, {link:true});
+		} catch (e) {
+			this._meta = {};
+		}
+
+		if (!this._meta.isSymbolicLink) { return; }
 
 		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
 		try {
 			let targetPath = await readlink(this._path);
 			this._target = targetPath;
-
 
 			/*
 			 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
@@ -532,6 +540,8 @@ class Scan extends Operation {
 		if (this._aborted) { return null; }
 		this._progress.update({row1: path.getPath()});
 
+		await path.stat();
+
 		if (path.supports(CHILDREN)) { /* descend, recurse */
 			return this._analyzeDirectory(path);
 		} else { /* compute */
@@ -560,15 +570,10 @@ class Scan extends Operation {
 		}
 	}
 
-	async _analyzeFile(path) {
-		try {
-			await path.stat();
-			let record = createRecord(path);
-			record.size = record.path.getSize(); /* update this one */
-			return record;
-		} catch (e) {
-			return this._handleError(e, path);
-		}
+	_analyzeFile(path) {
+		let record = createRecord(path);
+		record.size = record.path.getSize();
+		return record;
 	}
 
 	async _handleError(e, path) {
@@ -937,9 +942,10 @@ class List {
 	async _loadPathContents(path) {
 		this._path = path;
 
+		/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
+		await path.stat();
+
 		try {
-			/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
-			await path.stat();
 			let paths = await path.getChildren();
 			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
 			this._show(paths);
@@ -1561,10 +1567,8 @@ class Delete extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.count;
-		let result = await this._startDeleting(root);
-
+		await this._startDeleting(root);
 		this._end();
-		return result;
 	}
 
 	async _startDeleting(record) {
@@ -1614,9 +1618,9 @@ class Delete extends Operation {
 		let result = await this._processIssue("delete", { text, title, buttons });
 		switch (result) {
 			case "retry": return this._delete(record); break;
-			case "abort": this.abort(); return false; break;
-			default: return false; break;
+			case "abort": this.abort(); break;
 		}
+		return false;
 	}
 }
 
@@ -1638,10 +1642,8 @@ class Copy extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.size;
-		let result = await this._startCopying(root);
-
+		await this._startCopying(root);
 		this._end();
-		return result;
 	}
 
 	async _startCopying(root) {
@@ -1666,10 +1668,20 @@ class Copy extends Operation {
 	 * @param {Path} targetPath Target path without the appended part
 	 */
 	async _copy(record, targetPath) {
-		if (this._aborted) { return false; }
+		if (this._aborted) { return; }
 
-		/* create new proper target name */
-		targetPath = targetPath.append(record.path.getName());
+		await targetPath.stat();
+
+		if (record.path.getParent().is(targetPath)) { /* copy to the same parent -- create a "copy of" prefix */
+			let name = record.path.getName();
+			while (targetPath.exists()) {
+				name = `Copy of ${name}`;
+				targetPath = record.path.getParent().append(name);
+				await targetPath.stat();
+			}
+		} else if (targetPath.exists()) { /* append inside an existing target */
+			targetPath = targetPath.append(record.path.getName());
+		} /* else does not exist, will be created during copy impl below */
 
 		/* FIXME symlinks */
 
@@ -1680,24 +1692,6 @@ class Copy extends Operation {
 		}
 	}
 
-	// Create a new (non-existant) target path for currently processed source node
-	_createCurrentTarget(record) {
-		// copy to the same file/dir: create a "copy of" clone 
-		// FIXME exists
-		/*
-		if (currentTarget.is(record.path)) {
-			var name = newPath.getName();
-			var parent = newPath.getParent();
-			while (newPath.exists()) { 
-				name = "Copy of " + name;
-				newPath = parent.append(name);
-			}
-			record.targetName = name; // remember as a "renamed" target name for potential children
-		}
-*/
-		return currentTarget;
-	}
-
 	/**
 	 * Copy a directory record to target directory path
 	 * @param {object} record
@@ -1705,21 +1699,18 @@ class Copy extends Operation {
 	 */
 	async _copyDirectory(record, targetPath) {
 		let created = await this._createDirectory(targetPath);
-		if (!created) { return false; }
+		if (!created) { return; }
 
-		let copied = true;
 		for (let child of record.children) {
-			let childCopied = await this._copy(child, targetPath);
-			if (!childCopied) { copied = false; }
+			await this._copy(child, targetPath);
 		}
-		return copied;
 	}
 
+	/**
+	 * @returns {Promise<bool>}
+	 */
 	async _createDirectory(path) {
-		try { // FIXME exists() ?
-			await path.stat();
-			if (path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
-		} catch (e) {} /* does not exist, good */
+		if (path.exists() && path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
 
 		try {
 			await path.create({dir:true});
@@ -1740,25 +1731,24 @@ class Copy extends Operation {
 		let progress2 = 100*this._stats.done/this._stats.total;
 		this._progress.update({row1:record.path.getPath(), row2:targetPath.getPath(), progress1, progress2});
 
-		try { // FIXME exists() ?
-			await targetPath.stat();
+		if (targetPath.exists()) { /* target exists: overwrite/skip/abort */
 			if (this._issues.overwrite == "skip-all") { /* silently skip */
 				this._stats.done += record.size;
-				return true;
-			} 
+				return;
+			}
 			if (this._issues.overwrite != "overwrite-all") { /* raise an issue */
 				let result = await this._handleFileExists(targetPath);
 				switch (result) {
-					case "abort": this.abort(); return false; break;
+					case "abort": this.abort(); return; break;
 					case "skip":
 					case "skip-all":
 						this._stats.done += record.size;
-						return true;
+						return;
 					break;
 					/* overwrite = continue */
 				}
 			}
-		} catch (e) {} /* does not exist, good */
+		}
 
 		let readStream = record.path.createStream("r");
 		let writeStream = targetPath.createStream("w");
@@ -1766,11 +1756,11 @@ class Copy extends Operation {
 
 		return new Promise(resolve => {
 			let handleError = async e => {
-				let copied = await this._handleCopyError(e, record, targetPath);
-				resolve(copied);
+				await this._handleCopyError(e, record, targetPath);
+				resolve();
 			};
 
-			writeStream.on("finish", () => resolve(true));
+			writeStream.on("finish", resolve);
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
 
@@ -1800,9 +1790,10 @@ class Copy extends Operation {
 
 		switch (result) {
 			case "retry": return this._createDirectory(path); break;
-			case "abort": this.abort(); return false; break;
-			default: return false; break;
+			case "abort": this.abort(); break;
 		}
+
+		return false;
 	}
 
 	async _handleCopyError(e, record, targetPath) {
@@ -1812,8 +1803,7 @@ class Copy extends Operation {
 		let result = await this._processIssue("copy", { text, title, buttons });
 		switch (result) {
 			case "retry": return this._copyFile(record, targetPath); break;
-			case "abort": this.abort(); return false; break;
-			default: return false; break;
+			case "abort": this.abort(); break;
 		}
 	}
 }
@@ -1941,8 +1931,8 @@ register("file:delete", ["Delete", "F8"], async () => {
 	let result = await confirm(`Really delete "${path.getPath()}" ?`);
 	if (!result) { return; }
 	let d = new Delete(path);
-	let deleted = await d.run();
-	if (deleted) { list.reload(); }
+	await d.run();
+	list.reload();
 });
 
 register("file:rename", "F2", () => {
@@ -1964,8 +1954,8 @@ register("file:copy", "F5", async () => {
 	if (!name) { return; }
 	targetPath = new Local(name); // fixme other path types
 	let copy = new Copy(sourcePath, targetPath);
-	let copied = await copy.run();
-	if (copied) { targetList.reload(); }
+	await copy.run();
+	targetList.reload();
 });
 
 register("app:devtools", "F12", () => {

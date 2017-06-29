@@ -1,6 +1,7 @@
 export default class Path {
 	is(other) { return other.getPath() == this.getPath(); }
 
+	/* sync getters */
 	getPath() {}
 	getName() {}
 	getImage() {}
@@ -8,19 +9,26 @@ export default class Path {
 	getSize() {}
 	getMode() {}
 	getDescription() {}
-
-	supports(what) {}
 	getParent() {}
-	async getChildren() {}
-	activate(list) {
-		if (this.supports(CHILDREN)) { list.setPath(this); }
-	}
 	append(leaf) {}
+
+	/* never fails */
+	async stat() {}
+
+	/* these can be called only after stat */
+	exists() {}
+	supports(what) {}
+	async getChildren() {}
+
+	/* misc */
 	async create(opts) {}
 	async rename(newPath) {}
 	async delete() {}
-
 	createStream(type) {}
+
+	activate(list) {
+		if (this.supports(CHILDREN)) { list.setPath(this); }
+	}
 }
 
 export const CHILDREN = 0; // list children

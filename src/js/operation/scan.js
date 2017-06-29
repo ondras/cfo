@@ -37,6 +37,8 @@ export default class Scan extends Operation {
 		if (this._aborted) { return null; }
 		this._progress.update({row1: path.getPath()});
 
+		await path.stat();
+
 		if (path.supports(CHILDREN)) { /* descend, recurse */
 			return this._analyzeDirectory(path);
 		} else { /* compute */
@@ -65,15 +67,10 @@ export default class Scan extends Operation {
 		}
 	}
 
-	async _analyzeFile(path) {
-		try {
-			await path.stat();
-			let record = createRecord(path);
-			record.size = record.path.getSize(); /* update this one */
-			return record;
-		} catch (e) {
-			return this._handleError(e, path);
-		}
+	_analyzeFile(path) {
+		let record = createRecord(path);
+		record.size = record.path.getSize();
+		return record;
 	}
 
 	async _handleError(e, path) {

@@ -49,6 +49,7 @@ export default class Local extends Path {
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
 	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
+	exists() { return ("isDirectory" in this._meta); }
 
 	getDescription() {
 		let d = this._path;
@@ -113,7 +114,7 @@ export default class Local extends Path {
 	}
 
 	async delete() {
-		return this._meta.isDirectory ? rmdir(this._path) : unlink(this._path);
+		return (this._meta.isDirectory ? rmdir(this._path) : unlink(this._path));
 	}
 
 	async getChildren() {
@@ -122,15 +123,11 @@ export default class Local extends Path {
 			.map(name => path.resolve(this._path, name))
 			.map(name => new this.constructor(name));
 
-		// safe stat: always fulfills with the path
-		let stat = async p => { 
-			try {
-				await p.stat();
-			} catch (e) {};
-			return p;
-		}
+		let promises = paths.map(async path => {
+			await path.stat();
+			return path;
+		});
 
-		let promises = paths.map(stat);
 		return Promise.all(promises);
 	}
 
@@ -143,15 +140,18 @@ export default class Local extends Path {
 	}
 
 	async stat() {
-		let meta = await getMetadata(this._path, {link:true});
-		Object.assign(this._meta, meta);
-		if (!meta.isSymbolicLink) { return; }
+		try {
+			this._meta = await getMetadata(this._path, {link:true});
+		} catch (e) {
+			this._meta = {};
+		}
+
+		if (!this._meta.isSymbolicLink) { return; }
 
 		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
 		try {
 			let targetPath = await readlink(this._path);
 			this._target = targetPath;
-
 
 			/*
 			 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).

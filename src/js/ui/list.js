@@ -240,9 +240,10 @@ export default class List {
 	async _loadPathContents(path) {
 		this._path = path;
 
+		/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
+		await path.stat();
+
 		try {
-			/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
-			await path.stat();
 			let paths = await path.getChildren();
 			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
 			this._show(paths);

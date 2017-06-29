@@ -91,8 +91,8 @@ command.register("file:delete", ["Delete", "F8"], async () => {
 	let result = await confirm(`Really delete "${path.getPath()}" ?`);
 	if (!result) { return; }
 	let d = new Delete(path);
-	let deleted = await d.run();
-	if (deleted) { list.reload(); }
+	await d.run();
+	list.reload();
 });
 
 command.register("file:rename", "F2", () => {
@@ -114,8 +114,8 @@ command.register("file:copy", "F5", async () => {
 	if (!name) { return; }
 	targetPath = new LocalPath(name); // fixme other path types
 	let copy = new Copy(sourcePath, targetPath);
-	let copied = await copy.run();
-	if (copied) { targetList.reload(); }
+	await copy.run();
+	targetList.reload();
 });
 
 command.register("app:devtools", "F12", () => {

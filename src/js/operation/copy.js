@@ -21,10 +21,8 @@ export default class Copy extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.size;
-		let result = await this._startCopying(root);
-
+		await this._startCopying(root);
 		this._end();
-		return result;
 	}
 
 	async _startCopying(root) {
@@ -49,10 +47,20 @@ export default class Copy extends Operation {
 	 * @param {Path} targetPath Target path without the appended part
 	 */
 	async _copy(record, targetPath) {
-		if (this._aborted) { return false; }
+		if (this._aborted) { return; }
 
-		/* create new proper target name */
-		targetPath = targetPath.append(record.path.getName());
+		await targetPath.stat();
+
+		if (record.path.getParent().is(targetPath)) { /* copy to the same parent -- create a "copy of" prefix */
+			let name = record.path.getName();
+			while (targetPath.exists()) {
+				name = `Copy of ${name}`;
+				targetPath = record.path.getParent().append(name);
+				await targetPath.stat();
+			}
+		} else if (targetPath.exists()) { /* append inside an existing target */
+			targetPath = targetPath.append(record.path.getName());
+		} /* else does not exist, will be created during copy impl below */
 
 		/* FIXME symlinks */
 
@@ -63,24 +71,6 @@ export default class Copy extends Operation {
 		}
 	}
 
-	// Create a new (non-existant) target path for currently processed source node
-	_createCurrentTarget(record) {
-		// copy to the same file/dir: create a "copy of" clone 
-		// FIXME exists
-		/*
-		if (currentTarget.is(record.path)) {
-			var name = newPath.getName();
-			var parent = newPath.getParent();
-			while (newPath.exists()) { 
-				name = "Copy of " + name;
-				newPath = parent.append(name);
-			}
-			record.targetName = name; // remember as a "renamed" target name for potential children
-		}
-*/
-		return currentTarget;
-	}
-
 	/**
 	 * Copy a directory record to target directory path
 	 * @param {object} record
@@ -88,21 +78,18 @@ export default class Copy extends Operation {
 	 */
 	async _copyDirectory(record, targetPath) {
 		let created = await this._createDirectory(targetPath);
-		if (!created) { return false; }
+		if (!created) { return; }
 
-		let copied = true;
 		for (let child of record.children) {
-			let childCopied = await this._copy(child, targetPath);
-			if (!childCopied) { copied = false; }
+			await this._copy(child, targetPath);
 		}
-		return copied;
 	}
 
+	/**
+	 * @returns {Promise<bool>}
+	 */
 	async _createDirectory(path) {
-		try { // FIXME exists() ?
-			await path.stat();
-			if (path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
-		} catch (e) {} /* does not exist, good */
+		if (path.exists() && path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
 
 		try {
 			await path.create({dir:true});
@@ -123,25 +110,24 @@ export default class Copy extends Operation {
 		let progress2 = 100*this._stats.done/this._stats.total;
 		this._progress.update({row1:record.path.getPath(), row2:targetPath.getPath(), progress1, progress2});
 
-		try { // FIXME exists() ?
-			await targetPath.stat();
+		if (targetPath.exists()) { /* target exists: overwrite/skip/abort */
 			if (this._issues.overwrite == "skip-all") { /* silently skip */
 				this._stats.done += record.size;
-				return true;
+				return;
 			}
 			if (this._issues.overwrite != "overwrite-all") { /* raise an issue */
 				let result = await this._handleFileExists(targetPath);
 				switch (result) {
-					case "abort": this.abort(); return false; break;
+					case "abort": this.abort(); return; break;
 					case "skip":
 					case "skip-all":
 						this._stats.done += record.size;
-						return true;
+						return;
 					break;
 					/* overwrite = continue */
 				}
 			}
-		} catch (e) {} /* does not exist, good */
+		}
 
 		let readStream = record.path.createStream("r");
 		let writeStream = targetPath.createStream("w");
@@ -149,11 +135,11 @@ export default class Copy extends Operation {
 
 		return new Promise(resolve => {
 			let handleError = async e => {
-				let copied = await this._handleCopyError(e, record, targetPath);
-				resolve(copied);
+				await this._handleCopyError(e, record, targetPath);
+				resolve();
 			}
 
-			writeStream.on("finish", () => resolve(true));
+			writeStream.on("finish", resolve);
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
 
@@ -183,9 +169,10 @@ export default class Copy extends Operation {
 
 		switch (result) {
 			case "retry": return this._createDirectory(path); break;
-			case "abort": this.abort(); return false; break;
-			default: return false; break;
+			case "abort": this.abort(); break;
 		}
+
+		return false;
 	}
 
 	async _handleCopyError(e, record, targetPath) {
@@ -195,8 +182,7 @@ export default class Copy extends Operation {
 		let result = await this._processIssue("copy", { text, title, buttons });
 		switch (result) {
 			case "retry": return this._copyFile(record, targetPath); break;
-			case "abort": this.abort(); return false; break;
-			default: return false; break;
+			case "abort": this.abort(); break;
 		}
 	}
 }

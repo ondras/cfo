@@ -18,10 +18,8 @@ export default class Delete extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.count;
-		let result = await this._startDeleting(root);
-
+		await this._startDeleting(root);
 		this._end();
-		return result;
 	}
 
 	async _startDeleting(record) {
@@ -71,8 +69,8 @@ export default class Delete extends Operation {
 		let result = await this._processIssue("delete", { text, title, buttons });
 		switch (result) {
 			case "retry": return this._delete(record); break;
-			case "abort": this.abort(); return false; break;
-			default: return false; break;
+			case "abort": this.abort(); break;
 		}
+		return false;
 	}
 }
