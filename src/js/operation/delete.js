@@ -52,7 +52,6 @@ export default class Delete extends Operation {
 
 		if (!deleted) { return false; }
 
-		// show where are we FIXME stats etc
 		var path = record.path;
 		this._progress.update({row1:path.getPath(), progress1:100*this._stats.done/this._stats.total});
 

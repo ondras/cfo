@@ -179,6 +179,7 @@ electron.ipcRenderer.on("config", (e, data) => {
 
 electron.ipcRenderer.on("data", (e, data) => {
 	let node$$1;
+	console.log(data);
 
 	if ("row1" in data) {
 		node$$1 = DOM.row1.value;

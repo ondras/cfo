@@ -14,6 +14,8 @@ electron.ipcRenderer.on("config", (e, data) => {
 		if (data.buttons.includes(b.dataset.action)) { return; }
 		b.parentNode.removeChild(b);
 	});
+
+	document.querySelector("button").focus();
 });
 
 command.register("window:close", "Escape", () => {

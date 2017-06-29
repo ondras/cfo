@@ -19,7 +19,7 @@ const windowOptions = {
 export default class Progress {
 	constructor(config) {
 		this._config = config;
-		this._data = null;
+		this._data = {};
 		this._window = null;
 		this._timeout = null;
 	}
@@ -55,7 +55,7 @@ export default class Progress {
 	}
 
 	update(data) {
-		this._data = data;
+		Object.assign(this._data, data);
 		if (!this._window || this._timeout) { return; }
 
 		this._timeout = setTimeout(() => {

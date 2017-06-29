@@ -61,6 +61,7 @@ electron.ipcRenderer.on("config", (e, data) => {
 
 electron.ipcRenderer.on("data", (e, data) => {
 	let node;
+	console.log(data);
 
 	if ("row1" in data) {
 		node = DOM.row1.value;

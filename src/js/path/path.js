@@ -1,7 +1,7 @@
 export default class Path {
 	is(other) { return other.getPath() == this.getPath(); }
-	getPath() {}
 
+	getPath() {}
 	getName() {}
 	getImage() {}
 	getDate() {}
