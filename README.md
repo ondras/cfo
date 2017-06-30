@@ -39,12 +39,18 @@ CFO shall become a modernized version of [Fire Commander](https://addons.mozilla
   - [ ] Clipboard support
   - [ ] App icon
 
-## Building & Running
+## Running
+
+```bash
+$ npm install
+$ npm start
+```
+
+## Building
 
 ```bash
 $ npm install
 $ make
-$ npm start
 ```
 
 ## Contributing
