@@ -14,7 +14,7 @@ app.on("ready", () => {
 		icon: `${__dirname}/icon.png`
 	}
 	let win = new BrowserWindow(options);
-	win.setMenu(null);
+//	win.setMenu(null);
 
 	win.on("resize", () => {
 		settings.set("window.size", win.getSize());
