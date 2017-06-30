@@ -61,7 +61,7 @@ export function execute(command) {
 }
 
 export function menuItem(command, label) {
-	return {label};
+	return {label, click() { console.log(label); } };
 }
 
 document.body.addEventListener("click", e => {
