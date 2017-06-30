@@ -83,7 +83,7 @@ export default class List {
 		this._active = true;
 		document.addEventListener("keydown", this);
 
-		this._focusPath(this._pathToBeFocused);
+		this._focusPath(this._pathToBeFocused, 0);
 		this._pathToBeFocused = null;
 		this._scroll.focus();
 	}
@@ -260,6 +260,8 @@ export default class List {
 	}
 
 	_show(paths) {
+		let fallbackIndex = (this._pathToBeFocused ? 0 : this._getFocusedIndex());
+
 		this._clear();
 
 		this._input.value = this._path.getPath();
@@ -271,11 +273,12 @@ export default class List {
 			paths.unshift(up);
 		}
 
-		this._items = this._build(paths);
 		if (!paths.length) { return; }
 
+		this._items = this._build(paths);
+
 		if (this._active) {
-			this._focusPath(this._pathToBeFocused);
+			this._focusPath(this._pathToBeFocused, fallbackIndex);
 			this._pathToBeFocused = null;
 		}
 	}
@@ -393,10 +396,11 @@ export default class List {
 		}
 	}
 
-	_focusPath(path) {
+	/* Focus a given path. If not available, focus a given index. */
+	_focusPath(path, fallbackIndex) {
 		let focusIndex = this._items.reduce((result, item, index) => {
 			return (path && item.path.is(path) ? index : result);
-		}, 0);
+		}, fallbackIndex);
 		this._focusAt(focusIndex);
 	}
 

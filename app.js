@@ -312,7 +312,7 @@ class Local extends Path {
 
 		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
 		try {
-			let targetPath = await readlink(this._path);
+			let targetPath = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
 			this._target = targetPath;
 
 			/*
@@ -811,7 +811,7 @@ class List {
 		this._active = true;
 		document.addEventListener("keydown", this);
 
-		this._focusPath(this._pathToBeFocused);
+		this._focusPath(this._pathToBeFocused, 0);
 		this._pathToBeFocused = null;
 		this._scroll.focus();
 	}
@@ -988,6 +988,8 @@ class List {
 	}
 
 	_show(paths) {
+		let fallbackIndex = (this._pathToBeFocused ? 0 : this._getFocusedIndex());
+
 		this._clear();
 
 		this._input.value = this._path.getPath();
@@ -999,11 +1001,12 @@ class List {
 			paths.unshift(up);
 		}
 
-		this._items = this._build(paths);
 		if (!paths.length) { return; }
 
+		this._items = this._build(paths);
+
 		if (this._active) {
-			this._focusPath(this._pathToBeFocused);
+			this._focusPath(this._pathToBeFocused, fallbackIndex);
 			this._pathToBeFocused = null;
 		}
 	}
@@ -1121,10 +1124,11 @@ class List {
 		}
 	}
 
-	_focusPath(path) {
+	/* Focus a given path. If not available, focus a given index. */
+	_focusPath(path, fallbackIndex) {
 		let focusIndex = this._items.reduce((result, item, index) => {
 			return (path && item.path.is(path) ? index : result);
-		}, 0);
+		}, fallbackIndex);
 		this._focusAt(focusIndex);
 	}
 
@@ -2075,15 +2079,5 @@ if (!("".padStart)) {
 }
 
 init();
-
-/*
-
-reload: 
-  - zadana: chceme focusnout zadanou (created), pokud neni, chceme ??? => prvni.
-  - nezadana: chceme focusnout aktualni (refresh), pokud neni, chceme stejny index.
-
-setPath: chceme focusnout predchozi. pokud neni, chceme prvni.
-
-*/
 
 }());

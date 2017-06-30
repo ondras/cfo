@@ -35,13 +35,3 @@ if (!("".padStart)) {
 }
 
 panes.init();
-
-/*
-
-reload: 
-  - zadana: chceme focusnout zadanou (created), pokud neni, chceme ??? => prvni.
-  - nezadana: chceme focusnout aktualni (refresh), pokud neni, chceme stejny index.
-
-setPath: chceme focusnout predchozi. pokud neni, chceme prvni.
-
-*/

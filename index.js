@@ -1,5 +1,5 @@
 const {app, BrowserWindow, remote, Menu} = require("electron");
-const pkg = require("./package.json");
+const settings = require("electron-settings");
 
 app.on("window-all-closed", () => {
 	if (process.platform != "darwin") { app.quit(); }
@@ -7,13 +7,18 @@ app.on("window-all-closed", () => {
 
 app.on("ready", () => {
 	Menu.setApplicationMenu(null);
+	let size = settings.get("window.size") || [800, 600];
 	let options = {
-		width: pkg.window.width,
-		height: pkg.window.height,
+		width: size[0],
+		height: size[1],
 		icon: `${__dirname}/icon.png`
 	}
 	let win = new BrowserWindow(options);
 	win.setMenu(null);
+
+	win.on("resize", () => {
+		settings.set("window.size", win.getSize());
+	});
 
 	win.loadURL(`file://${__dirname}/index.html`);
 });
