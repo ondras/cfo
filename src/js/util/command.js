@@ -21,12 +21,15 @@ export function register(command, keys, func) {
 		}
 	}
 
+	keys = [].concat(keys || []);
+
 	registry[command] = {
 		func: wrap,
-		enabled: true
+		enabled: true,
+		key: keys[0]
 	};
 
-	[].concat(keys || []).forEach(key => keyboard.register(wrap, key));
+	keys.forEach(key => keyboard.register(wrap, key));
 
 	return command;
 }
@@ -61,7 +64,11 @@ export function execute(command) {
 }
 
 export function menuItem(command, label) {
-	return {label, click() { console.log(label); } };
+	let click = () => execute(command);
+	let accelerator = null;
+	if (command in registry) { accelerator = registry[command].key; }
+
+	return { label, click, accelerator };
 }
 
 document.body.addEventListener("click", e => {

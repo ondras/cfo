@@ -1406,12 +1406,15 @@ function register(command, keys, func) {
 		}
 	}
 
+	keys = [].concat(keys || []);
+
 	registry[command] = {
 		func: wrap,
-		enabled: true
+		enabled: true,
+		key: keys[0]
 	};
 
-	[].concat(keys || []).forEach(key => register$1(wrap, key));
+	keys.forEach(key => register$1(wrap, key));
 
 	return command;
 }
@@ -1429,7 +1432,11 @@ function execute(command) {
 }
 
 function menuItem(command, label) {
-	return {label};
+	let click = () => execute(command);
+	let accelerator = null;
+	if (command in registry) { accelerator = registry[command].key; }
+
+	return { label, click, accelerator };
 }
 
 document$1.body.addEventListener("click", e => {
@@ -1492,61 +1499,58 @@ register("tab:close", "Ctrl+W", () => {
 
 const Menu$1 = require('electron').remote.Menu;
 
-const template = [
-	{
-		label: "File",
-		submenu: [
-			menuItem("xxx", "Quick rename"),
-			menuItem("xxx", "View"),
-			menuItem("xxx", "Edit"),
-			menuItem("xxx", "Edit new file"),
-			menuItem("xxx", "Copy"),
-			menuItem("xxx", "Move"),
-			menuItem("xxx", "Delete"),
-			{type: "separator"},
-			{role: "quit"}
-		]
-	},
-	{
-		label: "Go",
-		submenu: [
-		]
-	},
-	{
-		label: "Commands",
-		submenu: [
-		]
-	},
-	{
-		label: "Help",
-		submenu: [
-			{
-				label: "About"
-			}
-		]
-	}
-];
-
 function init$1() {
+	const template = [
+		{
+			label: "&File",
+			submenu: [
+				menuItem("file:rename", "&Quick rename"),
+				menuItem("fixme", "&View"),
+				menuItem("file:edit", "&Edit"),
+				menuItem("file:new", "Edit &new file"),
+				menuItem("file:copy", "&Copy"),
+				menuItem("file:move", "&Move"),
+				menuItem("file:delete", "&Delete"),
+				{type: "separator"},
+				{role: "quit"}
+			]
+		},
+		{
+			label: "&Go",
+			submenu: [
+				menuItem("list:up", "Go to &parent"),
+				menuItem("list:top", "Go to &top"),
+				menuItem("fixme", "&Drive selection"),
+				menuItem("fixme", "&Wi-Fi Access points"),
+				menuItem("fixme", "&Favorites"),
+				menuItem("list:home", "&Home")
+			]
+		},
+		{
+			label: "&Commands",
+			submenu: [
+				menuItem("directory:new", "Create &directory"),
+				menuItem("fixme", "&New tab"),
+				menuItem("fixme", "&Close tab"),
+				menuItem("fixme", "&Search"),
+				menuItem("fixme", "Create &archive"),
+				{type: "separator"}, /* fixme sort? */
+				menuItem("fixme", "O&pen console"),
+				menuItem("fixme", "&Options")
+			]
+		},
+		{
+			label: "&Help",
+			submenu: [
+				{
+					label: "&About"
+				},
+				menuItem("app:devtools", "Toggle &Devtools")
+			]
+		}
+	];
+
 	let menu = Menu$1.buildFromTemplate(template);
-	/*
-const menu = new Menu();
-let i1 = new MenuItem({label: 'MenuItem1', click() { console.log('item 1 clicked') }});
-menu.append(i1);
-
-
-const x = new Menu();
-let tmp = new MenuItem({label:"xxxx", accelerator:"Ctrl+A", click() { console.log("xxx"); }});
-x.append(tmp);
-
-tmp = new MenuItem({label:"wwww", accelerator:"F3", click() { console.log("www"); }});
-x.append(tmp);
-
-menu.append(new MenuItem({label:"yyy", submenu:x}));
-
-x.append(new MenuItem({type: 'separator'}));
-x.append(new MenuItem({label: 'MenuItem2', type: 'checkbox', checked: true}));
-*/
 	Menu$1.setApplicationMenu(menu);
 }
 

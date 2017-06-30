@@ -87,12 +87,15 @@ function register(command, keys, func) {
 		}
 	}
 
+	keys = [].concat(keys || []);
+
 	registry[command] = {
 		func: wrap,
-		enabled: true
+		enabled: true,
+		key: keys[0]
 	};
 
-	[].concat(keys || []).forEach(key => register$1(wrap, key));
+	keys.forEach(key => register$1(wrap, key));
 
 	return command;
 }
