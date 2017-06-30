@@ -109,6 +109,8 @@ function execute(command) {
 	return registry[command].func();
 }
 
+
+
 document$1.body.addEventListener("click", e => {
 	let node = e.target;
 	while (node) {

@@ -6,7 +6,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("ready", () => {
-	Menu.setApplicationMenu(null);
 	let size = settings.get("window.size") || [800, 600];
 	let options = {
 		width: size[0],
@@ -14,7 +13,6 @@ app.on("ready", () => {
 		icon: `${__dirname}/icon.png`
 	}
 	let win = new BrowserWindow(options);
-//	win.setMenu(null);
 
 	win.on("resize", () => {
 		settings.set("window.size", win.getSize());

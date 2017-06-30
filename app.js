@@ -373,11 +373,11 @@ function removeProgress(window) {
 
 /* Progress window - remote (data) part */
 
-const remote = require("electron").remote;
+const remote$1 = require("electron").remote;
 const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
 const windowOptions = {
-	parent: remote.getCurrentWindow(),
+	parent: remote$1.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -397,7 +397,7 @@ class Progress {
 
 	open() {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
-		this._window = new remote.BrowserWindow(options);
+		this._window = new remote$1.BrowserWindow(options);
 		this._window.loadURL(`file://${__dirname}/progress.html`);
 
 		let webContents = this._window.webContents;
@@ -441,9 +441,9 @@ class Progress {
 
 /* Issue window - remote (data) part */
 
-const remote$1 = require("electron").remote;
+const remote$2 = require("electron").remote;
 const windowOptions$1 = {
-	parent: remote$1.getCurrentWindow(),
+	parent: remote$2.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,
@@ -463,7 +463,7 @@ class Issue {
 
 	open() {
 		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
-		this._window = new remote$1.BrowserWindow(options);
+		this._window = new remote$2.BrowserWindow(options);
 		this._window.loadURL(`file://${__dirname}/issue.html`);
 
 		let webContents = this._window.webContents;
@@ -472,7 +472,7 @@ class Issue {
 			webContents.send("config", this._config);
 		});
 
-		remote$1.ipcMain.once("action", (e, action) => {
+		remote$2.ipcMain.once("action", (e, action) => {
 			let w = this._window;
 			removeIssue(w);
 			this._window = null;
@@ -1428,6 +1428,10 @@ function execute(command) {
 	return registry[command].func();
 }
 
+function menuItem(command, label) {
+	return {label};
+}
+
 document$1.body.addEventListener("click", e => {
 	let node = e.target;
 	while (node) {
@@ -1485,6 +1489,66 @@ register("tab:new", "Ctrl+T", () => {
 register("tab:close", "Ctrl+W", () => {
 	getActive().removeList();
 });
+
+const Menu$1 = require('electron').remote.Menu;
+
+const template = [
+	{
+		label: "File",
+		submenu: [
+			menuItem("xxx", "Quick rename"),
+			menuItem("xxx", "View"),
+			menuItem("xxx", "Edit"),
+			menuItem("xxx", "Edit new file"),
+			menuItem("xxx", "Copy"),
+			menuItem("xxx", "Move"),
+			menuItem("xxx", "Delete"),
+			{type: "separator"},
+			{role: "quit"}
+		]
+	},
+	{
+		label: "Go",
+		submenu: [
+		]
+	},
+	{
+		label: "Commands",
+		submenu: [
+		]
+	},
+	{
+		label: "Help",
+		submenu: [
+			{
+				label: "About"
+			}
+		]
+	}
+];
+
+function init$1() {
+	let menu = Menu$1.buildFromTemplate(template);
+	/*
+const menu = new Menu();
+let i1 = new MenuItem({label: 'MenuItem1', click() { console.log('item 1 clicked') }});
+menu.append(i1);
+
+
+const x = new Menu();
+let tmp = new MenuItem({label:"xxxx", accelerator:"Ctrl+A", click() { console.log("xxx"); }});
+x.append(tmp);
+
+tmp = new MenuItem({label:"wwww", accelerator:"F3", click() { console.log("www"); }});
+x.append(tmp);
+
+menu.append(new MenuItem({label:"yyy", submenu:x}));
+
+x.append(new MenuItem({type: 'separator'}));
+x.append(new MenuItem({label: 'MenuItem2', type: 'checkbox', checked: true}));
+*/
+	Menu$1.setApplicationMenu(menu);
+}
 
 let resolve;
 
@@ -2045,6 +2109,7 @@ register("app:devtools", "F12", () => {
 	require("electron").remote.getCurrentWindow().toggleDevTools();
 });
 
+const {remote} = require('electron');
 window.FIXME = (...args) => console.error(...args);
 window.sleep = (delay = 1000) => new Promise(r => setTimeout(r, delay));
 
@@ -2078,6 +2143,7 @@ if (!("".padStart)) {
 	};
 }
 
+init$1();
 init();
 
 }());

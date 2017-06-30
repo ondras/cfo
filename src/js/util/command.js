@@ -60,6 +60,10 @@ export function execute(command) {
 	return registry[command].func();
 }
 
+export function menuItem(command, label) {
+	return {label};
+}
+
 document.body.addEventListener("click", e => {
 	let node = e.target;
 	while (node) {

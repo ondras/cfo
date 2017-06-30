@@ -1,5 +1,9 @@
 import * as panes from "panes.js";
+import * as menu from "menu.js";
 import * as commands from "commands.js";
+
+const {remote} = require('electron');
+const {Menu, MenuItem} = remote
 
 window.FIXME = (...args) => console.error(...args);
 window.sleep = (delay = 1000) => new Promise(r => setTimeout(r, delay));
@@ -34,4 +38,5 @@ if (!("".padStart)) {
 	}
 }
 
+menu.init();
 panes.init();
