@@ -16,7 +16,7 @@ export function readlink(linkPath) {
 export function readdir(path) {
 	return new Promise((resolve, reject) => {
 		fs.readdir(path, (err, files) => {
-			if (err) { reject(err); } else { resolve(files); }
+			err ? reject(err) : resolve(files);
 		});
 	});
 }
@@ -24,7 +24,7 @@ export function readdir(path) {
 export function mkdir(path, mode) {
 	return new Promise((resolve, reject) => {
 		fs.mkdir(path, mode, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	});
 }
@@ -32,7 +32,7 @@ export function mkdir(path, mode) {
 export function open(path, flags, mode) {
 	return new Promise((resolve, reject) => {
 		fs.open(path, flags, mode, (err, fd) => {
-			if (err) { reject(err); } else { resolve(fd); }
+			err ? reject(err) : resolve(fd);
 		});
 	});
 }
@@ -40,7 +40,7 @@ export function open(path, flags, mode) {
 export function close(fd) {
 	return new Promise((resolve, reject) => {
 		fs.close(fd, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	})
 }
@@ -48,7 +48,7 @@ export function close(fd) {
 export function rename(oldPath, newPath) {
 	return new Promise((resolve, reject) => {
 		fs.rename(oldPath, newPath, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	})
 }
@@ -56,7 +56,7 @@ export function rename(oldPath, newPath) {
 export function unlink(path) {
 	return new Promise((resolve, reject) => {
 		fs.unlink(path, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	});
 }
@@ -64,7 +64,7 @@ export function unlink(path) {
 export function rmdir(path) {
 	return new Promise((resolve, reject) => {
 		fs.rmdir(path, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	});
 }
@@ -72,7 +72,15 @@ export function rmdir(path) {
 export function utimes(path, atime, mtime) {
 	return new Promise((resolve, reject) => {
 		fs.utimes(path, atime, mtime, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
+		});
+	});
+}
+
+export function symlink(target, path) {
+	return new Promise((resolve, reject) => {
+		fs.symlink(target, path, err => {
+			err ? reject(err) : resolve();
 		});
 	});
 }

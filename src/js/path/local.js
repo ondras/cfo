@@ -1,5 +1,5 @@
 import Path, {CHILDREN, CREATE, EDIT, RENAME, DELETE } from "./path.js";
-import {readlink, readdir, mkdir, open, close, rename, unlink, rmdir, utimes} from "util/fs.js";
+import {readlink, readdir, mkdir, open, close, rename, unlink, rmdir, utimes, symlink} from "util/fs.js";
 import * as format from "util/format.js";
 
 const fs = require("fs");
@@ -51,6 +51,10 @@ export default class Local extends Path {
 	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
 	exists() { return ("isDirectory" in this._meta); }
 
+	/* symlink-specific */
+	isSymbolicLink() { return this._meta.isSymbolicLink; }
+	getTarget() { return this._target; }
+
 	getDescription() {
 		let d = this._path;
 		/* fixme relativni */
@@ -101,7 +105,9 @@ export default class Local extends Path {
 	}
 
 	async create(opts = {}) {
-		if (opts.dir) {
+		if (opts.link) {
+			return symlink(opts.link, this._path);
+		} else if (opts.dir) {
 			return mkdir(this._path);
 		} else {
 			let handle = await open(this._path, "wx", opts.mode);
@@ -128,12 +134,10 @@ export default class Local extends Path {
 			.map(name => path.resolve(this._path, name))
 			.map(name => new this.constructor(name));
 
-		let promises = paths.map(async path => {
-			await path.stat();
-			return path;
-		});
+		let promises = paths.map(path => path.stat());
+		await Promise.all(promises);
 
-		return Promise.all(promises);
+		return paths;
 	}
 
 	createStream(type, opts) {
@@ -155,7 +159,7 @@ export default class Local extends Path {
 
 		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
 		try {
-			let targetPath = await readlink(this._path);
+			let targetPath = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
 			this._target = targetPath;
 
 			/*

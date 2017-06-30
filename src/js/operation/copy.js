@@ -3,6 +3,8 @@ import Operation from "./operation.js";
 import Scan from "./scan.js";
 import {CHILDREN} from "path/path.js";
 
+import LocalPath from "path/local.js";
+
 export default class Copy extends Operation {
 	constructor(sourcePath, targetPath) {
 		super();
@@ -65,8 +67,6 @@ export default class Copy extends Operation {
 			targetPath = targetPath.append(record.path.getName());
 		} /* else does not exist, will be created during copy impl below */
 
-		/* FIXME symlinks */
-
 		if (record.children !== null) {
 			await this._copyDirectory(record, targetPath);
 		} else {
@@ -111,7 +111,6 @@ export default class Copy extends Operation {
 	 * @param {Path} targetPath already appended target path
 	 */
 	async _copyFile(record, targetPath) {
-		let done = 0;
 		let progress1 = 0;
 		let progress2 = 100*this._stats.done/this._stats.total;
 		this._progress.update({row1:record.path.getPath(), row2:targetPath.getPath(), progress1, progress2});
@@ -135,6 +134,23 @@ export default class Copy extends Operation {
 			}
 		}
 
+		if (record.path instanceof LocalPath && record.path.isSymbolicLink()) {
+			return this._copyFileSymlink(record, targetPath);
+		} else {
+			return this._copyFileContents(record, targetPath);
+		}
+	}
+
+	async _copyFileSymlink(record, targetPath) {
+		try {
+			await targetPath.create({link:record.path.getTarget()});
+		} catch (e) {
+			return this._handleSymlinkError(e, record, targetPath);
+		}
+	}
+
+	async _copyFileContents(record, targetPath) {
+		let done = 0;
 		let opts = { mode:record.path.getMode() };
 		let readStream = record.path.createStream("r");
 		let writeStream = targetPath.createStream("w", opts);
@@ -158,7 +174,7 @@ export default class Copy extends Operation {
 				let progress2 = 100*this._stats.done/this._stats.total;
 				this._progress.update({progress1, progress2});
 			}); /* on data */
-		}); /* file copy promise */
+		}); /* file copy promise */		
 	}
 
 	async _recordCopied(record) {} /* used only for moving */
@@ -194,44 +210,15 @@ export default class Copy extends Operation {
 			case "abort": this.abort(); break;
 		}
 	}
-}
-/*
-// Try to copy symlink
-Operation.Copy.prototype._copySymlink = function(oldPath, newPath) {
-	// try to locate "ln" 
-	var fn = null;
-	var path = "/bin/ln";
-	var func = function() { 
-		ln = Path.Local.fromString(path); 
-		if (!ln.exists()) { throw Cr.NS_ERROR_FILE_NOT_FOUND; }
-	};
-	var found = this._repeatedAttempt(func, path, "ln");
-	if (this._state == Operation.ABORTED || !found) { return; }
-	
-	if (newPath.exists()) { // existing must be removed
-		var func = function() { newPath.delete(); }
-		var deleted = this._repeatedAttempt(func, newPath, "create");
-		if (this._state == Operation.ABORTED || !deleted) { return; }
-	}
-	
-	// run it as a process
-	var process = Cc["@mozilla.org/process/util;1"].createInstance(Ci.nsIProcess);
-	process.init(ln.getFile());
-	var params = ["-s", oldPath.getPath(), newPath.getPath()];
-	
-	var func = function() { 
-		process.run(false, params, params.length);
-		var cnt = 0; 
-		while (process.isRunning) { // wait for exitValue
-			cnt++;
-			if (cnt > 100000) { break; } // no infinite loops 
+
+	async _handleSymlinkError(e, record, targetPath) {
+		let text = e.message;
+		let title = "Error creating symbolic link";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let result = await this._processIssue("symlink", { text, title, buttons });
+		switch (result) {
+			case "retry": return this._copyFileSymlink(record, targetPath); break;
+			case "abort": this.abort(); break;
 		}
-		if (process.exitValue) { throw Cr.NS_ERROR_FILE_ACCESS_DENIED; }
 	}
-	this._repeatedAttempt(func, newPath.getPath(), "create");
-
-	// if we succeeded, if we did not - this one is done 
-	this._scheduleNext(); 
 }
-
-*/

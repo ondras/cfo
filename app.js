@@ -59,7 +59,7 @@ function readlink(linkPath) {
 function readdir(path) {
 	return new Promise((resolve, reject) => {
 		fs$1.readdir(path, (err, files) => {
-			if (err) { reject(err); } else { resolve(files); }
+			err ? reject(err) : resolve(files);
 		});
 	});
 }
@@ -67,7 +67,7 @@ function readdir(path) {
 function mkdir(path, mode) {
 	return new Promise((resolve, reject) => {
 		fs$1.mkdir(path, mode, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	});
 }
@@ -75,7 +75,7 @@ function mkdir(path, mode) {
 function open(path, flags, mode) {
 	return new Promise((resolve, reject) => {
 		fs$1.open(path, flags, mode, (err, fd) => {
-			if (err) { reject(err); } else { resolve(fd); }
+			err ? reject(err) : resolve(fd);
 		});
 	});
 }
@@ -83,7 +83,7 @@ function open(path, flags, mode) {
 function close(fd) {
 	return new Promise((resolve, reject) => {
 		fs$1.close(fd, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	})
 }
@@ -91,7 +91,7 @@ function close(fd) {
 function rename(oldPath, newPath) {
 	return new Promise((resolve, reject) => {
 		fs$1.rename(oldPath, newPath, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	})
 }
@@ -99,7 +99,7 @@ function rename(oldPath, newPath) {
 function unlink(path) {
 	return new Promise((resolve, reject) => {
 		fs$1.unlink(path, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	});
 }
@@ -107,7 +107,7 @@ function unlink(path) {
 function rmdir(path) {
 	return new Promise((resolve, reject) => {
 		fs$1.rmdir(path, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
 		});
 	});
 }
@@ -115,7 +115,15 @@ function rmdir(path) {
 function utimes(path, atime, mtime) {
 	return new Promise((resolve, reject) => {
 		fs$1.utimes(path, atime, mtime, err => {
-			if (err) { reject(err); } else { resolve(); }
+			err ? reject(err) : resolve();
+		});
+	});
+}
+
+function symlink(target, path) {
+	return new Promise((resolve, reject) => {
+		fs$1.symlink(target, path, err => {
+			err ? reject(err) : resolve();
 		});
 	});
 }
@@ -196,6 +204,10 @@ class Local extends Path {
 	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
 	exists() { return ("isDirectory" in this._meta); }
 
+	/* symlink-specific */
+	isSymbolicLink() { return this._meta.isSymbolicLink; }
+	getTarget() { return this._target; }
+
 	getDescription() {
 		let d = this._path;
 		/* fixme relativni */
@@ -246,7 +258,9 @@ class Local extends Path {
 	}
 
 	async create(opts = {}) {
-		if (opts.dir) {
+		if (opts.link) {
+			return symlink(opts.link, this._path);
+		} else if (opts.dir) {
 			return mkdir(this._path);
 		} else {
 			let handle = await open(this._path, "wx", opts.mode);
@@ -273,12 +287,10 @@ class Local extends Path {
 			.map(name => path.resolve(this._path, name))
 			.map(name => new this.constructor(name));
 
-		let promises = paths.map(async path => {
-			await path.stat();
-			return path;
-		});
+		let promises = paths.map(path => path.stat());
+		await Promise.all(promises);
 
-		return Promise.all(promises);
+		return paths;
 	}
 
 	createStream(type, opts) {
@@ -1700,8 +1712,6 @@ class Copy extends Operation {
 			targetPath = targetPath.append(record.path.getName());
 		} /* else does not exist, will be created during copy impl below */
 
-		/* FIXME symlinks */
-
 		if (record.children !== null) {
 			await this._copyDirectory(record, targetPath);
 		} else {
@@ -1746,7 +1756,6 @@ class Copy extends Operation {
 	 * @param {Path} targetPath already appended target path
 	 */
 	async _copyFile(record, targetPath) {
-		let done = 0;
 		let progress1 = 0;
 		let progress2 = 100*this._stats.done/this._stats.total;
 		this._progress.update({row1:record.path.getPath(), row2:targetPath.getPath(), progress1, progress2});
@@ -1770,6 +1779,23 @@ class Copy extends Operation {
 			}
 		}
 
+		if (record.path instanceof Local && record.path.isSymbolicLink()) {
+			return this._copyFileSymlink(record, targetPath);
+		} else {
+			return this._copyFileContents(record, targetPath);
+		}
+	}
+
+	async _copyFileSymlink(record, targetPath) {
+		try {
+			await targetPath.create({link:record.path.getTarget()});
+		} catch (e) {
+			return this._handleSymlinkError(e, record, targetPath);
+		}
+	}
+
+	async _copyFileContents(record, targetPath) {
+		let done = 0;
 		let opts = { mode:record.path.getMode() };
 		let readStream = record.path.createStream("r");
 		let writeStream = targetPath.createStream("w", opts);
@@ -1793,7 +1819,7 @@ class Copy extends Operation {
 				let progress2 = 100*this._stats.done/this._stats.total;
 				this._progress.update({progress1, progress2});
 			}); /* on data */
-		}); /* file copy promise */
+		}); /* file copy promise */		
 	}
 
 	async _recordCopied(record) {} /* used only for moving */
@@ -1829,47 +1855,18 @@ class Copy extends Operation {
 			case "abort": this.abort(); break;
 		}
 	}
-}
-/*
-// Try to copy symlink
-Operation.Copy.prototype._copySymlink = function(oldPath, newPath) {
-	// try to locate "ln" 
-	var fn = null;
-	var path = "/bin/ln";
-	var func = function() { 
-		ln = Path.Local.fromString(path); 
-		if (!ln.exists()) { throw Cr.NS_ERROR_FILE_NOT_FOUND; }
-	};
-	var found = this._repeatedAttempt(func, path, "ln");
-	if (this._state == Operation.ABORTED || !found) { return; }
-	
-	if (newPath.exists()) { // existing must be removed
-		var func = function() { newPath.delete(); }
-		var deleted = this._repeatedAttempt(func, newPath, "create");
-		if (this._state == Operation.ABORTED || !deleted) { return; }
-	}
-	
-	// run it as a process
-	var process = Cc["@mozilla.org/process/util;1"].createInstance(Ci.nsIProcess);
-	process.init(ln.getFile());
-	var params = ["-s", oldPath.getPath(), newPath.getPath()];
-	
-	var func = function() { 
-		process.run(false, params, params.length);
-		var cnt = 0; 
-		while (process.isRunning) { // wait for exitValue
-			cnt++;
-			if (cnt > 100000) { break; } // no infinite loops 
+
+	async _handleSymlinkError(e, record, targetPath) {
+		let text = e.message;
+		let title = "Error creating symbolic link";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let result = await this._processIssue("symlink", { text, title, buttons });
+		switch (result) {
+			case "retry": return this._copyFileSymlink(record, targetPath); break;
+			case "abort": this.abort(); break;
 		}
-		if (process.exitValue) { throw Cr.NS_ERROR_FILE_ACCESS_DENIED; }
 	}
-	this._repeatedAttempt(func, newPath.getPath(), "create");
-
-	// if we succeeded, if we did not - this one is done 
-	this._scheduleNext(); 
 }
-
-*/
 
 class Move extends Copy {
 	constructor(sourcePath, targetPath) {
@@ -2078,5 +2075,15 @@ if (!("".padStart)) {
 }
 
 init();
+
+/*
+
+reload: 
+  - zadana: chceme focusnout zadanou (created), pokud neni, chceme ??? => prvni.
+  - nezadana: chceme focusnout aktualni (refresh), pokud neni, chceme stejny index.
+
+setPath: chceme focusnout predchozi. pokud neni, chceme prvni.
+
+*/
 
 }());
