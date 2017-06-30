@@ -8,6 +8,7 @@ CFO shall become a modernized version of [Fire Commander](https://addons.mozilla
 
 - Directory listing
   - [X] Tabs
+  - [X] Statusbar
   - [ ] Filetype/symlink icons
 - [ ] Menu
 - File operations
@@ -31,6 +32,7 @@ CFO shall become a modernized version of [Fire Commander](https://addons.mozilla
   - [ ] SQLite
   - [ ] Wifi?
 - Miscellaneous
+  - [X] No toolbar
   - [ ] Configuration
   - [ ] Persistence
   - [ ] Selection
