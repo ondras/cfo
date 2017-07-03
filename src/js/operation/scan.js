@@ -35,7 +35,7 @@ export default class Scan extends Operation {
 
 	async _analyze(path) {
 		if (this._aborted) { return null; }
-		this._progress.update({row1: path.getPath()});
+		this._progress.update({row1: path.toString()});
 
 		await path.stat();
 

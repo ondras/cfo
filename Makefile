@@ -6,19 +6,19 @@ LESSC := npm -s run lessc --
 all: $(ALL)
 
 app.js: $(JS)
-	$(ROLLUP) src/js/app.js > $@
+	$(ROLLUP) src/js/app.js -o $@
 
 app.css: src/css/*
 	$(LESSC) src/css/app.less > $@
 
 progress.js: $(JS)
-	$(ROLLUP) src/js/progress.js > $@
+	$(ROLLUP) src/js/progress.js -o $@
 
 progress.css: src/css/*
 	$(LESSC) src/css/progress.less > $@
 
 issue.js: $(JS)
-	$(ROLLUP) src/js/issue.js > $@
+	$(ROLLUP) src/js/issue.js -o $@
 
 issue.css: src/css/*
 	$(LESSC) src/css/issue.less > $@

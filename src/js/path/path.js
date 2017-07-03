@@ -1,8 +1,9 @@
 export default class Path {
-	is(other) { return other.getPath() == this.getPath(); }
+	static match(str) { return false; }
+	is(other) { return other.toString() == this.toString(); }
 
 	/* sync getters */
-	getPath() {}
+	toString() {}
 	getName() {}
 	getImage() {}
 	getDate() {}

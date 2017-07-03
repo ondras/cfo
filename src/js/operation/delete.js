@@ -51,7 +51,7 @@ export default class Delete extends Operation {
 		if (!deleted) { return false; }
 
 		var path = record.path;
-		this._progress.update({row1:path.getPath(), progress1:100*this._stats.done/this._stats.total});
+		this._progress.update({row1:path.toString(), progress1:100*this._stats.done/this._stats.total});
 
 		try {
 			await path.delete();

@@ -199,10 +199,11 @@ class Operation {
 }
 
 class Path {
-	is(other) { return other.getPath() == this.getPath(); }
+	static match(str) { return false; }
+	is(other) { return other.toString() == this.toString(); }
 
 	/* sync getters */
-	getPath() {}
+	toString() {}
 	getName() {}
 	getImage() {}
 	getDate() {}
@@ -271,7 +272,7 @@ class Scan extends Operation {
 
 	async _analyze(path) {
 		if (this._aborted) { return null; }
-		this._progress.update({row1: path.getPath()});
+		this._progress.update({row1: path.toString()});
 
 		await path.stat();
 
@@ -415,7 +416,7 @@ class Up extends Path {
 
 	getImage() { return "up.png"; }
 	getDescription() { return this._path.getDescription(); }
-	getPath() { return this._path.getPath(); }
+	toString() { return this._path.toString(); }
 	activate(list) { list.setPath(this._path); }
 
 	supports(what) {
@@ -566,6 +567,8 @@ function getMetadata(path, options = {}) {
 
 
 class Local extends Path {
+	static match(str) { return str.match(/^\//); }
+
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); /* to get rid of a trailing slash */
@@ -574,7 +577,7 @@ class Local extends Path {
 		this._meta = {};
 	}
 
-	getPath() { return this._path; }
+	toString() { return this._path; }
 	getName() { return path.basename(this._path) || "/"; }
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
@@ -647,7 +650,7 @@ class Local extends Path {
 	}
 
 	async rename(newPath) {
-		return rename(this._path, newPath.getPath());
+		return rename(this._path, newPath.toString());
 	}
 
 	async delete() {
@@ -712,20 +715,220 @@ class Local extends Path {
 	}
 }
 
+/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
+const KEYS = {
+	"return": "enter",
+	"left": "arrowleft",
+	"up": "arrowup",
+	"right": "arrowright",
+	"down": "arrowdown",
+	"esc": "escape"
+};
+
+const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
+const REGISTRY = [];
+
+function handler(e) {
+	console.log(e);
+	let available = REGISTRY.filter(reg => {
+		for (let m in reg.modifiers) {
+			if (reg.modifiers[m] != e[m]) { return false; }
+		}
+
+		if (reg.key != e.key.toLowerCase() && reg.key != e.code.toLowerCase()) { return false; }
+
+		return true;
+	});
+
+	while (available.length) {
+		let executed = available.pop().func();
+		if (executed) { 
+			e.preventDefault();
+			return;
+		}
+	}
+}
+
+function parse(key) {
+	let result = {
+		func: null,
+		modifiers: {}
+	};
+
+	key = key.toLowerCase();
+
+	MODIFIERS.forEach(mod => {
+		let mkey = mod + "Key";
+		result.modifiers[mkey] = false;
+
+		let re = new RegExp(mod + "[+-]");
+		key = key.replace(re, () => {
+			result.modifiers[mkey] = true;
+			return "";
+		});
+	});
+
+	result.key = KEYS[key] || key;
+
+	return result;
+}
+
+function register(func, key) {
+	let item = parse(key);
+	item.func = func;
+	REGISTRY.push(item);
+}
+
+window.addEventListener("keydown", handler);
+
+let resolve;
+
+const body = document.body;
+const form = node("form", {id:"confirm", className:"dialog"});
+const text$1 = node("p");
+const ok = node("button", {type:"submit"}, "OK");
+const cancel = node("button", {type:"button"}, "Cancel");
+
+form.appendChild(text$1);
+form.appendChild(ok);
+form.appendChild(cancel);
+
+form.addEventListener("submit", e => {
+	e.preventDefault();
+	close$1(true);
+});
+
+cancel.addEventListener("click", e => {
+	close$1(false);
+});
+
+function onKeyDown(e) {
+	if (e.key == "Escape") { close$1(false); }
+	e.stopPropagation();
+}
+
+function close$1(value) {
+	window.removeEventListener("keydown", onKeyDown, true);
+	body.classList.remove("modal");
+	form.parentNode.removeChild(form);
+	resolve(value);
+}
+
+function confirm(t) {
+	clear(text$1);
+	text$1.appendChild(text(t));
+
+	body.classList.add("modal");
+	body.appendChild(form);
+	window.addEventListener("keydown", onKeyDown, true);
+	ok.focus();
+
+	return new Promise(r => resolve = r);
+}
+
+const {remote: remote$3} = require('electron');
+const settings$1 = remote$3.require('electron-settings');
+let storage = []; // strings
+
+function viewFunc(i) {
+	return async () => {
+		console.log(i);
+		let path = get(i);
+		if (!path) { return; }
+		getActive().getList().setPath(path);
+	};
+}
+
+function setFunc(i) {
+	return async () => {
+		let path = getActive().getList().getPath();
+		let result = await confirm(`Set "${path}" as favorite? It will be accessible as Ctrl+${i}.`);
+		if (!result) { return; }
+		set(path, i);
+	}
+}
+
+function init$1(saved) {
+	for (let i=0; i<10; i++) {
+		let str = saved[i];
+		storage[i] = str ? fromString(str) : null;
+
+		register(viewFunc(i), `Ctrl+Digit${i}`);
+		register(setFunc(i), `Ctrl+Shift+Digit${i}`);
+	}
+}
+
+function toJSON$1() { return storage.map(path => path && path.toString()); }
+function list() { return storage; }
+function set(path, index) { storage[index] = path; }
+function get(index) { return storage[index]; }
+function remove(index) { storage[index] = null; }
+
+class Favorite extends Path {
+	constructor(path, index) {
+		super();
+		this._path = path;
+		this._index = index;
+	}
+
+	toString() { return this._path.toString(); }
+	getName() { return this.toString(); }
+	getSize() { return this._index; }
+	getImage() { return "favorite.png"; }
+
+	supports(what) {
+		if (what == DELETE) { return true; }
+		return false;
+	}
+
+	delete() {
+		remove(this._index);
+	}
+
+	activate(list$$1) {
+		list$$1.setPath(this._path);
+	}
+}
+
+class Favorites extends Path {
+	static match(str) { return str.match(/^fav:/i); }
+
+	toString() { return "fav:"; }
+	getName() { return "Favorites"; }
+	supports(what) {
+		if (what == CHILDREN) { return true; }
+		return false;
+	}
+
+	getChildren() {
+		return list().map((path, index) => {
+			return path ? new Favorite(path, index) : null;
+		}).filter(path => path);
+	}
+}
+
 const {app} = require("electron").remote;
+const ALL = [Favorites, Local];
 
 function fromString(str) {
-	return new Local(str);
+	let ctors = ALL.filter(ctor => ctor.match(str));
+	if (!ctors.length) { throw new Error(`No Path available to handle "${str}"`); }
+	let Ctor = ctors.shift();
+	return new Ctor(str);
 }
 
 function home() {
 	return fromString(app.getPath("home"));
 }
 
-const storage = Object.create(null);
+function favorites() {
+	return new Favorites();
+}
+
+const storage$1 = Object.create(null);
 
 function publish(message, publisher, data) {
-	let subscribers = storage[message] || [];
+	let subscribers = storage$1[message] || [];
 	subscribers.forEach(subscriber => {
 		typeof(subscriber) == "function"
 			? subscriber(message, publisher, data)
@@ -734,13 +937,13 @@ function publish(message, publisher, data) {
 }
 
 function subscribe(message, subscriber) {
-	if (!(message in storage)) { storage[message] = []; }
-	storage[message].push(subscriber);
+	if (!(message in storage$1)) { storage$1[message] = []; }
+	storage$1[message].push(subscriber);
 }
 
 const node$1 = document.querySelector("footer");
 
-function set(value) {
+function set$1(value) {
 	node$1.innerHTML = value;
 }
 
@@ -854,7 +1057,7 @@ class List {
 		}
 
 /*
-		var data = _("rename.exists", newFile.getPath());
+		var data = _("rename.exists", newFile);
 		var title = _("rename.title");
 		if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
 		
@@ -998,7 +1201,7 @@ class List {
 
 		this._clear();
 
-		this._input.value = this._path.getPath();
+		this._input.value = this._path;
 		paths.sort(SORT);
 
 		let parent = this._path.getParent();
@@ -1126,7 +1329,7 @@ class List {
 				}
 			}
 
-			set(this._items[index].path.getDescription());
+			set$1(this._items[index].path.getDescription());
 		}
 	}
 
@@ -1244,7 +1447,7 @@ class Pane {
 	getNode() { return this._node; }
 
 	toJSON() {
-		return this._lists.map(l => l.getPath().getPath());
+		return this._lists.map(l => l.getPath().toString());
 	}
 
 	activate() {
@@ -1338,75 +1541,10 @@ class Pane {
 	}
 }
 
-/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
-const KEYS = {
-	"return": "enter",
-	"left": "arrowleft",
-	"up": "arrowup",
-	"right": "arrowright",
-	"down": "arrowdown",
-	"esc": "escape"
-};
-
-const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
-const REGISTRY = [];
-
-function handler(e) {
-	let available = REGISTRY.filter(reg => {
-		for (let m in reg.modifiers) {
-			if (reg.modifiers[m] != e[m]) { return false; }
-		}
-
-		if (reg.key != e.key.toLowerCase()) { return false; }
-
-		return true;
-	});
-
-	while (available.length) {
-		let executed = available.pop().func();
-		if (executed) { 
-			e.preventDefault();
-			return;
-		}
-	}
-}
-
-function parse(key) {
-	let result = {
-		func: null,
-		modifiers: {}
-	};
-
-	key = key.toLowerCase();
-
-	MODIFIERS.forEach(mod => {
-		let mkey = mod + "Key";
-		result.modifiers[mkey] = false;
-
-		let re = new RegExp(mod + "[+-]");
-		key = key.replace(re, () => {
-			result.modifiers[mkey] = true;
-			return "";
-		});
-	});
-
-	result.key = KEYS[key] || key;
-
-	return result;
-}
-
-function register$1(func, key) {
-	let item = parse(key);
-	item.func = func;
-	REGISTRY.push(item);
-}
-
-window.addEventListener("keydown", handler);
-
 const document$1 = window.document;
 const registry = Object.create(null);
 
-function register(command, keys, func) {
+function register$1(command, keys, func) {
 	function wrap() {
 		if (isEnabled(command)) {
 			func(command);
@@ -1424,7 +1562,7 @@ function register(command, keys, func) {
 		key: keys[0]
 	};
 
-	keys.forEach(key => register$1(wrap, key));
+	keys.forEach(key => register(wrap, key));
 
 	return command;
 }
@@ -1498,34 +1636,43 @@ function toJSON() {
 	return {
 		index,
 		left: PANES[0].toJSON(),
-		right: PANES[0].toJSON()
+		right: PANES[1].toJSON()
 	}
 }
 
-register("pane:toggle", "Tab", () => {
+register$1("pane:toggle", "Tab", () => {
 	let i = (index + 1) % PANES.length;
 	activate(PANES[i]);
 });
 
-register("tab:next", "Ctrl+Tab", () => {
+register$1("tab:next", "Ctrl+Tab", () => {
 	getActive().adjustTab(+1);
 });
 
-register("tab:prev", "Ctrl+Shift+Tab", () => {
+register$1("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
 });
 
-register("tab:new", "Ctrl+T", () => {
+register$1("tab:new", "Ctrl+T", () => {
 	getActive().addList();
 });
 
-register("tab:close", "Ctrl+W", () => {
+register$1("tab:close", "Ctrl+W", () => {
 	getActive().removeList();
+});
+
+
+var panes = Object.freeze({
+	activate: activate,
+	getActive: getActive,
+	getInactive: getInactive,
+	init: init,
+	toJSON: toJSON
 });
 
 const Menu = require('electron').remote.Menu;
 
-function init$1() {
+function init$2() {
 	const template = [
 		{
 			label: "&File",
@@ -1548,7 +1695,7 @@ function init$1() {
 				menuItem("list:top", "Go to &top"),
 				menuItem("fixme", "&Drive selection"),
 				menuItem("fixme", "&Wi-Fi Access points"),
-				menuItem("fixme", "&Favorites"),
+				menuItem("list:favorites", "&Favorites"),
 				menuItem("list:home", "&Home")
 			]
 		},
@@ -1580,71 +1727,23 @@ function init$1() {
 	Menu.setApplicationMenu(menu);
 }
 
-let resolve;
-
-const body = document.body;
-const form = node("form", {id:"prompt", className:"dialog"});
-const text$1 = node("p");
-const input = node("input", {type:"text"});
-const ok = node("button", {type:"submit"}, "OK");
-const cancel = node("button", {type:"button"}, "Cancel");
-
-form.appendChild(text$1);
-form.appendChild(input);
-form.appendChild(ok);
-form.appendChild(cancel);
-
-form.addEventListener("submit", e => {
-	e.preventDefault();
-	close$1(input.value);
-});
-
-cancel.addEventListener("click", e => {
-	close$1(false);
-});
-
-function onKeyDown(e) {
-	if (e.key == "Escape") { close$1(null); }
-	e.stopPropagation();
-}
-
-function close$1(value) {
-	window.removeEventListener("keydown", onKeyDown, true);
-	body.classList.remove("modal");
-	form.parentNode.removeChild(form);
-	resolve(value);
-}
-
-function prompt(t, value = "") {
-	clear(text$1);
-	text$1.appendChild(text(t));
-	input.value = value;
-
-	body.classList.add("modal");
-	body.appendChild(form);
-	window.addEventListener("keydown", onKeyDown, true);
-	input.selectionStart = 0;
-	input.selectionEnd = input.value.length;
-	input.focus();
-
-	return new Promise(r => resolve = r);
-}
-
 let resolve$1;
 
 const body$1 = document.body;
-const form$1 = node("form", {id:"confirm", className:"dialog"});
+const form$1 = node("form", {id:"prompt", className:"dialog"});
 const text$2 = node("p");
+const input = node("input", {type:"text"});
 const ok$1 = node("button", {type:"submit"}, "OK");
 const cancel$1 = node("button", {type:"button"}, "Cancel");
 
 form$1.appendChild(text$2);
+form$1.appendChild(input);
 form$1.appendChild(ok$1);
 form$1.appendChild(cancel$1);
 
 form$1.addEventListener("submit", e => {
 	e.preventDefault();
-	close$2(true);
+	close$2(input.value);
 });
 
 cancel$1.addEventListener("click", e => {
@@ -1652,7 +1751,7 @@ cancel$1.addEventListener("click", e => {
 });
 
 function onKeyDown$1(e) {
-	if (e.key == "Escape") { close$2(false); }
+	if (e.key == "Escape") { close$2(null); }
 	e.stopPropagation();
 }
 
@@ -1663,14 +1762,17 @@ function close$2(value) {
 	resolve$1(value);
 }
 
-function confirm(t) {
+function prompt(t, value = "") {
 	clear(text$2);
 	text$2.appendChild(text(t));
+	input.value = value;
 
 	body$1.classList.add("modal");
 	body$1.appendChild(form$1);
 	window.addEventListener("keydown", onKeyDown$1, true);
-	ok$1.focus();
+	input.selectionStart = 0;
+	input.selectionEnd = input.value.length;
+	input.focus();
 
 	return new Promise(r => resolve$1 = r);
 }
@@ -1724,7 +1826,7 @@ class Delete extends Operation {
 		if (!deleted) { return false; }
 
 		var path = record.path;
-		this._progress.update({row1:path.getPath(), progress1:100*this._stats.done/this._stats.total});
+		this._progress.update({row1:path.toString(), progress1:100*this._stats.done/this._stats.total});
 
 		try {
 			await path.delete();
@@ -1856,7 +1958,7 @@ class Copy extends Operation {
 	async _copyFile(record, targetPath) {
 		let progress1 = 0;
 		let progress2 = 100*this._stats.done/this._stats.total;
-		this._progress.update({row1:record.path.getPath(), row2:targetPath.getPath(), progress1, progress2});
+		this._progress.update({row1:record.path.toString(), row2:targetPath.toString(), progress1, progress2});
 
 		if (targetPath.exists()) { /* target exists: overwrite/skip/abort */
 			if (this._issues.overwrite == "skip-all") { /* silently skip */
@@ -1923,7 +2025,7 @@ class Copy extends Operation {
 	async _recordCopied(record) {} /* used only for moving */
 
 	async _handleFileExists(path) {
-		let text = `Target file ${path.getPath()} already exists`;
+		let text = `Target file ${path} already exists`;
 		let title = "File exists";
 		let buttons = ["overwrite", "overwrite-all", "skip", "skip-all", "abort"];
 		return this._processIssue("overwrite", { text, title, buttons });
@@ -2008,13 +2110,13 @@ class Move extends Copy {
 	}
 }
 
-register("list:up", "Backspace", () => {
+register$1("list:up", "Backspace", () => {
 	let list = getActive().getList();
 	let parent = list.getPath().getParent();
 	parent && list.setPath(parent);
 });
 
-register("list:top", "Ctrl+Backspace", () => {
+register$1("list:top", "Ctrl+Backspace", () => {
 	let list = getActive().getList();
 	let path = list.getPath();
 	while (true) {
@@ -2028,21 +2130,26 @@ register("list:top", "Ctrl+Backspace", () => {
 	list.setPath(path);
 });
 
-register("list:home", "Ctrl+H", () => {
-	let home$$1 = home();
-	getActive().getList().setPath(home$$1);
+register$1("list:home", "Ctrl+H", () => {
+	let path = home();
+	getActive().getList().setPath(path);
 });
 
-register("list:input", "Ctrl+L", () => {
+register$1("list:favorites", [], () => {
+	let path = favorites();
+	getActive().getList().setPath(path);
+});
+
+register$1("list:input", "Ctrl+L", () => {
 	getActive().getList().focusInput();
 });
 
-register("directory:new", "F7", async () => {
+register$1("directory:new", "F7", async () => {
 	let list = getActive().getList();
 	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
-	let name = await prompt(`Create new directory in "${path.getPath()}"`);
+	let name = await prompt(`Create new directory in "${path}"`);
 	if (!name) { return; }
 
 	let newPath = path.append(name);
@@ -2055,13 +2162,13 @@ register("directory:new", "F7", async () => {
 	}
 });
 
-register("file:new", "Shift+F4", async () => {
+register$1("file:new", "Shift+F4", async () => {
 	let list = getActive().getList();
 	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
 	/* fixme new.txt mit jako preferenci */
-	let name = await prompt(`Create new file in "${path.getPath()}"`, "new.txt");
+	let name = await prompt(`Create new file in "${path}"`, "new.txt");
 	if (!name) { return; }
 
 	let newPath = path.append(name);
@@ -2073,36 +2180,36 @@ register("file:new", "Shift+F4", async () => {
 	}
 });
 
-register("file:edit", "F4", () => {
+register$1("file:edit", "F4", () => {
 	let file = getActive().getList().getFocusedPath();
 	if (!file.supports(EDIT)) { return; }
 
 	/* fixme configurable */
-	let child = require("child_process").spawn("/usr/bin/subl", [file.getPath()]);
+	let child = require("child_process").spawn("/usr/bin/subl", [file]);
 
 	child.on("error", e => alert(e.message));
 });
 
-register("file:delete", ["Delete", "F8"], async () => {
+register$1("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 	let list = getActive().getList();
 	let path = list.getFocusedPath();
 	if (!path.supports(DELETE)) { return; }
 
-	let result = await confirm(`Really delete "${path.getPath()}" ?`);
+	let result = await confirm(`Really delete "${path}" ?`);
 	if (!result) { return; }
 	let d = new Delete(path);
 	await d.run();
 	list.reload();
 });
 
-register("file:rename", "F2", () => {
+register$1("file:rename", "F2", () => {
 	let list = getActive().getList();
 	let file = list.getFocusedPath();
 	if (!file.supports(RENAME)) { return; }
 	list.startEditing();
 });
 
-register("file:copy", "F5", async () => {
+register$1("file:copy", "F5", async () => {
 	let sourceList = getActive().getList();
 	let sourcePath = sourceList.getFocusedPath();
 	let targetList = getInactive().getList();
@@ -2110,15 +2217,15 @@ register("file:copy", "F5", async () => {
 
 	/* fixme parent->child test */
 
-	let name = await prompt(`Copy "${sourcePath.getPath()}" to:`, targetPath.getPath());
+	let name = await prompt(`Copy "${sourcePath}" to:`, targetPath);
 	if (!name) { return; }
-	targetPath = new LocalPath(name); // fixme other path types
+	targetPath = fromString(name);
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
 	targetList.reload();
 });
 
-register("file:move", "F6", async () => {
+register$1("file:move", "F6", async () => {
 	let sourceList = getActive().getList();
 	let sourcePath = sourceList.getFocusedPath();
 	let targetList = getInactive().getList();
@@ -2126,16 +2233,16 @@ register("file:move", "F6", async () => {
 
 	/* fixme parent->child test */
 
-	let name = await prompt(`Move "${sourcePath.getPath()}" to:`, targetPath.getPath());
+	let name = await prompt(`Move "${sourcePath}" to:`, targetPath);
 	if (!name) { return; }
-	targetPath = new LocalPath(name); // fixme other path types
+	targetPath = fromString(name);
 	let move = new Move(sourcePath, targetPath);
 	await move.run();
 	sourceList.reload();
 	targetList.reload();
 });
 
-register("app:devtools", "F12", () => {
+register$1("app:devtools", "F12", () => {
 	require("electron").remote.getCurrentWindow().toggleDevTools();
 });
 
@@ -2175,14 +2282,17 @@ if (!("".padStart)) {
 	};
 }
 
-function saveSettings() {
+function saveSettings(e) {
 	let win = remote.getCurrentWindow();
 	settings.set("window.size", win.getSize());
 	settings.set("panes", toJSON());
+	settings.set("favorites", toJSON$1());
 }
 window.addEventListener("beforeunload", saveSettings);
+window.panes = panes;
 
-init$1();
+init$2();
+init$1(settings.get("favorites", []));
 init(settings.get("panes", {}));
 
 }());

@@ -41,7 +41,7 @@ export function toJSON() {
 	return {
 		index,
 		left: PANES[0].toJSON(),
-		right: PANES[0].toJSON()
+		right: PANES[1].toJSON()
 	}
 }
 

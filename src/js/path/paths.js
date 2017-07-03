@@ -1,12 +1,20 @@
 import Local from "./local.js";
+import Favorites from "./favorites.js";
 
 const {app} = require("electron").remote;
+const ALL = [Favorites, Local];
 
 export function fromString(str) {
-	return new Local(str);
+	let ctors = ALL.filter(ctor => ctor.match(str));
+	if (!ctors.length) { throw new Error(`No Path available to handle "${str}"`); }
+	let Ctor = ctors.shift();
+	return new Ctor(str);
 }
 
 export function home() {
 	return fromString(app.getPath("home"));
 }
 
+export function favorites() {
+	return new Favorites();
+}

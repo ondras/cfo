@@ -31,6 +31,8 @@ function getMetadata(path, options = {}) {
 
 
 export default class Local extends Path {
+	static match(str) { return str.match(/^\//); }
+
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); /* to get rid of a trailing slash */
@@ -39,7 +41,7 @@ export default class Local extends Path {
 		this._meta = {};
 	}
 
-	getPath() { return this._path; }
+	toString() { return this._path; }
 	getName() { return path.basename(this._path) || "/"; }
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
@@ -112,7 +114,7 @@ export default class Local extends Path {
 	}
 
 	async rename(newPath) {
-		return rename(this._path, newPath.getPath());
+		return rename(this._path, newPath.toString());
 	}
 
 	async delete() {

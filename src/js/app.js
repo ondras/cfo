@@ -1,6 +1,7 @@
 import * as panes from "panes.js";
 import * as menu from "menu.js";
 import * as commands from "commands.js";
+import * as favorites from "util/favorites.js";
 
 const {remote} = require('electron');
 const settings = remote.require('electron-settings');
@@ -38,13 +39,15 @@ if (!("".padStart)) {
 	}
 }
 
-function saveSettings() {
+function saveSettings(e) {
 	let win = remote.getCurrentWindow();
 	settings.set("window.size", win.getSize());
 	settings.set("panes", panes.toJSON());
+	settings.set("favorites", favorites.toJSON());
 }
 window.addEventListener("beforeunload", saveSettings);
+window.panes = panes;
 
 menu.init();
+favorites.init(settings.get("favorites", []));
 panes.init(settings.get("panes", {}));
-

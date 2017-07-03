@@ -27,7 +27,7 @@ export default class Pane {
 	getNode() { return this._node; }
 
 	toJSON() {
-		return this._lists.map(l => l.getPath().getPath());
+		return this._lists.map(l => l.getPath().toString());
 	}
 
 	activate() {

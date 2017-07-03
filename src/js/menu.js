@@ -25,7 +25,7 @@ export function init() {
 				command.menuItem("list:top", "Go to &top"),
 				command.menuItem("fixme", "&Drive selection"),
 				command.menuItem("fixme", "&Wi-Fi Access points"),
-				command.menuItem("fixme", "&Favorites"),
+				command.menuItem("list:favorites", "&Favorites"),
 				command.menuItem("list:home", "&Home")
 			]
 		},

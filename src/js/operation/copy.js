@@ -113,7 +113,7 @@ export default class Copy extends Operation {
 	async _copyFile(record, targetPath) {
 		let progress1 = 0;
 		let progress2 = 100*this._stats.done/this._stats.total;
-		this._progress.update({row1:record.path.getPath(), row2:targetPath.getPath(), progress1, progress2});
+		this._progress.update({row1:record.path.toString(), row2:targetPath.toString(), progress1, progress2});
 
 		if (targetPath.exists()) { /* target exists: overwrite/skip/abort */
 			if (this._issues.overwrite == "skip-all") { /* silently skip */
@@ -180,7 +180,7 @@ export default class Copy extends Operation {
 	async _recordCopied(record) {} /* used only for moving */
 
 	async _handleFileExists(path) {
-		let text = `Target file ${path.getPath()} already exists`;
+		let text = `Target file ${path} already exists`;
 		let title = "File exists";
 		let buttons = ["overwrite", "overwrite-all", "skip", "skip-all", "abort"];
 		return this._processIssue("overwrite", { text, title, buttons });

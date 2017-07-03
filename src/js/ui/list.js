@@ -120,7 +120,7 @@ export default class List {
 		}
 
 /*
-		var data = _("rename.exists", newFile.getPath());
+		var data = _("rename.exists", newFile);
 		var title = _("rename.title");
 		if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
 		
@@ -264,7 +264,7 @@ export default class List {
 
 		this._clear();
 
-		this._input.value = this._path.getPath();
+		this._input.value = this._path;
 		paths.sort(SORT);
 
 		let parent = this._path.getParent();

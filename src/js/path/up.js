@@ -9,7 +9,7 @@ export default class Up extends Path {
 
 	getImage() { return "up.png"; }
 	getDescription() { return this._path.getDescription(); }
-	getPath() { return this._path.getPath(); }
+	toString() { return this._path.toString(); }
 	activate(list) { list.setPath(this._path); }
 
 	supports(what) {

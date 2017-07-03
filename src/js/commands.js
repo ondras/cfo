@@ -31,8 +31,13 @@ command.register("list:top", "Ctrl+Backspace", () => {
 });
 
 command.register("list:home", "Ctrl+H", () => {
-	let home = paths.home();
-	panes.getActive().getList().setPath(home);
+	let path = paths.home();
+	panes.getActive().getList().setPath(path);
+});
+
+command.register("list:favorites", [], () => {
+	let path = paths.favorites();
+	panes.getActive().getList().setPath(path);
 });
 
 command.register("list:input", "Ctrl+L", () => {
@@ -44,7 +49,7 @@ command.register("directory:new", "F7", async () => {
 	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
-	let name = await prompt(`Create new directory in "${path.getPath()}"`);
+	let name = await prompt(`Create new directory in "${path}"`);
 	if (!name) { return; }
 
 	let newPath = path.append(name);
@@ -63,7 +68,7 @@ command.register("file:new", "Shift+F4", async () => {
 	if (!path.supports(CREATE)) { return; }
 
 	/* fixme new.txt mit jako preferenci */
-	let name = await prompt(`Create new file in "${path.getPath()}"`, "new.txt");
+	let name = await prompt(`Create new file in "${path}"`, "new.txt");
 	if (!name) { return; }
 
 	let newPath = path.append(name);
@@ -80,17 +85,17 @@ command.register("file:edit", "F4", () => {
 	if (!file.supports(EDIT)) { return; }
 
 	/* fixme configurable */
-	let child = require("child_process").spawn("/usr/bin/subl", [file.getPath()]);
+	let child = require("child_process").spawn("/usr/bin/subl", [file]);
 
 	child.on("error", e => alert(e.message));
 });
 
-command.register("file:delete", ["Delete", "F8"], async () => {
+command.register("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 	let list = panes.getActive().getList();
 	let path = list.getFocusedPath();
 	if (!path.supports(DELETE)) { return; }
 
-	let result = await confirm(`Really delete "${path.getPath()}" ?`);
+	let result = await confirm(`Really delete "${path}" ?`);
 	if (!result) { return; }
 	let d = new Delete(path);
 	await d.run();
@@ -112,9 +117,9 @@ command.register("file:copy", "F5", async () => {
 
 	/* fixme parent->child test */
 
-	let name = await prompt(`Copy "${sourcePath.getPath()}" to:`, targetPath.getPath());
+	let name = await prompt(`Copy "${sourcePath}" to:`, targetPath);
 	if (!name) { return; }
-	targetPath = new LocalPath(name); // fixme other path types
+	targetPath = paths.fromString(name);
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
 	targetList.reload();
@@ -128,9 +133,9 @@ command.register("file:move", "F6", async () => {
 
 	/* fixme parent->child test */
 
-	let name = await prompt(`Move "${sourcePath.getPath()}" to:`, targetPath.getPath());
+	let name = await prompt(`Move "${sourcePath}" to:`, targetPath);
 	if (!name) { return; }
-	targetPath = new LocalPath(name); // fixme other path types
+	targetPath = paths.fromString(name);
 	let move = new Move(sourcePath, targetPath);
 	await move.run();
 	sourceList.reload();
