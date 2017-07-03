@@ -5,7 +5,6 @@ body {
   box-sizing: border-box;
   margin: 0;
   font: 12px ubuntu;
-  background-color: #e8e8e8;
 }
 .dialog {
   z-index: 1;

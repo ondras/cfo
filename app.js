@@ -38,6 +38,8 @@ function removeProgress(window) {
 	sync();
 }
 
+const background = "#e8e8e8";
+
 /* Progress window - remote (data) part */
 
 const remote$1 = require("electron").remote;
@@ -51,7 +53,8 @@ const windowOptions = {
 	width: 500,
 	height: 60,
 	show: false,
-	useContentSize: true
+	useContentSize: true,
+	backgroundColor: background
 };
 
 class Progress {
@@ -118,7 +121,8 @@ const windowOptions$1 = {
 	width: 500,
 	height: 60,
 	show: false,
-	useContentSize: true
+	useContentSize: true,
+	backgroundColor: background
 };
 
 class Issue {
@@ -209,7 +213,7 @@ class Path {
 	getDate() {}
 	getSize() {}
 	getMode() {}
-	getDescription() {}
+	getDescription() { return this.toString(); }
 	getParent() {}
 	append(leaf) {}
 
@@ -729,7 +733,6 @@ const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
 
 function handler(e) {
-	console.log(e);
 	let available = REGISTRY.filter(reg => {
 		for (let m in reg.modifiers) {
 			if (reg.modifiers[m] != e[m]) { return false; }
@@ -1661,15 +1664,6 @@ register$1("tab:close", "Ctrl+W", () => {
 	getActive().removeList();
 });
 
-
-var panes = Object.freeze({
-	activate: activate,
-	getActive: getActive,
-	getInactive: getInactive,
-	init: init,
-	toJSON: toJSON
-});
-
 const Menu = require('electron').remote.Menu;
 
 function init$2() {
@@ -2285,14 +2279,16 @@ if (!("".padStart)) {
 function saveSettings(e) {
 	let win = remote.getCurrentWindow();
 	settings.set("window.size", win.getSize());
+	settings.set("window.position", win.getPosition());
 	settings.set("panes", toJSON());
 	settings.set("favorites", toJSON$1());
 }
 window.addEventListener("beforeunload", saveSettings);
-window.panes = panes;
 
 init$2();
 init$1(settings.get("favorites", []));
 init(settings.get("panes", {}));
+
+window.bw = remote.getCurrentWindow();
 
 }());

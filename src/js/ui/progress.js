@@ -1,6 +1,7 @@
 /* Progress window - remote (data) part */
 
 import * as wm from "util/windowmanager.js";
+import * as conf from "conf.js";
 
 const remote = require("electron").remote;
 const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
@@ -13,7 +14,8 @@ const windowOptions = {
 	width: 500,
 	height: 60,
 	show: false,
-	useContentSize: true
+	useContentSize: true,
+	backgroundColor: conf.background
 }
 
 export default class Progress {

@@ -12,7 +12,6 @@ const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
 
 function handler(e) {
-	console.log(e);
 	let available = REGISTRY.filter(reg => {
 		for (let m in reg.modifiers) {
 			if (reg.modifiers[m] != e[m]) { return false; }

@@ -9,7 +9,7 @@ export default class Path {
 	getDate() {}
 	getSize() {}
 	getMode() {}
-	getDescription() {}
+	getDescription() { return this.toString(); }
 	getParent() {}
 	append(leaf) {}
 

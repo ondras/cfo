@@ -6,11 +6,15 @@ app.on("window-all-closed", () => {
 });
 
 app.on("ready", () => {
+	let position = settings.get("window.position", [16, 16]);
 	let size = settings.get("window.size", [800, 600]);
 	let options = {
 		width: size[0],
 		height: size[1],
-		icon: `${__dirname}/icon.png`
+		x: position[0],
+		y: position[1],
+		icon: `${__dirname}/icon.png`,
+		backgroundColor: "#e8e8e8"
 	}
 	let win = new BrowserWindow(options);
 	win.loadURL(`file://${__dirname}/index.html`);

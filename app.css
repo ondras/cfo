@@ -5,7 +5,6 @@ body {
   box-sizing: border-box;
   margin: 0;
   font: 12px ubuntu;
-  background-color: #e8e8e8;
 }
 .dialog {
   z-index: 1;
@@ -67,12 +66,19 @@ body {
   margin: 0;
   padding: 0;
   list-style: none;
+  font-size: 14px;
+  line-height: 1.5;
 }
 .tabs li {
   display: inline-block;
+  cursor: pointer;
+  padding: 0 3px;
+}
+.tabs li:not(.active) {
+  opacity: 0.8;
 }
 .tabs li.active {
-  font-weight: bold;
+  background-color: #ccc;
 }
 #prompt input {
   display: block;
@@ -82,6 +88,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: #e8e8e8;
 }
 #panes {
   flex: 1;
@@ -89,7 +96,8 @@ body {
   flex-direction: row;
 }
 footer {
-  padding: 3px;
+  line-height: 1.5;
+  padding: 0 3px;
 }
 body.modal::after {
   content: "";

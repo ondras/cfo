@@ -42,12 +42,14 @@ if (!("".padStart)) {
 function saveSettings(e) {
 	let win = remote.getCurrentWindow();
 	settings.set("window.size", win.getSize());
+	settings.set("window.position", win.getPosition());
 	settings.set("panes", panes.toJSON());
 	settings.set("favorites", favorites.toJSON());
 }
 window.addEventListener("beforeunload", saveSettings);
-window.panes = panes;
 
 menu.init();
 favorites.init(settings.get("favorites", []));
 panes.init(settings.get("panes", {}));
+
+window.bw = remote.getCurrentWindow();

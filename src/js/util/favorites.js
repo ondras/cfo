@@ -11,7 +11,6 @@ let storage = []; // strings
 
 function viewFunc(i) {
 	return async () => {
-		console.log(i);
 		let path = get(i);
 		if (!path) { return; }
 		panes.getActive().getList().setPath(path);
