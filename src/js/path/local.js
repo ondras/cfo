@@ -4,7 +4,7 @@ import * as format from "util/format.js";
 
 const fs = require("fs");
 const path = require("path");
-const {app, shell} = require("electron").remote;
+const {shell} = require("electron").remote;
 
 function statsToMetadata(stats) {
 	return {
@@ -31,10 +31,6 @@ function getMetadata(path, options = {}) {
 
 
 export default class Local extends Path {
-	static home() {
-		return new this(app.getPath("home"));
-	}
-
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); /* to get rid of a trailing slash */

@@ -33,13 +33,13 @@ CFO shall become a modernized version of [Fire Commander](https://addons.mozilla
   - [ ] SQLite
   - [ ] Wifi?
 - Miscellaneous
-  - [ ] Menu
+  - [X] Menu
   - [X] No toolbar
   - [ ] Configuration
-  - [ ] Persistence
+  - [X] Persistence
   - [ ] Selection
   - [ ] Clipboard support
-  - [ ] App icon
+  - [ ] Logo / App icon
 
 ## Running
 

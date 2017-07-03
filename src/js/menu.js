@@ -33,8 +33,8 @@ export function init() {
 			label: "&Commands",
 			submenu: [
 				command.menuItem("directory:new", "Create &directory"),
-				command.menuItem("fixme", "&New tab"),
-				command.menuItem("fixme", "&Close tab"),
+				command.menuItem("tab:new", "&New tab"),
+				command.menuItem("tab:close", "&Close tab"),
 				command.menuItem("fixme", "&Search"),
 				command.menuItem("fixme", "Create &archive"),
 				{type: "separator"}, /* fixme sort? */

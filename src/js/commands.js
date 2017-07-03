@@ -4,7 +4,8 @@ import confirm from "ui/confirm.js";
 import { CREATE, EDIT, RENAME, DELETE } from "path/path.js";
 import * as panes from "panes.js";
 import * as command from "util/command.js";
-import LocalPath from "path/local.js";
+import * as paths from "path/paths.js";
+
 import Delete from "operation/delete.js";
 import Copy from "operation/copy.js";
 import Move from "operation/move.js";
@@ -30,7 +31,7 @@ command.register("list:top", "Ctrl+Backspace", () => {
 });
 
 command.register("list:home", "Ctrl+H", () => {
-	let home = LocalPath.home();
+	let home = paths.home();
 	panes.getActive().getList().setPath(home);
 });
 

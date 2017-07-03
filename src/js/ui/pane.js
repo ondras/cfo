@@ -1,4 +1,3 @@
-import LocalPath from "path/local.js";
 import List from "ui/list.js";
 import Tabs from "ui/tabs.js";
 
@@ -7,7 +6,7 @@ import * as pubsub from "util/pubsub.js";
 import * as html from "util/html.js";
 
 export default class Pane {
-	constructor() {
+	constructor(paths = []) {
 		this._active = false;
 		this._lists = [];
 		this._tabs = new Tabs();
@@ -22,10 +21,14 @@ export default class Pane {
 		pubsub.subscribe("tab-change", this);
 		pubsub.subscribe("list-change", this);
 
-		this.addList();
+		paths.forEach(path => this.addList(path));
 	}
 
 	getNode() { return this._node; }
+
+	toJSON() {
+		return this._lists.map(l => l.getPath().getPath());
+	}
 
 	activate() {
 		if (this._active) { return; }
@@ -61,7 +64,8 @@ export default class Pane {
 	addList(path) {
 		if (!path) { /* either duplicate or home */
 			let index = this._tabs.selectedIndex;
-			path = (index == -1 ? LocalPath.home() : this._lists[index].getPath());
+			if (index == -1) { throw new Error("Cannot add new list: no path specified and duplication is not possible"); }
+			path = this._lists[index].getPath();
 		}
 
 		let list = new List();
@@ -115,6 +119,5 @@ export default class Pane {
 			break;
 		}
 	}
-
 }
 

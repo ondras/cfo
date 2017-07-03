@@ -1,339 +1,6 @@
 (function () {
 'use strict';
 
-class Path {
-	is(other) { return other.getPath() == this.getPath(); }
-
-	/* sync getters */
-	getPath() {}
-	getName() {}
-	getImage() {}
-	getDate() {}
-	getSize() {}
-	getMode() {}
-	getDescription() {}
-	getParent() {}
-	append(leaf) {}
-
-	/* never fails */
-	async stat() {}
-
-	/* these can be called only after stat */
-	exists() {}
-	supports(what) {}
-	async getChildren() {}
-
-	/* misc */
-	async create(opts) {}
-	async rename(newPath) {}
-	async delete() {}
-	async setDate(date) {}
-	createStream(type, opts) {}
-
-	activate(list) {
-		if (this.supports(CHILDREN)) { list.setPath(this); }
-	}
-}
-
-const CHILDREN = 0; // list children
-const CREATE = 1; // create descendants
-const EDIT = 2; // edit file via the default text editor
-const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
-const DELETE = 4; // self-explanatory
-
-const fs$1 = require("fs");
-const path$1 = require("path");
-
-function readlink(linkPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.readlink(linkPath, (err, targetPath) => {
-			if (err) { reject(err); } else {
-				let linkDir = path$1.dirname(linkPath);
-				let finalPath = path$1.resolve(linkDir, targetPath);
-				resolve(finalPath);
-			}
-		});
-	});
-}
-
-function readdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.readdir(path, (err, files) => {
-			err ? reject(err) : resolve(files);
-		});
-	});
-}
-
-function mkdir(path, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.mkdir(path, mode, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function open(path, flags, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.open(path, flags, mode, (err, fd) => {
-			err ? reject(err) : resolve(fd);
-		});
-	});
-}
-
-function close(fd) {
-	return new Promise((resolve, reject) => {
-		fs$1.close(fd, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
-
-function rename(oldPath, newPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.rename(oldPath, newPath, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
-
-function unlink(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.unlink(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function rmdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.rmdir(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function utimes(path, atime, mtime) {
-	return new Promise((resolve, reject) => {
-		fs$1.utimes(path, atime, mtime, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function symlink(target, path) {
-	return new Promise((resolve, reject) => {
-		fs$1.symlink(target, path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-const MASK = "rwxrwxrwx";
-
-function mode(m) {
-	return MASK.replace(/./g, (ch, index) => {
-		let perm = 1 << (MASK.length-index-1);
-		return (m & perm ? ch : "–");
-	});
-}
-
-function date(date) {
-	let d = date.getDate();
-	let mo = date.getMonth()+1;
-	let y = date.getFullYear();
-
-	let h = date.getHours().toString().padStart(2, "0");
-	let m = date.getMinutes().toString().padStart(2, "0");
-	let s = date.getSeconds().toString().padStart(2, "0");
-
-	return `${d}.${mo}.${y} ${h}:${m}:${s}`;
-}
-
-function size(bytes) {
-	{
-		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
-	}
-}
-
-const fs = require("fs");
-const path = require("path");
-const {app, shell} = require("electron").remote;
-
-function statsToMetadata(stats) {
-	return {
-		isDirectory: stats.isDirectory(),
-		isSymbolicLink: stats.isSymbolicLink(),
-		date: stats.mtime,
-		size: stats.size,
-		mode: stats.mode
-	}
-}
-
-function getMetadata(path, options = {}) {
-	return new Promise((resolve, reject) => {
-		let cb = (err, stats) => {
-			if (err) { 
-				reject(err);
-			} else {
-				resolve(statsToMetadata(stats));
-			}
-		};
-		options.link ? fs.lstat(path, cb) : fs.stat(path, cb);
-	});
-}
-
-
-class Local extends Path {
-	static home() {
-		return new this(app.getPath("home"));
-	}
-
-	constructor(p) {
-		super();
-		this._path = path.resolve(p); /* to get rid of a trailing slash */
-		this._target = null;
-		this._error = null;
-		this._meta = {};
-	}
-
-	getPath() { return this._path; }
-	getName() { return path.basename(this._path) || "/"; }
-	getDate() { return this._meta.date; }
-	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
-	getMode() { return this._meta.mode; }
-	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
-	exists() { return ("isDirectory" in this._meta); }
-
-	/* symlink-specific */
-	isSymbolicLink() { return this._meta.isSymbolicLink; }
-	getTarget() { return this._target; }
-
-	getDescription() {
-		let d = this._path;
-		/* fixme relativni */
-		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
-
-		if (!this._meta.isDirectory) {
-			let size$$1 = this.getSize();
-			/* fixme vynuceny vypnuty autoformat */
-			if (size$$1 !== undefined) { d = `${d}, ${size(size$$1)} bytes`; }
-		}
-		return d;
-	}
- 
-	getParent() {
-		let parent = new this.constructor(path.dirname(this._path));
-		return (parent.is(this) ? null : parent);
-	}
-
-	supports(what) { 
-		switch (what) {
-			case CHILDREN:
-			case CREATE:
-				return this._meta.isDirectory;
-			break;
-
-			case EDIT:
-				return !this._meta.isDirectory;
-			break;
-
-			case RENAME:
-			case DELETE:
-				return true;
-			break;
-		}
-	}
-
-	activate(list) {
-		if (this.supports(CHILDREN)) {
-			return super.activate(list);
-		} else {
-			shell.openItem(this._path);
-		}
-	}
-
-	append(leaf) {
-		let newPath = path.resolve(this._path, leaf);
-		return new this.constructor(newPath);
-	}
-
-	async create(opts = {}) {
-		if (opts.link) {
-			return symlink(opts.link, this._path);
-		} else if (opts.dir) {
-			return mkdir(this._path);
-		} else {
-			let handle = await open(this._path, "wx", opts.mode);
-			return close(handle);
-		}
-	}
-
-	async rename(newPath) {
-		return rename(this._path, newPath.getPath());
-	}
-
-	async delete() {
-		return (this._meta.isDirectory ? rmdir(this._path) : unlink(this._path));
-	}
-
-	async setDate(date$$1) {
-		let ts = date$$1.getTime()/1000;
-		return utimes(this._path, ts, ts);
-	}
-
-	async getChildren() {
-		let names = await readdir(this._path);
-		let paths = names
-			.map(name => path.resolve(this._path, name))
-			.map(name => new this.constructor(name));
-
-		let promises = paths.map(path => path.stat());
-		await Promise.all(promises);
-
-		return paths;
-	}
-
-	createStream(type, opts) {
-		switch (type) {
-			case "r": return fs.createReadStream(this._path, opts); break;
-			case "w": return fs.createWriteStream(this._path, opts); break;
-			default: throw new Error(`Unknown stream type "${type}"`); break;
-		}
-	}
-
-	async stat() {
-		try {
-			this._meta = await getMetadata(this._path, {link:true});
-		} catch (e) {
-			this._meta = {};
-		}
-
-		if (!this._meta.isSymbolicLink) { return; }
-
-		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
-		try {
-			let targetPath = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
-			this._target = targetPath;
-
-			/*
-			 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
-			 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
-			 */
-			return;
-
-			/* we need to get target isDirectory flag */
-			return getMetadata(this._target, {link:false}).then(meta => {
-				this._meta.isDirectory = meta.isDirectory;
-			}, e => { /* failed to stat link target */
-				delete this._meta.isDirectory;
-			});
-
-		} catch (e) { /* failed to readlink */
-			this._target = e;
-		}
-	}
-}
-
 let issues = [];
 let progresses = [];
 let current = null;
@@ -531,6 +198,46 @@ class Operation {
 	}
 }
 
+class Path {
+	is(other) { return other.getPath() == this.getPath(); }
+
+	/* sync getters */
+	getPath() {}
+	getName() {}
+	getImage() {}
+	getDate() {}
+	getSize() {}
+	getMode() {}
+	getDescription() {}
+	getParent() {}
+	append(leaf) {}
+
+	/* never fails */
+	async stat() {}
+
+	/* these can be called only after stat */
+	exists() {}
+	supports(what) {}
+	async getChildren() {}
+
+	/* misc */
+	async create(opts) {}
+	async rename(newPath) {}
+	async delete() {}
+	async setDate(date) {}
+	createStream(type, opts) {}
+
+	activate(list) {
+		if (this.supports(CHILDREN)) { list.setPath(this); }
+	}
+}
+
+const CHILDREN = 0; // list children
+const CREATE = 1; // create descendants
+const EDIT = 2; // edit file via the default text editor
+const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
+const DELETE = 4; // self-explanatory
+
 function createRecord(path) {
 	return {
 		path,
@@ -716,6 +423,305 @@ class Up extends Path {
 	}
 }
 
+const fs$1 = require("fs");
+const path$1 = require("path");
+
+function readlink(linkPath) {
+	return new Promise((resolve, reject) => {
+		fs$1.readlink(linkPath, (err, targetPath) => {
+			if (err) { reject(err); } else {
+				let linkDir = path$1.dirname(linkPath);
+				let finalPath = path$1.resolve(linkDir, targetPath);
+				resolve(finalPath);
+			}
+		});
+	});
+}
+
+function readdir(path) {
+	return new Promise((resolve, reject) => {
+		fs$1.readdir(path, (err, files) => {
+			err ? reject(err) : resolve(files);
+		});
+	});
+}
+
+function mkdir(path, mode) {
+	return new Promise((resolve, reject) => {
+		fs$1.mkdir(path, mode, err => {
+			err ? reject(err) : resolve();
+		});
+	});
+}
+
+function open(path, flags, mode) {
+	return new Promise((resolve, reject) => {
+		fs$1.open(path, flags, mode, (err, fd) => {
+			err ? reject(err) : resolve(fd);
+		});
+	});
+}
+
+function close(fd) {
+	return new Promise((resolve, reject) => {
+		fs$1.close(fd, err => {
+			err ? reject(err) : resolve();
+		});
+	})
+}
+
+function rename(oldPath, newPath) {
+	return new Promise((resolve, reject) => {
+		fs$1.rename(oldPath, newPath, err => {
+			err ? reject(err) : resolve();
+		});
+	})
+}
+
+function unlink(path) {
+	return new Promise((resolve, reject) => {
+		fs$1.unlink(path, err => {
+			err ? reject(err) : resolve();
+		});
+	});
+}
+
+function rmdir(path) {
+	return new Promise((resolve, reject) => {
+		fs$1.rmdir(path, err => {
+			err ? reject(err) : resolve();
+		});
+	});
+}
+
+function utimes(path, atime, mtime) {
+	return new Promise((resolve, reject) => {
+		fs$1.utimes(path, atime, mtime, err => {
+			err ? reject(err) : resolve();
+		});
+	});
+}
+
+function symlink(target, path) {
+	return new Promise((resolve, reject) => {
+		fs$1.symlink(target, path, err => {
+			err ? reject(err) : resolve();
+		});
+	});
+}
+
+const MASK = "rwxrwxrwx";
+
+function mode(m) {
+	return MASK.replace(/./g, (ch, index) => {
+		let perm = 1 << (MASK.length-index-1);
+		return (m & perm ? ch : "–");
+	});
+}
+
+function date(date) {
+	let d = date.getDate();
+	let mo = date.getMonth()+1;
+	let y = date.getFullYear();
+
+	let h = date.getHours().toString().padStart(2, "0");
+	let m = date.getMinutes().toString().padStart(2, "0");
+	let s = date.getSeconds().toString().padStart(2, "0");
+
+	return `${d}.${mo}.${y} ${h}:${m}:${s}`;
+}
+
+function size(bytes) {
+	{
+		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
+	}
+}
+
+const fs = require("fs");
+const path = require("path");
+const {shell} = require("electron").remote;
+
+function statsToMetadata(stats) {
+	return {
+		isDirectory: stats.isDirectory(),
+		isSymbolicLink: stats.isSymbolicLink(),
+		date: stats.mtime,
+		size: stats.size,
+		mode: stats.mode
+	}
+}
+
+function getMetadata(path, options = {}) {
+	return new Promise((resolve, reject) => {
+		let cb = (err, stats) => {
+			if (err) { 
+				reject(err);
+			} else {
+				resolve(statsToMetadata(stats));
+			}
+		};
+		options.link ? fs.lstat(path, cb) : fs.stat(path, cb);
+	});
+}
+
+
+class Local extends Path {
+	constructor(p) {
+		super();
+		this._path = path.resolve(p); /* to get rid of a trailing slash */
+		this._target = null;
+		this._error = null;
+		this._meta = {};
+	}
+
+	getPath() { return this._path; }
+	getName() { return path.basename(this._path) || "/"; }
+	getDate() { return this._meta.date; }
+	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
+	getMode() { return this._meta.mode; }
+	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
+	exists() { return ("isDirectory" in this._meta); }
+
+	/* symlink-specific */
+	isSymbolicLink() { return this._meta.isSymbolicLink; }
+	getTarget() { return this._target; }
+
+	getDescription() {
+		let d = this._path;
+		/* fixme relativni */
+		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
+
+		if (!this._meta.isDirectory) {
+			let size$$1 = this.getSize();
+			/* fixme vynuceny vypnuty autoformat */
+			if (size$$1 !== undefined) { d = `${d}, ${size(size$$1)} bytes`; }
+		}
+		return d;
+	}
+ 
+	getParent() {
+		let parent = new this.constructor(path.dirname(this._path));
+		return (parent.is(this) ? null : parent);
+	}
+
+	supports(what) { 
+		switch (what) {
+			case CHILDREN:
+			case CREATE:
+				return this._meta.isDirectory;
+			break;
+
+			case EDIT:
+				return !this._meta.isDirectory;
+			break;
+
+			case RENAME:
+			case DELETE:
+				return true;
+			break;
+		}
+	}
+
+	activate(list) {
+		if (this.supports(CHILDREN)) {
+			return super.activate(list);
+		} else {
+			shell.openItem(this._path);
+		}
+	}
+
+	append(leaf) {
+		let newPath = path.resolve(this._path, leaf);
+		return new this.constructor(newPath);
+	}
+
+	async create(opts = {}) {
+		if (opts.link) {
+			return symlink(opts.link, this._path);
+		} else if (opts.dir) {
+			return mkdir(this._path);
+		} else {
+			let handle = await open(this._path, "wx", opts.mode);
+			return close(handle);
+		}
+	}
+
+	async rename(newPath) {
+		return rename(this._path, newPath.getPath());
+	}
+
+	async delete() {
+		return (this._meta.isDirectory ? rmdir(this._path) : unlink(this._path));
+	}
+
+	async setDate(date$$1) {
+		let ts = date$$1.getTime()/1000;
+		return utimes(this._path, ts, ts);
+	}
+
+	async getChildren() {
+		let names = await readdir(this._path);
+		let paths = names
+			.map(name => path.resolve(this._path, name))
+			.map(name => new this.constructor(name));
+
+		let promises = paths.map(path => path.stat());
+		await Promise.all(promises);
+
+		return paths;
+	}
+
+	createStream(type, opts) {
+		switch (type) {
+			case "r": return fs.createReadStream(this._path, opts); break;
+			case "w": return fs.createWriteStream(this._path, opts); break;
+			default: throw new Error(`Unknown stream type "${type}"`); break;
+		}
+	}
+
+	async stat() {
+		try {
+			this._meta = await getMetadata(this._path, {link:true});
+		} catch (e) {
+			this._meta = {};
+		}
+
+		if (!this._meta.isSymbolicLink) { return; }
+
+		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
+		try {
+			let targetPath = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
+			this._target = targetPath;
+
+			/*
+			 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
+			 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
+			 */
+			return;
+
+			/* we need to get target isDirectory flag */
+			return getMetadata(this._target, {link:false}).then(meta => {
+				this._meta.isDirectory = meta.isDirectory;
+			}, e => { /* failed to stat link target */
+				delete this._meta.isDirectory;
+			});
+
+		} catch (e) { /* failed to readlink */
+			this._target = e;
+		}
+	}
+}
+
+const {app} = require("electron").remote;
+
+function fromString(str) {
+	return new Local(str);
+}
+
+function home() {
+	return fromString(app.getPath("home"));
+}
+
 const storage = Object.create(null);
 
 function publish(message, publisher, data) {
@@ -881,7 +887,7 @@ class List {
 		switch (key) {
 			case "Enter":
 				this._input.blur();
-				let path = new Local(this._input.value);
+				let path = fromString(this._input.value);
 				this.setPath(path);
 			break;
 
@@ -1217,7 +1223,7 @@ class Tabs {
 }
 
 class Pane {
-	constructor() {
+	constructor(paths = []) {
 		this._active = false;
 		this._lists = [];
 		this._tabs = new Tabs();
@@ -1232,10 +1238,14 @@ class Pane {
 		subscribe("tab-change", this);
 		subscribe("list-change", this);
 
-		this.addList();
+		paths.forEach(path => this.addList(path));
 	}
 
 	getNode() { return this._node; }
+
+	toJSON() {
+		return this._lists.map(l => l.getPath().getPath());
+	}
 
 	activate() {
 		if (this._active) { return; }
@@ -1271,7 +1281,8 @@ class Pane {
 	addList(path) {
 		if (!path) { /* either duplicate or home */
 			let index = this._tabs.selectedIndex;
-			path = (index == -1 ? Local.home() : this._lists[index].getPath());
+			if (index == -1) { throw new Error("Cannot add new list: no path specified and duplication is not possible"); }
+			path = this._lists[index].getPath();
 		}
 
 		let list = new List();
@@ -1325,7 +1336,6 @@ class Pane {
 			break;
 		}
 	}
-
 }
 
 /* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
@@ -1452,6 +1462,10 @@ document$1.body.addEventListener("click", e => {
 const PANES = [];
 let index = -1;
 
+function parsePaths(saved) {
+	return saved ? saved.map(fromString) : [home()];
+}
+
 function activate(pane) {
 	index = PANES.indexOf(pane);
 	PANES[(index+1) % 2].deactivate();
@@ -1466,14 +1480,26 @@ function getInactive() {
 	return PANES[(index+1) % 2];
 }
 
-function init() {
-	PANES.push(new Pane());
-	PANES.push(new Pane());
+function init(saved) {
+	let left = parsePaths(saved.left);
+	PANES.push(new Pane(left));
+
+	let right = parsePaths(saved.right);
+	PANES.push(new Pane(right));
 
 	let parent = document.querySelector("#panes");
 	PANES.forEach(pane => parent.appendChild(pane.getNode()));
 
-	activate(PANES[0]);
+	let index = saved.index || 0;
+	activate(PANES[index]);
+}
+
+function toJSON() {
+	return {
+		index,
+		left: PANES[0].toJSON(),
+		right: PANES[0].toJSON()
+	}
 }
 
 register("pane:toggle", "Tab", () => {
@@ -1497,7 +1523,7 @@ register("tab:close", "Ctrl+W", () => {
 	getActive().removeList();
 });
 
-const Menu$1 = require('electron').remote.Menu;
+const Menu = require('electron').remote.Menu;
 
 function init$1() {
 	const template = [
@@ -1530,8 +1556,8 @@ function init$1() {
 			label: "&Commands",
 			submenu: [
 				menuItem("directory:new", "Create &directory"),
-				menuItem("fixme", "&New tab"),
-				menuItem("fixme", "&Close tab"),
+				menuItem("tab:new", "&New tab"),
+				menuItem("tab:close", "&Close tab"),
 				menuItem("fixme", "&Search"),
 				menuItem("fixme", "Create &archive"),
 				{type: "separator"}, /* fixme sort? */
@@ -1550,8 +1576,8 @@ function init$1() {
 		}
 	];
 
-	let menu = Menu$1.buildFromTemplate(template);
-	Menu$1.setApplicationMenu(menu);
+	let menu = Menu.buildFromTemplate(template);
+	Menu.setApplicationMenu(menu);
 }
 
 let resolve;
@@ -2003,8 +2029,8 @@ register("list:top", "Ctrl+Backspace", () => {
 });
 
 register("list:home", "Ctrl+H", () => {
-	let home = Local.home();
-	getActive().getList().setPath(home);
+	let home$$1 = home();
+	getActive().getList().setPath(home$$1);
 });
 
 register("list:input", "Ctrl+L", () => {
@@ -2086,7 +2112,7 @@ register("file:copy", "F5", async () => {
 
 	let name = await prompt(`Copy "${sourcePath.getPath()}" to:`, targetPath.getPath());
 	if (!name) { return; }
-	targetPath = new Local(name); // fixme other path types
+	targetPath = new LocalPath(name); // fixme other path types
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
 	targetList.reload();
@@ -2102,7 +2128,7 @@ register("file:move", "F6", async () => {
 
 	let name = await prompt(`Move "${sourcePath.getPath()}" to:`, targetPath.getPath());
 	if (!name) { return; }
-	targetPath = new Local(name); // fixme other path types
+	targetPath = new LocalPath(name); // fixme other path types
 	let move = new Move(sourcePath, targetPath);
 	await move.run();
 	sourceList.reload();
@@ -2114,6 +2140,8 @@ register("app:devtools", "F12", () => {
 });
 
 const {remote} = require('electron');
+const settings = remote.require('electron-settings');
+
 window.FIXME = (...args) => console.error(...args);
 window.sleep = (delay = 1000) => new Promise(r => setTimeout(r, delay));
 
@@ -2147,7 +2175,14 @@ if (!("".padStart)) {
 	};
 }
 
+function saveSettings() {
+	let win = remote.getCurrentWindow();
+	settings.set("window.size", win.getSize());
+	settings.set("panes", toJSON());
+}
+window.addEventListener("beforeunload", saveSettings);
+
 init$1();
-init();
+init(settings.get("panes", {}));
 
 }());

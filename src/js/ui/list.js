@@ -1,10 +1,10 @@
 import Scan from "operation/scan.js";
 import QuickEdit from "ui/quickedit.js";
 
-import Local from "path/local.js";
 import Up from "path/up.js";
-
 import {CHILDREN} from "path/path.js";
+
+import * as paths from "path/paths.js";
 import * as html from "util/html.js";
 import * as format from "util/format.js";
 import * as pubsub from "util/pubsub.js";
@@ -153,7 +153,7 @@ export default class List {
 		switch (key) {
 			case "Enter":
 				this._input.blur();
-				let path = new Local(this._input.value);
+				let path = paths.fromString(this._input.value);
 				this.setPath(path);
 			break;
 

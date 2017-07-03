@@ -3,7 +3,7 @@ import * as menu from "menu.js";
 import * as commands from "commands.js";
 
 const {remote} = require('electron');
-const {Menu, MenuItem} = remote
+const settings = remote.require('electron-settings');
 
 window.FIXME = (...args) => console.error(...args);
 window.sleep = (delay = 1000) => new Promise(r => setTimeout(r, delay));
@@ -38,5 +38,13 @@ if (!("".padStart)) {
 	}
 }
 
+function saveSettings() {
+	let win = remote.getCurrentWindow();
+	settings.set("window.size", win.getSize());
+	settings.set("panes", panes.toJSON());
+}
+window.addEventListener("beforeunload", saveSettings);
+
 menu.init();
-panes.init();
+panes.init(settings.get("panes", {}));
+
