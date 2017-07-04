@@ -29,7 +29,7 @@ CFO shall become a modernized version of [Fire Commander](https://addons.mozilla
   - [ ] ZIP
   - [ ] ISO 9660
   - [ ] Windows drives
-  - [ ] Favorites
+  - [X] Favorites
   - [ ] SQLite
   - [ ] Wifi?
 - Miscellaneous

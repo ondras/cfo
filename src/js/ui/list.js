@@ -3,6 +3,7 @@ import QuickEdit from "ui/quickedit.js";
 
 import Up from "path/up.js";
 import {CHILDREN} from "path/path.js";
+import prompt from "ui/prompt.js";
 
 import * as paths from "path/paths.js";
 import * as html from "util/html.js";
@@ -45,10 +46,7 @@ export default class List {
 		this._table.addEventListener("dblclick", this);
 
 		this._quickEdit = new QuickEdit();
-	}
-
-	destroy() {
-
+		this._selected = {};
 	}
 
 	getNode() { return this._node; }
@@ -141,9 +139,14 @@ export default class List {
 			case "keydown":
 				if (e.target == this._input) { 
 					this._handleInputKey(e.key);
+				} else if (e.ctrlKey) { // ctrl+a = vyber vseho
+					if (e.key == "a") { 
+						this._selectAll();
+						e.preventDefault();
+					}
 				} else if (!e.ctrlKey) { // nechceme aby ctrl+l hledalo od "l"
 					let handled = this._handleKey(e.key);
-					if (handled) { e.preventDefault(); }
+					if (handled) { e.preventDefault(); } // FIXME nefunguje, handleKey je async!
 				}
 			break;
 		}
@@ -165,6 +168,7 @@ export default class List {
 
 	async _handleKey(key) {
 		let index = this._getFocusedIndex();
+		let item;
 
 		switch (key) {
 			case "Home": 
@@ -199,17 +203,17 @@ export default class List {
 
 			case "Enter": this._activatePath(); break;
 
+			case "Insert":
+				if (index == -1) { return; }
+				this._selectToggle(index);
+				this._focusBy(+1);
+			break;
+
 			case " ":
 				if (index == -1) { return; }
-				let item = this._items[index];
+				this._selectToggle(index);
 
-				/* FIXME 
-				if (this._selection.selectionContains(item)) {
-					this._toggleDown();
-					return;
-				}
-				*/
-
+				item = this._items[index];
 				let scan = new Scan(item.path);
 				let result = await scan.run();
 				if (!result) { return; }
@@ -220,13 +224,16 @@ export default class List {
 
 				this._prefix = "";
 				this._focusBy(+1);
-				// FIXME this._toggleDown();
 			break;
 
 			case "Escape":
 				this._prefix = "";
 				if (index > -1) { this._focusAt(index); } /* redraw without prefix highlight */
 			break;
+
+			case "+": this._addSelected(); break;
+			case "-": this._removeSelected(); break;
+			case "*": this._invertSelected(); break;
 
 			default:
 				if (key.length == 1) { this._search(key.toLowerCase()); }
@@ -263,6 +270,7 @@ export default class List {
 		let fallbackIndex = (this._pathToBeFocused ? 0 : this._getFocusedIndex());
 
 		this._clear();
+		this._selected = {};
 
 		this._input.value = this._path;
 		paths.sort(SORT);
@@ -392,7 +400,7 @@ export default class List {
 				}
 			}
 
-			status.set(this._items[index].path.getDescription());
+			this._updateStatus();
 		}
 	}
 
@@ -402,6 +410,37 @@ export default class List {
 			return (path && item.path.is(path) ? index : result);
 		}, fallbackIndex);
 		this._focusAt(focusIndex);
+	}
+
+	_updateStatus() {
+		let index = this._getFocusedIndex();
+		let str = this._items[index].path.getDescription();
+
+		let selected = Object.keys(this._selected);
+		if (selected.length > 0) {
+			let fileCount = 0;
+			let dirCount = 0;
+			let bytes = 0;
+			selected.forEach(index => {
+				let item = this._items[index];
+
+				if (item.path.supports(CHILDREN)) {
+					dirCount++;
+				} else {
+					fileCount++;
+				}
+				
+				if ("size" in item) {
+					bytes += item.size;
+				} else {
+					bytes += item.path.getSize() || 0;
+				}
+			});
+			
+			str = `Selected ${format.size(bytes)} bytes in ${fileCount} files and ${dirCount} directories`;
+		}
+
+		status.set(str);
 	}
 
 	_search(ch) {
@@ -419,9 +458,89 @@ export default class List {
 		/* not found, nothing */
 	}
 
+	_syncSelected() {
+		this._items.forEach((item, index) => {
+			item.node.classList.toggle("selected", index in this._selected);
+		});
+		this._updateStatus();
+	}
+
 	_clear() {
 		this._items = [];
 		this._table.innerHTML = "";
 		this._prefix = "";
+	}
+
+	_invertSelected() {
+		let newSelected = {};
+
+		Object.keys(this._selected).forEach(index => { // copy already selected directories
+			if (this._items[index].path.supports(CHILDREN)) { newSelected[index] = true; }
+		})
+
+		this._items.forEach((item, index) => {
+			if (index in this._selected) { return; } // already selected
+			if (item.path.supports(CHILDREN)) { return; } // do not select directories
+			if (item.path instanceof Up) { return; } // do not select "..""
+			newSelected[index] = true;
+		});
+
+		this._selected = newSelected;
+		this._syncSelected();
+	}
+
+	async _addSelected() {
+		let pattern = await this._getPattern("Select all files matching this pattern:");
+		if (!pattern) { return; }
+		
+		this._items.forEach((item, index) => {
+			if (index in this._selected) { return; } // already selected
+			if (item.path.supports(CHILDREN)) { return; } // do not select directories
+			if (item.path.getName().match(pattern)) { this._selected[index] = true; } // name match
+		});
+
+		this._syncSelected();
+	}
+
+	async _removeSelected() {
+		let pattern = await this._getPattern("Deselect all files matching this pattern:");
+		if (!pattern) { return; }
+
+		Object.keys(this._selected).forEach(index => {
+			let path = this._items[index].path;
+			if (path.getName().match(pattern)) { delete this._selected[index]; } // name match
+		});
+
+		this._syncSelected();
+	}
+
+	async _getPattern(text) {
+		let result = await prompt(text, "*");
+		if (!result) { return; }
+
+		result = result.replace(/\./g, "\\.");
+		result = result.replace(/\*/g, ".*");
+		result = result.replace(/\?/g, ".");
+
+		return new RegExp(`^${result}$`);
+	}
+
+	_selectAll() {
+		this._selected = {};
+		this._items.forEach((item, index) => {
+			if (item.path instanceof Up) { return; }
+			this._selected[index] = true;
+		});
+		this._syncSelected();
+	}
+
+	_selectToggle(index) {
+		if (this._items[index].path instanceof Up) { return; }
+		if (index in this._selected) {
+			delete this._selected[index];
+		} else {
+			this._selected[index] = true;
+		}
+		this._syncSelected();
 	}
 }

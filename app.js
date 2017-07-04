@@ -68,6 +68,7 @@ class Progress {
 	open() {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
 		this._window = new remote$1.BrowserWindow(options);
+		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/progress.html`);
 
 		let webContents = this._window.webContents;
@@ -135,6 +136,7 @@ class Issue {
 	open() {
 		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
 		this._window = new remote$2.BrowserWindow(options);
+		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/issue.html`);
 
 		let webContents = this._window.webContents;
@@ -242,6 +244,7 @@ const CREATE = 1; // create descendants
 const EDIT = 2; // edit file via the default text editor
 const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
 const DELETE = 4; // self-explanatory
+ // copy from FIXME pouzivat pro detekci
 
 function createRecord(path) {
 	return {
@@ -428,6 +431,56 @@ class Up extends Path {
 	}
 }
 
+let resolve;
+
+const body = document.body;
+const form = node("form", {id:"prompt", className:"dialog"});
+const text$1 = node("p");
+const input = node("input", {type:"text"});
+const ok = node("button", {type:"submit"}, "OK");
+const cancel = node("button", {type:"button"}, "Cancel");
+
+form.appendChild(text$1);
+form.appendChild(input);
+form.appendChild(ok);
+form.appendChild(cancel);
+
+form.addEventListener("submit", e => {
+	e.preventDefault();
+	close(input.value);
+});
+
+cancel.addEventListener("click", e => {
+	close(false);
+});
+
+function onKeyDown(e) {
+	if (e.key == "Escape") { close(null); }
+	e.stopPropagation();
+}
+
+function close(value) {
+	window.removeEventListener("keydown", onKeyDown, true);
+	body.classList.remove("modal");
+	form.parentNode.removeChild(form);
+	resolve(value);
+}
+
+function prompt(t, value = "") {
+	clear(text$1);
+	text$1.appendChild(text(t));
+	input.value = value;
+
+	body.classList.add("modal");
+	body.appendChild(form);
+	window.addEventListener("keydown", onKeyDown, true);
+	input.selectionStart = 0;
+	input.selectionEnd = input.value.length;
+	input.focus();
+
+	return new Promise(r => resolve = r);
+}
+
 const fs$1 = require("fs");
 const path$1 = require("path");
 
@@ -467,7 +520,7 @@ function open(path, flags, mode) {
 	});
 }
 
-function close(fd) {
+function close$1(fd) {
 	return new Promise((resolve, reject) => {
 		fs$1.close(fd, err => {
 			err ? reject(err) : resolve();
@@ -649,7 +702,7 @@ class Local extends Path {
 			return mkdir(this._path);
 		} else {
 			let handle = await open(this._path, "wx", opts.mode);
-			return close(handle);
+			return close$1(handle);
 		}
 	}
 
@@ -784,49 +837,49 @@ function register(func, key) {
 
 window.addEventListener("keydown", handler);
 
-let resolve;
+let resolve$1;
 
-const body = document.body;
-const form = node("form", {id:"confirm", className:"dialog"});
-const text$1 = node("p");
-const ok = node("button", {type:"submit"}, "OK");
-const cancel = node("button", {type:"button"}, "Cancel");
+const body$1 = document.body;
+const form$1 = node("form", {id:"confirm", className:"dialog"});
+const text$2 = node("p");
+const ok$1 = node("button", {type:"submit"}, "OK");
+const cancel$1 = node("button", {type:"button"}, "Cancel");
 
-form.appendChild(text$1);
-form.appendChild(ok);
-form.appendChild(cancel);
+form$1.appendChild(text$2);
+form$1.appendChild(ok$1);
+form$1.appendChild(cancel$1);
 
-form.addEventListener("submit", e => {
+form$1.addEventListener("submit", e => {
 	e.preventDefault();
-	close$1(true);
+	close$2(true);
 });
 
-cancel.addEventListener("click", e => {
-	close$1(false);
+cancel$1.addEventListener("click", e => {
+	close$2(false);
 });
 
-function onKeyDown(e) {
-	if (e.key == "Escape") { close$1(false); }
+function onKeyDown$1(e) {
+	if (e.key == "Escape") { close$2(false); }
 	e.stopPropagation();
 }
 
-function close$1(value) {
-	window.removeEventListener("keydown", onKeyDown, true);
-	body.classList.remove("modal");
-	form.parentNode.removeChild(form);
-	resolve(value);
+function close$2(value) {
+	window.removeEventListener("keydown", onKeyDown$1, true);
+	body$1.classList.remove("modal");
+	form$1.parentNode.removeChild(form$1);
+	resolve$1(value);
 }
 
 function confirm(t) {
-	clear(text$1);
-	text$1.appendChild(text(t));
+	clear(text$2);
+	text$2.appendChild(text(t));
 
-	body.classList.add("modal");
-	body.appendChild(form);
-	window.addEventListener("keydown", onKeyDown, true);
-	ok.focus();
+	body$1.classList.add("modal");
+	body$1.appendChild(form$1);
+	window.addEventListener("keydown", onKeyDown$1, true);
+	ok$1.focus();
 
-	return new Promise(r => resolve = r);
+	return new Promise(r => resolve$1 = r);
 }
 
 const {remote: remote$3} = require('electron');
@@ -835,7 +888,6 @@ let storage = []; // strings
 
 function viewFunc(i) {
 	return async () => {
-		console.log(i);
 		let path = get(i);
 		if (!path) { return; }
 		getActive().getList().setPath(path);
@@ -985,10 +1037,7 @@ class List {
 		this._table.addEventListener("dblclick", this);
 
 		this._quickEdit = new QuickEdit();
-	}
-
-	destroy() {
-
+		this._selected = {};
 	}
 
 	getNode() { return this._node; }
@@ -1081,9 +1130,14 @@ class List {
 			case "keydown":
 				if (e.target == this._input) { 
 					this._handleInputKey(e.key);
+				} else if (e.ctrlKey) { // ctrl+a = vyber vseho
+					if (e.key == "a") { 
+						this._selectAll();
+						e.preventDefault();
+					}
 				} else if (!e.ctrlKey) { // nechceme aby ctrl+l hledalo od "l"
 					let handled = this._handleKey(e.key);
-					if (handled) { e.preventDefault(); }
+					if (handled) { e.preventDefault(); } // FIXME nefunguje, handleKey je async!
 				}
 			break;
 		}
@@ -1105,6 +1159,7 @@ class List {
 
 	async _handleKey(key) {
 		let index = this._getFocusedIndex();
+		let item;
 
 		switch (key) {
 			case "Home": 
@@ -1139,17 +1194,17 @@ class List {
 
 			case "Enter": this._activatePath(); break;
 
+			case "Insert":
+				if (index == -1) { return; }
+				this._selectToggle(index);
+				this._focusBy(+1);
+			break;
+
 			case " ":
 				if (index == -1) { return; }
-				let item = this._items[index];
+				this._selectToggle(index);
 
-				/* FIXME 
-				if (this._selection.selectionContains(item)) {
-					this._toggleDown();
-					return;
-				}
-				*/
-
+				item = this._items[index];
 				let scan = new Scan(item.path);
 				let result = await scan.run();
 				if (!result) { return; }
@@ -1160,13 +1215,16 @@ class List {
 
 				this._prefix = "";
 				this._focusBy(+1);
-				// FIXME this._toggleDown();
 			break;
 
 			case "Escape":
 				this._prefix = "";
 				if (index > -1) { this._focusAt(index); } /* redraw without prefix highlight */
 			break;
+
+			case "+": this._addSelected(); break;
+			case "-": this._removeSelected(); break;
+			case "*": this._invertSelected(); break;
 
 			default:
 				if (key.length == 1) { this._search(key.toLowerCase()); }
@@ -1203,6 +1261,7 @@ class List {
 		let fallbackIndex = (this._pathToBeFocused ? 0 : this._getFocusedIndex());
 
 		this._clear();
+		this._selected = {};
 
 		this._input.value = this._path;
 		paths.sort(SORT);
@@ -1332,7 +1391,7 @@ class List {
 				}
 			}
 
-			set$1(this._items[index].path.getDescription());
+			this._updateStatus();
 		}
 	}
 
@@ -1342,6 +1401,37 @@ class List {
 			return (path && item.path.is(path) ? index : result);
 		}, fallbackIndex);
 		this._focusAt(focusIndex);
+	}
+
+	_updateStatus() {
+		let index = this._getFocusedIndex();
+		let str = this._items[index].path.getDescription();
+
+		let selected = Object.keys(this._selected);
+		if (selected.length > 0) {
+			let fileCount = 0;
+			let dirCount = 0;
+			let bytes = 0;
+			selected.forEach(index => {
+				let item = this._items[index];
+
+				if (item.path.supports(CHILDREN)) {
+					dirCount++;
+				} else {
+					fileCount++;
+				}
+				
+				if ("size" in item) {
+					bytes += item.size;
+				} else {
+					bytes += item.path.getSize() || 0;
+				}
+			});
+			
+			str = `Selected ${size(bytes)} bytes in ${fileCount} files and ${dirCount} directories`;
+		}
+
+		set$1(str);
 	}
 
 	_search(ch) {
@@ -1359,10 +1449,90 @@ class List {
 		/* not found, nothing */
 	}
 
+	_syncSelected() {
+		this._items.forEach((item, index) => {
+			item.node.classList.toggle("selected", index in this._selected);
+		});
+		this._updateStatus();
+	}
+
 	_clear() {
 		this._items = [];
 		this._table.innerHTML = "";
 		this._prefix = "";
+	}
+
+	_invertSelected() {
+		let newSelected = {};
+
+		Object.keys(this._selected).forEach(index => { // copy already selected directories
+			if (this._items[index].path.supports(CHILDREN)) { newSelected[index] = true; }
+		});
+
+		this._items.forEach((item, index) => {
+			if (index in this._selected) { return; } // already selected
+			if (item.path.supports(CHILDREN)) { return; } // do not select directories
+			if (item.path instanceof Up) { return; } // do not select "..""
+			newSelected[index] = true;
+		});
+
+		this._selected = newSelected;
+		this._syncSelected();
+	}
+
+	async _addSelected() {
+		let pattern = await this._getPattern("Select all files matching this pattern:");
+		if (!pattern) { return; }
+		
+		this._items.forEach((item, index) => {
+			if (index in this._selected) { return; } // already selected
+			if (item.path.supports(CHILDREN)) { return; } // do not select directories
+			if (item.path.getName().match(pattern)) { this._selected[index] = true; } // name match
+		});
+
+		this._syncSelected();
+	}
+
+	async _removeSelected() {
+		let pattern = await this._getPattern("Deselect all files matching this pattern:");
+		if (!pattern) { return; }
+
+		Object.keys(this._selected).forEach(index => {
+			let path = this._items[index].path;
+			if (path.getName().match(pattern)) { delete this._selected[index]; } // name match
+		});
+
+		this._syncSelected();
+	}
+
+	async _getPattern(text$$1) {
+		let result = await prompt(text$$1, "*");
+		if (!result) { return; }
+
+		result = result.replace(/\./g, "\\.");
+		result = result.replace(/\*/g, ".*");
+		result = result.replace(/\?/g, ".");
+
+		return new RegExp(`^${result}$`);
+	}
+
+	_selectAll() {
+		this._selected = {};
+		this._items.forEach((item, index) => {
+			if (item.path instanceof Up) { return; }
+			this._selected[index] = true;
+		});
+		this._syncSelected();
+	}
+
+	_selectToggle(index) {
+		if (this._items[index].path instanceof Up) { return; }
+		if (index in this._selected) {
+			delete this._selected[index];
+		} else {
+			this._selected[index] = true;
+		}
+		this._syncSelected();
 	}
 }
 
@@ -1719,56 +1889,6 @@ function init$2() {
 
 	let menu = Menu.buildFromTemplate(template);
 	Menu.setApplicationMenu(menu);
-}
-
-let resolve$1;
-
-const body$1 = document.body;
-const form$1 = node("form", {id:"prompt", className:"dialog"});
-const text$2 = node("p");
-const input = node("input", {type:"text"});
-const ok$1 = node("button", {type:"submit"}, "OK");
-const cancel$1 = node("button", {type:"button"}, "Cancel");
-
-form$1.appendChild(text$2);
-form$1.appendChild(input);
-form$1.appendChild(ok$1);
-form$1.appendChild(cancel$1);
-
-form$1.addEventListener("submit", e => {
-	e.preventDefault();
-	close$2(input.value);
-});
-
-cancel$1.addEventListener("click", e => {
-	close$2(false);
-});
-
-function onKeyDown$1(e) {
-	if (e.key == "Escape") { close$2(null); }
-	e.stopPropagation();
-}
-
-function close$2(value) {
-	window.removeEventListener("keydown", onKeyDown$1, true);
-	body$1.classList.remove("modal");
-	form$1.parentNode.removeChild(form$1);
-	resolve$1(value);
-}
-
-function prompt(t, value = "") {
-	clear(text$2);
-	text$2.appendChild(text(t));
-	input.value = value;
-
-	body$1.classList.add("modal");
-	body$1.appendChild(form$1);
-	window.addEventListener("keydown", onKeyDown$1, true);
-	input.selectionStart = 0;
-	input.selectionEnd = input.value.length;
-	input.focus();
-
-	return new Promise(r => resolve$1 = r);
 }
 
 class Delete extends Operation {

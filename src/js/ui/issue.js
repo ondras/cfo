@@ -27,6 +27,7 @@ export default class Issue {
 	open() {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
 		this._window = new remote.BrowserWindow(options);
+		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/issue.html`);
 
 		let webContents = this._window.webContents;

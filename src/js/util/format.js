@@ -28,7 +28,7 @@ export function size(bytes) {
 			bytes /= step;
 			index++;
 		}
-		return `${bytes.toFixed(2)}  ${units[index]}`;
+		return `${bytes.toFixed(2)} ${units[index]}`;
 	} else {
 		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
 	}

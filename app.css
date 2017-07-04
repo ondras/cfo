@@ -62,6 +62,9 @@ body {
   background-color: #e8e8e8;
   box-shadow: 0 0 0 1px #000;
 }
+.list tr.selected {
+  color: red;
+}
 .tabs {
   margin: 0;
   padding: 0;
