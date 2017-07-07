@@ -1,4 +1,4 @@
-import Path, {CHILDREN, CREATE, EDIT, RENAME, DELETE } from "./path.js";
+import Path, {CHILDREN, CREATE, VIEW, EDIT, RENAME, DELETE } from "./path.js";
 import {readlink, readdir, mkdir, open, close, rename, unlink, rmdir, utimes, symlink} from "util/fs.js";
 import * as format from "util/format.js";
 
@@ -78,6 +78,7 @@ export default class Local extends Path {
 				return this._meta.isDirectory;
 			break;
 
+			case VIEW:
 			case EDIT:
 				return !this._meta.isDirectory;
 			break;

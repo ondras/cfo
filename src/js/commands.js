@@ -1,7 +1,8 @@
 import prompt from "ui/prompt.js";
 import confirm from "ui/confirm.js";
 
-import { CREATE, EDIT, RENAME, DELETE } from "path/path.js";
+import { CREATE, EDIT, RENAME, DELETE, VIEW } from "path/path.js";
+import * as viewers from "viewer/viewers.js";
 import * as panes from "panes.js";
 import * as command from "util/command.js";
 import * as paths from "path/paths.js";
@@ -78,6 +79,13 @@ command.register("file:new", "Shift+F4", async () => {
 	} catch (e) {
 		alert(e.message);
 	}
+});
+
+command.register("file:view", "F3", () => {
+	let file = panes.getActive().getList().getSelection({multi:false});
+	if (!file.supports(VIEW)) { return; }
+
+	viewers.view(file);
 });
 
 command.register("file:edit", "F4", () => {

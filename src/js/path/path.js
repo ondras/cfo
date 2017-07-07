@@ -39,3 +39,4 @@ export const EDIT = 2; // edit file via the default text editor
 export const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
 export const DELETE = 4; // self-explanatory
 export const COPY = 5; // copy from FIXME pouzivat pro detekci
+export const VIEW = 6; // view using an internal viewer

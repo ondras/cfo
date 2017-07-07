@@ -310,7 +310,8 @@ export default class List {
 		let {node, path} = item;
 
 		let td = node.insertCell();
-		let img = html.node("img", {src:path.getImage()});
+		let src = `../img/${path.getImage()}`;
+		let img = html.node("img", {src});
 		td.appendChild(img);
 
 		let name = path.getName();

@@ -69,7 +69,7 @@ class Progress {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
 		this._window = new remote$1.BrowserWindow(options);
 		this._window.setMenu(null);
-		this._window.loadURL(`file://${__dirname}/progress.html`);
+		this._window.loadURL(`file://${__dirname}/progress/progress.html`);
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
@@ -137,7 +137,7 @@ class Issue {
 		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
 		this._window = new remote$2.BrowserWindow(options);
 		this._window.setMenu(null);
-		this._window.loadURL(`file://${__dirname}/issue.html`);
+		this._window.loadURL(`file://${__dirname}/issue/issue.html`);
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
@@ -245,6 +245,7 @@ const EDIT = 2; // edit file via the default text editor
 const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
 const DELETE = 4; // self-explanatory
 const COPY = 5; // copy from FIXME pouzivat pro detekci
+const VIEW = 6; // view using an internal viewer
 
 function createRecord(path) {
 	return {
@@ -671,6 +672,7 @@ class Local extends Path {
 				return this._meta.isDirectory;
 			break;
 
+			case VIEW:
 			case EDIT:
 				return !this._meta.isDirectory;
 			break;
@@ -1341,7 +1343,8 @@ class List {
 		let {node: node$$1, path} = item;
 
 		let td = node$$1.insertCell();
-		let img = node("img", {src:path.getImage()});
+		let src = `../img/${path.getImage()}`;
+		let img = node("img", {src});
 		td.appendChild(img);
 
 		let name = path.getName();
@@ -1936,6 +1939,39 @@ function init$2() {
 	Menu.setApplicationMenu(menu);
 }
 
+/* Text viewer window - remote (data) part */
+
+const remote$4 = require("electron").remote;
+
+const windowOptions$2 = {
+	parent: remote$4.getCurrentWindow(),
+	resizable: true,
+	fullscreenable: true,
+	center: true,
+	width: 640,
+	height: 480,
+	useContentSize: true,
+	backgroundColor: background
+};
+
+function view$1(path) {
+	let options = Object.assign({}, windowOptions$2, {title: path});
+
+	let window = new remote$4.BrowserWindow(options);
+	window.setMenu(null);
+	window.loadURL(`file://${__dirname}/../viewer/text/index.html`);
+
+	let webContents = window.webContents;
+	webContents.once("did-finish-load", () => {
+		webContents.send("path", path.toString());
+		window.toggleDevTools();
+	});
+}
+
+function view(path) {
+	return view$1(path);
+}
+
 class Delete extends Operation {
 	constructor(path) {
 		super();
@@ -2341,6 +2377,13 @@ register$1("file:new", "Shift+F4", async () => {
 	} catch (e) {
 		alert(e.message);
 	}
+});
+
+register$1("file:view", "F3", () => {
+	let file = getActive().getList().getSelection({multi:false});
+	if (!file.supports(VIEW)) { return; }
+
+	view(file);
 });
 
 register$1("file:edit", "F4", () => {

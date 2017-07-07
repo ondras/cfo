@@ -17,6 +17,6 @@ app.on("ready", () => {
 		backgroundColor: "#e8e8e8"
 	}
 	let win = new BrowserWindow(options);
-	win.loadURL(`file://${__dirname}/index.html`);
+	win.loadURL(`file://${__dirname}/app/index.html`);
 	win.toggleDevTools();
 });

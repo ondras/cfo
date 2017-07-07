@@ -30,7 +30,7 @@ export default class Progress {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
 		this._window = new remote.BrowserWindow(options);
 		this._window.setMenu(null);
-		this._window.loadURL(`file://${__dirname}/progress.html`);
+		this._window.loadURL(`file://${__dirname}/progress/progress.html`);
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
