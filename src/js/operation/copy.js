@@ -56,15 +56,18 @@ export default class Copy extends Operation {
 
 		await targetPath.stat();
 
-		if (record.path.getParent().is(targetPath)) { /* copy to the same parent -- create a "copy of" prefix */
-			let name = record.path.getName();
-			while (targetPath.exists()) {
-				name = `Copy of ${name}`;
-				targetPath = record.path.getParent().append(name);
-				await targetPath.stat();
-			}
-		} else if (targetPath.exists()) { /* append inside an existing target */
+		if (targetPath.exists()) { /* append inside an existing target */
 			targetPath = targetPath.append(record.path.getName());
+			await targetPath.stat();
+
+			if (targetPath.is(record.path)) { /* copy to the same parent -- create a "copy of" prefix */
+				while (targetPath.exists()) { 
+					let name = `Copy of ${targetPath.getName()}`;
+					targetPath = targetPath.getParent().append(name);
+					await targetPath.stat();
+				}
+			} /* not the same parent */
+
 		} /* else does not exist, will be created during copy impl below */
 
 		if (record.children !== null) {
@@ -73,7 +76,9 @@ export default class Copy extends Operation {
 			await this._copyFile(record, targetPath);
 		}
 
-		await targetPath.setDate(record.path.getDate());
+		let date = record.path.getDate();
+		if (date) { await targetPath.setDate(date); }
+
 		return this._recordCopied(record);
 	}
 

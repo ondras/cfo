@@ -81,7 +81,7 @@ command.register("file:new", "Shift+F4", async () => {
 });
 
 command.register("file:edit", "F4", () => {
-	let file = panes.getActive().getList().getFocusedPath();
+	let file = panes.getActive().getList().getSelection({multi:false});
 	if (!file.supports(EDIT)) { return; }
 
 	/* fixme configurable */
@@ -92,7 +92,7 @@ command.register("file:edit", "F4", () => {
 
 command.register("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 	let list = panes.getActive().getList();
-	let path = list.getFocusedPath();
+	let path = list.getSelection({multi:true});
 	if (!path.supports(DELETE)) { return; }
 
 	let result = await confirm(`Really delete "${path}" ?`);
@@ -104,14 +104,14 @@ command.register("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 
 command.register("file:rename", "F2", () => {
 	let list = panes.getActive().getList();
-	let file = list.getFocusedPath();
+	let file = list.getSelection({multi:false});
 	if (!file.supports(RENAME)) { return; }
 	list.startEditing();
 });
 
 command.register("file:copy", "F5", async () => {
 	let sourceList = panes.getActive().getList();
-	let sourcePath = sourceList.getFocusedPath();
+	let sourcePath = sourceList.getSelection({multi:true});
 	let targetList = panes.getInactive().getList();
 	let targetPath = targetList.getPath();
 
@@ -122,12 +122,13 @@ command.register("file:copy", "F5", async () => {
 	targetPath = paths.fromString(name);
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
+	sourceList.reload();
 	targetList.reload();
 });
 
 command.register("file:move", "F6", async () => {
 	let sourceList = panes.getActive().getList();
-	let sourcePath = sourceList.getFocusedPath();
+	let sourcePath = sourceList.getSelection({multi:true});
 	let targetList = panes.getInactive().getList();
 	let targetPath = targetList.getPath();
 

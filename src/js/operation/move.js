@@ -16,11 +16,10 @@ export default class Move extends Copy {
 			await targetPath.stat();
 			if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
 			try {
-				await root.path.rename(targetPath);
-				return;
+				return root.path.rename(targetPath);
 			} catch (e) {} // quick rename failed, need to copy+delete
 		}
-		super._startCopying(root);
+		return super._startCopying(root);
 	}
 
 	async _recordCopied(record) {

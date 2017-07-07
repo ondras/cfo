@@ -244,7 +244,7 @@ const CREATE = 1; // create descendants
 const EDIT = 2; // edit file via the default text editor
 const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
 const DELETE = 4; // self-explanatory
- // copy from FIXME pouzivat pro detekci
+const COPY = 5; // copy from FIXME pouzivat pro detekci
 
 function createRecord(path) {
 	return {
@@ -962,6 +962,42 @@ class Favorites extends Path {
 	}
 }
 
+class Group extends Path {
+	constructor(paths) {
+		super();
+		this._paths = paths;
+	}
+
+	getName() { return ""; } /* appending this group's name = noop; useful for recursive operations */
+
+	async getChildren() { return this._paths; }
+
+	supports(what) {
+		switch (what) {
+			case CHILDREN:
+			case DELETE:
+			case COPY:
+				return true;
+			break;
+
+			case RENAME:
+				return this._paths.every(item => item.supports(what));
+			break;
+
+			default: return false; break;
+		}
+	}
+
+	toString() { return `${this._paths.length} items`; }
+
+	async rename(newPath) {
+		for (let path of this._paths) {
+			let child = newPath.append(path.getName());
+			await path.rename(child);
+		}
+	}
+}
+
 const {app} = require("electron").remote;
 const ALL = [Favorites, Local];
 
@@ -978,6 +1014,10 @@ function home() {
 
 function favorites() {
 	return new Favorites();
+}
+
+function group(paths) {
+	return new Group(paths);
 }
 
 const storage$1 = Object.create(null);
@@ -1060,10 +1100,15 @@ class List {
 		this._input.selectionEnd = this._input.value.length;
 	}
 
-	getFocusedPath() {
-		let index = this._getFocusedIndex();
-		if (index == -1) { return null; }
-		return this._items[index].path;
+	getSelection(options = {}) {
+		if (!options.multi || Object.keys(this._selected).length == 0) {
+			let index = this._getFocusedIndex();
+			if (index == -1) { return null; }
+			return this._items[index].path;
+		} else {
+			let items = Object.keys(this._selected).map(index => this._items[index].path);
+			return group(items);
+		}
 	}
 
 	activate() {
@@ -1084,7 +1129,7 @@ class List {
 
 		this._quickEdit.stop();
 
-		this._pathToBeFocused = this.getFocusedPath();
+		this._pathToBeFocused = this.getSelection({multi:false});
 		this._removeFocus();
 		this._input.blur();
 	}
@@ -1252,7 +1297,7 @@ class List {
 	}
 
 	_activatePath() {
-		let path = this.getFocusedPath();
+		let path = this.getSelection({multi:false});
 		if (!path) { return; }
 		path.activate(this);
 	}
@@ -2015,15 +2060,18 @@ class Copy extends Operation {
 
 		await targetPath.stat();
 
-		if (record.path.getParent().is(targetPath)) { /* copy to the same parent -- create a "copy of" prefix */
-			let name = record.path.getName();
-			while (targetPath.exists()) {
-				name = `Copy of ${name}`;
-				targetPath = record.path.getParent().append(name);
-				await targetPath.stat();
-			}
-		} else if (targetPath.exists()) { /* append inside an existing target */
+		if (targetPath.exists()) { /* append inside an existing target */
 			targetPath = targetPath.append(record.path.getName());
+			await targetPath.stat();
+
+			if (targetPath.is(record.path)) { /* copy to the same parent -- create a "copy of" prefix */
+				while (targetPath.exists()) { 
+					let name = `Copy of ${targetPath.getName()}`;
+					targetPath = targetPath.getParent().append(name);
+					await targetPath.stat();
+				}
+			} /* not the same parent */
+
 		} /* else does not exist, will be created during copy impl below */
 
 		if (record.children !== null) {
@@ -2032,7 +2080,9 @@ class Copy extends Operation {
 			await this._copyFile(record, targetPath);
 		}
 
-		await targetPath.setDate(record.path.getDate());
+		let date = record.path.getDate();
+		if (date) { await targetPath.setDate(date); }
+
 		return this._recordCopied(record);
 	}
 
@@ -2197,11 +2247,10 @@ class Move extends Copy {
 			await targetPath.stat();
 			if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
 			try {
-				await root.path.rename(targetPath);
-				return;
+				return root.path.rename(targetPath);
 			} catch (e) {} // quick rename failed, need to copy+delete
 		}
-		super._startCopying(root);
+		return super._startCopying(root);
 	}
 
 	async _recordCopied(record) {
@@ -2295,7 +2344,7 @@ register$1("file:new", "Shift+F4", async () => {
 });
 
 register$1("file:edit", "F4", () => {
-	let file = getActive().getList().getFocusedPath();
+	let file = getActive().getList().getSelection({multi:false});
 	if (!file.supports(EDIT)) { return; }
 
 	/* fixme configurable */
@@ -2306,7 +2355,7 @@ register$1("file:edit", "F4", () => {
 
 register$1("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 	let list = getActive().getList();
-	let path = list.getFocusedPath();
+	let path = list.getSelection({multi:true});
 	if (!path.supports(DELETE)) { return; }
 
 	let result = await confirm(`Really delete "${path}" ?`);
@@ -2318,14 +2367,14 @@ register$1("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 
 register$1("file:rename", "F2", () => {
 	let list = getActive().getList();
-	let file = list.getFocusedPath();
+	let file = list.getSelection({multi:false});
 	if (!file.supports(RENAME)) { return; }
 	list.startEditing();
 });
 
 register$1("file:copy", "F5", async () => {
 	let sourceList = getActive().getList();
-	let sourcePath = sourceList.getFocusedPath();
+	let sourcePath = sourceList.getSelection({multi:true});
 	let targetList = getInactive().getList();
 	let targetPath = targetList.getPath();
 
@@ -2336,12 +2385,13 @@ register$1("file:copy", "F5", async () => {
 	targetPath = fromString(name);
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
+	sourceList.reload();
 	targetList.reload();
 });
 
 register$1("file:move", "F6", async () => {
 	let sourceList = getActive().getList();
-	let sourcePath = sourceList.getFocusedPath();
+	let sourcePath = sourceList.getSelection({multi:true});
 	let targetList = getInactive().getList();
 	let targetPath = targetList.getPath();
 

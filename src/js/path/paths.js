@@ -1,5 +1,6 @@
 import Local from "./local.js";
 import Favorites from "./favorites.js";
+import Group from "./group.js";
 
 const {app} = require("electron").remote;
 const ALL = [Favorites, Local];
@@ -17,4 +18,8 @@ export function home() {
 
 export function favorites() {
 	return new Favorites();
+}
+
+export function group(paths) {
+	return new Group(paths);
 }

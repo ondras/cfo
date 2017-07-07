@@ -69,10 +69,15 @@ export default class List {
 		this._input.selectionEnd = this._input.value.length;
 	}
 
-	getFocusedPath() {
-		let index = this._getFocusedIndex();
-		if (index == -1) { return null; }
-		return this._items[index].path;
+	getSelection(options = {}) {
+		if (!options.multi || Object.keys(this._selected).length == 0) {
+			let index = this._getFocusedIndex();
+			if (index == -1) { return null; }
+			return this._items[index].path;
+		} else {
+			let items = Object.keys(this._selected).map(index => this._items[index].path);
+			return paths.group(items);
+		}
 	}
 
 	activate() {
@@ -93,7 +98,7 @@ export default class List {
 
 		this._quickEdit.stop();
 
-		this._pathToBeFocused = this.getFocusedPath();
+		this._pathToBeFocused = this.getSelection({multi:false});
 		this._removeFocus();
 		this._input.blur();
 	}
@@ -261,7 +266,7 @@ export default class List {
 	}
 
 	_activatePath() {
-		let path = this.getFocusedPath();
+		let path = this.getSelection({multi:false});
 		if (!path) { return; }
 		path.activate(this);
 	}
