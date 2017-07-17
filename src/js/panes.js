@@ -1,13 +1,8 @@
 import Pane from "ui/pane.js";
-import * as paths from "path/paths.js";
 import * as command from "util/command.js";
 
 const PANES = [];
 let index = -1;
-
-function parsePaths(saved) {
-	return saved ? saved.map(paths.fromString) : [paths.home()];
-}
 
 export function activate(pane) {
 	index = PANES.indexOf(pane);
@@ -24,11 +19,8 @@ export function getInactive() {
 }
 
 export function init(saved) {
-	let left = parsePaths(saved.left);
-	PANES.push(new Pane(left));
-
-	let right = parsePaths(saved.right);
-	PANES.push(new Pane(right));
+	PANES.push(new Pane(saved.left || {}));
+	PANES.push(new Pane(saved.right || {}));
 
 	let parent = document.querySelector("#panes");
 	PANES.forEach(pane => parent.appendChild(pane.getNode()));

@@ -3,21 +3,18 @@
 
 dl {
 	margin: 1em;
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	grid-gap: 8px;
 
-	div {
-		display: flex;
-		flex-direction: row;
+	dd {
+		margin: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 
-		dt {
-			flex-basis: 100px;
-		}
-
-		dd {
-			margin: 0;
-			flex: 1;
-			white-space: nowrap;
-			overflow: hidden;
-			text-overflow: ellipsis;
-		}
+	progress {
+		width: 100%;
 	}
 }

@@ -12,7 +12,7 @@ const windowOptions = {
 	fullscreenable: false,
 	center: true,
 	width: 500,
-	height: 60,
+	height: 100,
 	show: false,
 	useContentSize: true,
 	backgroundColor: conf.background

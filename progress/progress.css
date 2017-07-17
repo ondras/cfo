@@ -67,18 +67,16 @@ body {
 }
 dl {
   margin: 1em;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  grid-gap: 8px;
 }
-dl div {
-  display: flex;
-  flex-direction: row;
-}
-dl div dt {
-  flex-basis: 100px;
-}
-dl div dd {
+dl dd {
   margin: 0;
-  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+dl progress {
+  width: 100%;
 }

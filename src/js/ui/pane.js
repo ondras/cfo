@@ -4,9 +4,14 @@ import Tabs from "ui/tabs.js";
 import * as panes from "panes.js";
 import * as pubsub from "util/pubsub.js";
 import * as html from "util/html.js";
+import * as paths from "path/paths.js";
+
+function parsePaths(saved) {
+	return saved ? saved.map(paths.fromString) : [paths.home()];
+}
 
 export default class Pane {
-	constructor(paths = []) {
+	constructor(saved = {}) {
 		this._active = false;
 		this._lists = [];
 		this._tabs = new Tabs();
@@ -21,13 +26,18 @@ export default class Pane {
 		pubsub.subscribe("tab-change", this);
 		pubsub.subscribe("list-change", this);
 
+		let paths = parsePaths(saved.paths);
 		paths.forEach(path => this.addList(path));
+		this._tabs.selectedIndex = saved.index || 0;
 	}
 
 	getNode() { return this._node; }
 
 	toJSON() {
-		return this._lists.map(l => l.getPath().toString());
+		return {
+			index: this._tabs.selectedIndex,
+			paths: this._lists.map(l => l.getPath().toString())
+		}
 	}
 
 	activate() {

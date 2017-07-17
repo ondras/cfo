@@ -51,5 +51,3 @@ window.addEventListener("beforeunload", saveSettings);
 menu.init();
 favorites.init(settings.get("favorites", []));
 panes.init(settings.get("panes", {}));
-
-window.bw = remote.getCurrentWindow();

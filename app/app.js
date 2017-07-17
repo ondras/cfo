@@ -51,7 +51,7 @@ const windowOptions = {
 	fullscreenable: false,
 	center: true,
 	width: 500,
-	height: 60,
+	height: 100,
 	show: false,
 	useContentSize: true,
 	backgroundColor: background
@@ -1647,8 +1647,12 @@ class Tabs {
 	}
 }
 
+function parsePaths(saved) {
+	return saved ? saved.map(fromString) : [home()];
+}
+
 class Pane {
-	constructor(paths = []) {
+	constructor(saved = {}) {
 		this._active = false;
 		this._lists = [];
 		this._tabs = new Tabs();
@@ -1663,13 +1667,18 @@ class Pane {
 		subscribe("tab-change", this);
 		subscribe("list-change", this);
 
+		let paths = parsePaths(saved.paths);
 		paths.forEach(path => this.addList(path));
+		this._tabs.selectedIndex = saved.index || 0;
 	}
 
 	getNode() { return this._node; }
 
 	toJSON() {
-		return this._lists.map(l => l.getPath().toString());
+		return {
+			index: this._tabs.selectedIndex,
+			paths: this._lists.map(l => l.getPath().toString())
+		}
 	}
 
 	activate() {
@@ -1822,10 +1831,6 @@ document$1.body.addEventListener("click", e => {
 const PANES = [];
 let index = -1;
 
-function parsePaths(saved) {
-	return saved ? saved.map(fromString) : [home()];
-}
-
 function activate(pane) {
 	index = PANES.indexOf(pane);
 	PANES[(index+1) % 2].deactivate();
@@ -1841,11 +1846,8 @@ function getInactive() {
 }
 
 function init(saved) {
-	let left = parsePaths(saved.left);
-	PANES.push(new Pane(left));
-
-	let right = parsePaths(saved.right);
-	PANES.push(new Pane(right));
+	PANES.push(new Pane(saved.left || {}));
+	PANES.push(new Pane(saved.right || {}));
 
 	let parent = document.querySelector("#panes");
 	PANES.forEach(pane => parent.appendChild(pane.getNode()));
@@ -2501,7 +2503,5 @@ window.addEventListener("beforeunload", saveSettings);
 init$2();
 init$1(settings.get("favorites", []));
 init(settings.get("panes", {}));
-
-window.bw = remote.getCurrentWindow();
 
 }());
