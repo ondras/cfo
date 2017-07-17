@@ -1082,6 +1082,7 @@ class List {
 		this._selected = {};
 	}
 
+	destroy() {}
 	getNode() { return this._node; }
 	getPath() { return this._path; }
 
