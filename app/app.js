@@ -1951,11 +1951,11 @@ const windowOptions$2 = {
 	width: 640,
 	height: 480,
 	useContentSize: true,
-	backgroundColor: background
+	backgroundColor: background,
 };
 
 function view$1(path) {
-	let options = Object.assign({}, windowOptions$2, {title: path});
+	let options = Object.assign({}, windowOptions$2, {title: path.toString()});
 
 	let window = new remote$4.BrowserWindow(options);
 	window.setMenu(null);
@@ -1964,7 +1964,6 @@ function view$1(path) {
 	let webContents = window.webContents;
 	webContents.once("did-finish-load", () => {
 		webContents.send("path", path.toString());
-		window.toggleDevTools();
 	});
 }
 

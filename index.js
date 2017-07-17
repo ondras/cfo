@@ -18,5 +18,5 @@ app.on("ready", () => {
 	}
 	let win = new BrowserWindow(options);
 	win.loadURL(`file://${__dirname}/app/index.html`);
-	win.toggleDevTools();
+//	win.toggleDevTools();
 });

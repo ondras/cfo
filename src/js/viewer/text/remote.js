@@ -12,11 +12,11 @@ const windowOptions = {
 	width: 640,
 	height: 480,
 	useContentSize: true,
-	backgroundColor: conf.background
+	backgroundColor: conf.background,
 }
 
 export function view(path) {
-	let options = Object.assign({}, windowOptions, {title: path});
+	let options = Object.assign({}, windowOptions, {title: path.toString()});
 
 	let window = new remote.BrowserWindow(options);
 	window.setMenu(null);
@@ -25,6 +25,5 @@ export function view(path) {
 	let webContents = window.webContents;
 	webContents.once("did-finish-load", () => {
 		webContents.send("path", path.toString());
-		window.toggleDevTools();
 	});
 }
