@@ -13,13 +13,13 @@ app/app.css: $(CSS)
 	$(LESSC) src/css/app.less > $@
 
 progress/progress.js: $(JS)
-	$(ROLLUP) src/js/progress.js -o $@
+	$(ROLLUP) src/js/progress/local.js -o $@
 
 progress/progress.css: $(CSS)
 	$(LESSC) src/css/progress.less > $@
 
 issue/issue.js: $(JS)
-	$(ROLLUP) src/js/issue.js -o $@
+	$(ROLLUP) src/js/issue/local.js -o $@
 
 issue/issue.css: $(CSS)
 	$(LESSC) src/css/issue.less > $@

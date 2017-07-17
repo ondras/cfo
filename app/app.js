@@ -69,7 +69,7 @@ class Progress {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
 		this._window = new remote$1.BrowserWindow(options);
 		this._window.setMenu(null);
-		this._window.loadURL(`file://${__dirname}/progress/progress.html`);
+		this._window.loadURL(`file://${__dirname}/../progress/index.html`);
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {
@@ -137,7 +137,7 @@ class Issue {
 		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
 		this._window = new remote$2.BrowserWindow(options);
 		this._window.setMenu(null);
-		this._window.loadURL(`file://${__dirname}/issue/issue.html`);
+		this._window.loadURL(`file://${__dirname}/../issue/index.html`);
 
 		let webContents = this._window.webContents;
 		webContents.once("did-finish-load", () => {

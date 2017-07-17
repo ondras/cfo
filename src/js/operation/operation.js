@@ -1,4 +1,4 @@
-import Issue from "ui/issue.js"
+import Issue from "issue/remote.js"
 
 const TIMEOUT = 500;
 

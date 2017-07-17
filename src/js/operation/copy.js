@@ -1,4 +1,4 @@
-import Progress from "ui/progress.js";
+import Progress from "progress/remote.js";
 import Operation from "./operation.js";
 import Scan from "./scan.js";
 import {CHILDREN} from "path/path.js";
