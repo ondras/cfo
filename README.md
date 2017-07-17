@@ -1,5 +1,7 @@
 # CFO
 
+![Screenshot](screenshot.png)
+
 CFO is a traditional two-pane file manager. It is aimed at power users, built to be controlled (almost exlusively) with keyboard shortcuts (most notably F-keys).
 
 CFO shall become a modernized version of [Fire Commander](https://addons.mozilla.org/en-us/firefox/addon/fire-commander/). Fire Commander is built using XUL/XPCOM, a tech stack that is becoming obsolete. Electron-based CFO will continue its mission.
