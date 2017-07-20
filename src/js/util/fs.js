@@ -1,14 +1,9 @@
 const fs = require("fs");
-const path = require("path");
 
 export function readlink(linkPath) {
 	return new Promise((resolve, reject) => {
-		fs.readlink(linkPath, (err, targetPath) => {
-			if (err) { reject(err); } else {
-				let linkDir = path.dirname(linkPath);
-				let finalPath = path.resolve(linkDir, targetPath);
-				resolve(finalPath);
-			}
+		fs.readlink(linkPath, (err, target) => {
+			err ? reject(err) : resolve(target);
 		});
 	});
 }

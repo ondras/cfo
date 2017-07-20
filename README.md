@@ -11,7 +11,8 @@ CFO shall become a modernized version of [Fire Commander](https://addons.mozilla
 - Directory listing
   - [X] Tabs
   - [X] Statusbar
-  - [ ] Filetype/symlink icons
+  - [ ] Filetype icons
+  - [X] Symlink icons
   - [X] Quick search
   - [X] Fast rename
 - File operations

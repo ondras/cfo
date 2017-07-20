@@ -126,6 +126,14 @@ document$1.body.addEventListener("click", e => {
 	}
 });
 
+const CHILDREN = 0; // list children
+const CREATE = 1; // create descendants
+const EDIT = 2; // edit file via the default text editor
+const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
+const DELETE = 4; // self-explanatory
+ // copy from FIXME pouzivat pro detekci
+const VIEW = 6; // view using an internal viewer
+
 class Path {
 	static match(str) { return false; }
 	is(other) { return other.toString() == this.toString(); }
@@ -162,25 +170,12 @@ class Path {
 	}
 }
 
-const CHILDREN = 0; // list children
-const CREATE = 1; // create descendants
-const EDIT = 2; // edit file via the default text editor
-const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
-const DELETE = 4; // self-explanatory
- // copy from FIXME pouzivat pro detekci
-const VIEW = 6; // view using an internal viewer
-
 const fs$1 = require("fs");
-const path$1 = require("path");
 
 function readlink(linkPath) {
 	return new Promise((resolve, reject) => {
-		fs$1.readlink(linkPath, (err, targetPath) => {
-			if (err) { reject(err); } else {
-				let linkDir = path$1.dirname(linkPath);
-				let finalPath = path$1.resolve(linkDir, targetPath);
-				resolve(finalPath);
-			}
+		fs$1.readlink(linkPath, (err, target) => {
+			err ? reject(err) : resolve(target);
 		});
 	});
 }
@@ -332,7 +327,6 @@ function getMetadata(path, options = {}) {
 	});
 }
 
-
 class Local extends Path {
 	static match(str) { return str.match(/^\//); }
 
@@ -480,8 +474,12 @@ class Local extends Path {
 
 		// symlink: get target path (readlink), get target metadata (stat)
 		try {
-			let target = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
+			let target = await readlink(this._path);
 			this._target = target;
+
+			// resolve relative path
+			let linkDir = path.dirname(this._path);
+			target = path.resolve(linkDir, target);
 
 			let targetPath = new Local(target);
 			this._targetPath = targetPath;

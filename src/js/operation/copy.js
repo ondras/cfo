@@ -77,8 +77,9 @@ export default class Copy extends Operation {
 		}
 
 		let date = record.path.getDate();
-		if (date) { await targetPath.setDate(date); }
-
+		try {
+		if (date) { await targetPath.setDate(date); } // FIXME tady to hnije pri kopirovani neexistujiciho relativniho symlinku
+		} catch (e) { console.log(e); }
 		return this._recordCopied(record);
 	}
 

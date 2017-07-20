@@ -1,3 +1,11 @@
+export const CHILDREN = 0; // list children
+export const CREATE = 1; // create descendants
+export const EDIT = 2; // edit file via the default text editor
+export const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
+export const DELETE = 4; // self-explanatory
+export const COPY = 5; // copy from FIXME pouzivat pro detekci
+export const VIEW = 6; // view using an internal viewer
+
 export default class Path {
 	static match(str) { return false; }
 	is(other) { return other.toString() == this.toString(); }
@@ -33,11 +41,3 @@ export default class Path {
 		if (this.supports(CHILDREN)) { list.setPath(this); }
 	}
 }
-
-export const CHILDREN = 0; // list children
-export const CREATE = 1; // create descendants
-export const EDIT = 2; // edit file via the default text editor
-export const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
-export const DELETE = 4; // self-explanatory
-export const COPY = 5; // copy from FIXME pouzivat pro detekci
-export const VIEW = 6; // view using an internal viewer

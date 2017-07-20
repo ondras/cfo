@@ -30,7 +30,6 @@ function getMetadata(path, options = {}) {
 	});
 }
 
-
 export default class Local extends Path {
 	static match(str) { return str.match(/^\//); }
 
@@ -178,8 +177,12 @@ export default class Local extends Path {
 
 		// symlink: get target path (readlink), get target metadata (stat)
 		try {
-			let target = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
+			let target = await readlink(this._path);
 			this._target = target;
+
+			// resolve relative path
+			let linkDir = path.dirname(this._path);
+			target = path.resolve(linkDir, target);
 
 			let targetPath = new Local(target);
 			this._targetPath = targetPath;
