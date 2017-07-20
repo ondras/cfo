@@ -1,7 +1,8 @@
+import * as commands from "commands.js"; // fixme nema explicitni inicializaci
 import * as panes from "panes.js";
 import * as menu from "menu.js";
-import * as commands from "commands.js";
 import * as favorites from "util/favorites.js";
+import * as icons from "util/icons.js";
 
 const {remote} = require('electron');
 const settings = remote.require('electron-settings');
@@ -46,8 +47,14 @@ function saveSettings(e) {
 	settings.set("panes", panes.toJSON());
 	settings.set("favorites", favorites.toJSON());
 }
-window.addEventListener("beforeunload", saveSettings);
 
-menu.init();
-favorites.init(settings.get("favorites", []));
-panes.init(settings.get("panes", {}));
+async function init() {
+	await icons.init();
+
+	menu.init();
+	favorites.init(settings.get("favorites", []));
+	panes.init(settings.get("panes", {}));
+	window.addEventListener("beforeunload", saveSettings);
+}
+
+init();

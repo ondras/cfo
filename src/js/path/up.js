@@ -1,4 +1,5 @@
 import Path, {CHILDREN} from "./path.js";
+import * as icons from "util/icons.js";
 
 /* fixme tezko rict, jestli cestu takto maskovat, kdyz o patro vys lze jit i klavesovou zkratkou... */
 export default class Up extends Path {
@@ -7,7 +8,7 @@ export default class Up extends Path {
 		this._path = path;
 	}
 
-	getImage() { return "up.png"; }
+	getImage() { return icons.get("up"); }
 	getDescription() { return this._path.getDescription(); }
 	toString() { return this._path.toString(); }
 	activate(list) { list.setPath(this._path); }

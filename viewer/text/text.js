@@ -145,6 +145,7 @@ class Path {
 	async stat() {}
 
 	/* these can be called only after stat */
+	getSort() { return (this.supports(CHILDREN) ? 1 : 2); }
 	exists() {}
 	supports(what) {}
 	async getChildren() {}
@@ -262,6 +263,48 @@ function size(bytes) {
 	}
 }
 
+let images = Object.create(null);
+let cache = Object.create(null);
+
+function createCacheKey(name, options) {
+	return `${name}${options.link ? "-link" : ""}`;
+}
+
+function serialize(canvas) {
+	let url = canvas.toDataURL();
+
+	let binStr = atob(url.split(",").pop());
+	let len = binStr.length;
+	let arr = new Uint8Array(len);
+	for (let i=0; i<len; i++) { arr[i] = binStr.charCodeAt(i); }
+
+    let blob = new Blob([arr], {type: "image/png"});
+	return URL.createObjectURL(blob);
+}
+
+function createIcon(name, options) {
+	let image = images[name];
+	let canvas = node("canvas", {width:image.width, height:image.height});
+
+	let ctx = canvas.getContext("2d");
+
+	ctx.drawImage(image, 0, 0);
+	if (options.link) {
+		let link = images["link"];
+		ctx.drawImage(link, 0, image.height - link.height);
+	}
+
+	return serialize(canvas);
+}
+
+
+
+function get(name, options = {}) {
+	let key = createCacheKey(name, options);
+	if (!(key in cache)) { cache[key] = createIcon(name, options); }
+	return cache[key];
+}
+
 const fs = require("fs");
 const path = require("path");
 const {shell} = require("electron").remote;
@@ -295,8 +338,9 @@ class Local extends Path {
 
 	constructor(p) {
 		super();
-		this._path = path.resolve(p); /* to get rid of a trailing slash */
-		this._target = null;
+		this._path = path.resolve(p); // to get rid of a trailing slash
+		this._target = null; // string
+		this._targetPath = null; // Local, for icon resolution
 		this._error = null;
 		this._meta = {};
 	}
@@ -306,8 +350,27 @@ class Local extends Path {
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
-	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
+	getImage() { 
+		let link = this._meta.isSymbolicLink;
+		let name;
+
+		if (link) {
+			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : "file");
+		} else {
+			name = (this._meta.isDirectory ? "folder" : "file");
+		}
+
+		return get(name, {link});
+	}
 	exists() { return ("isDirectory" in this._meta); }
+
+	getSort() {
+		if (this._meta.isSymbolicLink && this._targetPath) {
+			return this._targetPath.getSort();
+		} else {
+			return super.getSort();
+		}
+	}
 
 	/* symlink-specific */
 	isSymbolicLink() { return this._meta.isSymbolicLink; }
@@ -315,7 +378,6 @@ class Local extends Path {
 
 	getDescription() {
 		let d = this._path;
-		/* fixme relativni */
 		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
 
 		if (!this._meta.isDirectory) {
@@ -416,27 +478,17 @@ class Local extends Path {
 
 		if (!this._meta.isSymbolicLink) { return; }
 
-		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
+		// symlink: get target path (readlink), get target metadata (stat)
 		try {
-			let targetPath = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
-			this._target = targetPath;
+			let target = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
+			this._target = target;
 
-			/*
-			 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
-			 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
-			 */
-			return;
+			let targetPath = new Local(target);
+			this._targetPath = targetPath;
 
-			/* we need to get target isDirectory flag */
-			return getMetadata(this._target, {link:false}).then(meta => {
-				this._meta.isDirectory = meta.isDirectory;
-			}, e => { /* failed to stat link target */
-				delete this._meta.isDirectory;
-			});
+			await targetPath.stat();
 
-		} catch (e) { /* failed to readlink */
-			this._target = e;
-		}
+		} catch (e) {} // failed to readlink
 	}
 }
 
@@ -607,7 +659,7 @@ class Favorite extends Path {
 	toString() { return this._path.toString(); }
 	getName() { return this.toString(); }
 	getSize() { return this._index; }
-	getImage() { return "favorite.png"; }
+	getImage() { return get("favorite"); }
 
 	supports(what) {
 		if (what == DELETE) { return true; }

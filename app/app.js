@@ -1,6 +1,206 @@
 (function () {
 'use strict';
 
+function clear(node) {
+	node.innerHTML = "";
+}
+
+function text$1(t) {
+	return document.createTextNode(t);
+}
+
+function node(name, attrs = {}, content = "") {
+	let n = document.createElement(name);
+	content && n.appendChild(text$1(content));
+	return Object.assign(n, attrs);
+}
+
+function scrollIntoView(node, scrollable = node.offsetParent) {
+	let nodeRect = node.getBoundingClientRect();
+	let scrollableRect = scrollable.getBoundingClientRect();
+
+	let top = nodeRect.top - scrollableRect.top;
+	let bottom = scrollableRect.bottom - nodeRect.bottom;
+
+	bottom -= (scrollable.offsetHeight - scrollable.clientHeight); // scrollable horizontal scrollbar
+
+	if (top < 0) { scrollable.scrollTop += top; } /* upper edge above */
+	if (bottom < 0) { scrollable.scrollTop -= bottom; } /* lower edge below */
+}
+
+let resolve;
+
+const body = document.body;
+const form = node("form", {id:"prompt", className:"dialog"});
+const text = node("p");
+const input = node("input", {type:"text"});
+const ok = node("button", {type:"submit"}, "OK");
+const cancel = node("button", {type:"button"}, "Cancel");
+
+form.appendChild(text);
+form.appendChild(input);
+form.appendChild(ok);
+form.appendChild(cancel);
+
+form.addEventListener("submit", e => {
+	e.preventDefault();
+	close(input.value);
+});
+
+cancel.addEventListener("click", e => {
+	close(false);
+});
+
+function onKeyDown(e) {
+	if (e.key == "Escape") { close(null); }
+	e.stopPropagation();
+}
+
+function close(value) {
+	window.removeEventListener("keydown", onKeyDown, true);
+	body.classList.remove("modal");
+	form.parentNode.removeChild(form);
+	resolve(value);
+}
+
+function prompt(t, value = "") {
+	clear(text);
+	text.appendChild(text$1(t));
+	input.value = value;
+
+	body.classList.add("modal");
+	body.appendChild(form);
+	window.addEventListener("keydown", onKeyDown, true);
+	input.selectionStart = 0;
+	input.selectionEnd = input.value.length;
+	input.focus();
+
+	return new Promise(r => resolve = r);
+}
+
+let resolve$1;
+
+const body$1 = document.body;
+const form$1 = node("form", {id:"confirm", className:"dialog"});
+const text$2 = node("p");
+const ok$1 = node("button", {type:"submit"}, "OK");
+const cancel$1 = node("button", {type:"button"}, "Cancel");
+
+form$1.appendChild(text$2);
+form$1.appendChild(ok$1);
+form$1.appendChild(cancel$1);
+
+form$1.addEventListener("submit", e => {
+	e.preventDefault();
+	close$1(true);
+});
+
+cancel$1.addEventListener("click", e => {
+	close$1(false);
+});
+
+function onKeyDown$1(e) {
+	if (e.key == "Escape") { close$1(false); }
+	e.stopPropagation();
+}
+
+function close$1(value) {
+	window.removeEventListener("keydown", onKeyDown$1, true);
+	body$1.classList.remove("modal");
+	form$1.parentNode.removeChild(form$1);
+	resolve$1(value);
+}
+
+function confirm(t) {
+	clear(text$2);
+	text$2.appendChild(text$1(t));
+
+	body$1.classList.add("modal");
+	body$1.appendChild(form$1);
+	window.addEventListener("keydown", onKeyDown$1, true);
+	ok$1.focus();
+
+	return new Promise(r => resolve$1 = r);
+}
+
+class Path {
+	static match(str) { return false; }
+	is(other) { return other.toString() == this.toString(); }
+
+	/* sync getters */
+	toString() {}
+	getName() {}
+	getImage() {}
+	getDate() {}
+	getSize() {}
+	getMode() {}
+	getDescription() { return this.toString(); }
+	getParent() {}
+	append(leaf) {}
+
+	/* never fails */
+	async stat() {}
+
+	/* these can be called only after stat */
+	getSort() { return (this.supports(CHILDREN) ? 1 : 2); }
+	exists() {}
+	supports(what) {}
+	async getChildren() {}
+
+	/* misc */
+	async create(opts) {}
+	async rename(newPath) {}
+	async delete() {}
+	async setDate(date) {}
+	createStream(type, opts) {}
+
+	activate(list) {
+		if (this.supports(CHILDREN)) { list.setPath(this); }
+	}
+}
+
+const CHILDREN = 0; // list children
+const CREATE = 1; // create descendants
+const EDIT = 2; // edit file via the default text editor
+const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
+const DELETE = 4; // self-explanatory
+const COPY = 5; // copy from FIXME pouzivat pro detekci
+const VIEW = 6; // view using an internal viewer
+
+const background = "#e8e8e8";
+
+/* Text viewer window - remote (data) part */
+
+const remote$1 = require("electron").remote;
+
+const windowOptions = {
+	parent: remote$1.getCurrentWindow(),
+	resizable: true,
+	fullscreenable: true,
+	center: true,
+	width: 640,
+	height: 480,
+	useContentSize: true,
+	backgroundColor: background,
+};
+
+function view$1(path) {
+	let options = Object.assign({}, windowOptions, {title: path.toString()});
+
+	let window = new remote$1.BrowserWindow(options);
+	window.setMenu(null);
+	window.loadURL(`file://${__dirname}/../viewer/text/index.html`);
+
+	let webContents = window.webContents;
+	webContents.once("did-finish-load", () => {
+		webContents.send("path", path.toString());
+	});
+}
+
+function view(path) {
+	return view$1(path);
+}
+
 let issues = [];
 let progresses = [];
 let current = null;
@@ -38,15 +238,13 @@ function removeProgress(window) {
 	sync();
 }
 
-const background = "#e8e8e8";
-
 /* Progress window - remote (data) part */
 
-const remote$1 = require("electron").remote;
+const remote$2 = require("electron").remote;
 const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
-const windowOptions = {
-	parent: remote$1.getCurrentWindow(),
+const windowOptions$1 = {
+	parent: remote$2.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -66,8 +264,8 @@ class Progress {
 	}
 
 	open() {
-		let options = Object.assign({}, windowOptions, {title: this._config.title});
-		this._window = new remote$1.BrowserWindow(options);
+		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
+		this._window = new remote$2.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../progress/index.html`);
 
@@ -112,9 +310,9 @@ class Progress {
 
 /* Issue window - remote (data) part */
 
-const remote$2 = require("electron").remote;
-const windowOptions$1 = {
-	parent: remote$2.getCurrentWindow(),
+const remote$3 = require("electron").remote;
+const windowOptions$2 = {
+	parent: remote$3.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,
@@ -134,8 +332,8 @@ class Issue {
 	}
 
 	open() {
-		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
-		this._window = new remote$2.BrowserWindow(options);
+		let options = Object.assign({}, windowOptions$2, {title: this._config.title});
+		this._window = new remote$3.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../issue/index.html`);
 
@@ -145,7 +343,7 @@ class Issue {
 			webContents.send("config", this._config);
 		});
 
-		remote$2.ipcMain.once("action", (e, action) => {
+		remote$3.ipcMain.once("action", (e, action) => {
 			let w = this._window;
 			removeIssue(w);
 			this._window = null;
@@ -203,49 +401,6 @@ class Operation {
 		}
 	}
 }
-
-class Path {
-	static match(str) { return false; }
-	is(other) { return other.toString() == this.toString(); }
-
-	/* sync getters */
-	toString() {}
-	getName() {}
-	getImage() {}
-	getDate() {}
-	getSize() {}
-	getMode() {}
-	getDescription() { return this.toString(); }
-	getParent() {}
-	append(leaf) {}
-
-	/* never fails */
-	async stat() {}
-
-	/* these can be called only after stat */
-	exists() {}
-	supports(what) {}
-	async getChildren() {}
-
-	/* misc */
-	async create(opts) {}
-	async rename(newPath) {}
-	async delete() {}
-	async setDate(date) {}
-	createStream(type, opts) {}
-
-	activate(list) {
-		if (this.supports(CHILDREN)) { list.setPath(this); }
-	}
-}
-
-const CHILDREN = 0; // list children
-const CREATE = 1; // create descendants
-const EDIT = 2; // edit file via the default text editor
-const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
-const DELETE = 4; // self-explanatory
-const COPY = 5; // copy from FIXME pouzivat pro detekci
-const VIEW = 6; // view using an internal viewer
 
 function createRecord(path) {
 	return {
@@ -332,33 +487,6 @@ class Scan extends Operation {
 	}
 }
 
-function clear(node) {
-	node.innerHTML = "";
-}
-
-function text(t) {
-	return document.createTextNode(t);
-}
-
-function node(name, attrs = {}, content = "") {
-	let n = document.createElement(name);
-	content && n.appendChild(text(content));
-	return Object.assign(n, attrs);
-}
-
-function scrollIntoView(node, scrollable = node.offsetParent) {
-	let nodeRect = node.getBoundingClientRect();
-	let scrollableRect = scrollable.getBoundingClientRect();
-
-	let top = nodeRect.top - scrollableRect.top;
-	let bottom = scrollableRect.bottom - nodeRect.bottom;
-
-	bottom -= (scrollable.offsetHeight - scrollable.clientHeight); // scrollable horizontal scrollbar
-
-	if (top < 0) { scrollable.scrollTop += top; } /* upper edge above */
-	if (bottom < 0) { scrollable.scrollTop -= bottom; } /* lower edge below */
-}
-
 class QuickEdit {
 	constructor() {
 		this._resolve = null;
@@ -395,7 +523,7 @@ class QuickEdit {
 	stop() {
 		if (!this._resolve) { return; }
 
-		this._input.parentNode.replaceChild(text(this._oldValue), this._input);
+		this._input.parentNode.replaceChild(text$1(this._oldValue), this._input);
 		this._resolve = null;
 	}
 
@@ -415,6 +543,63 @@ class QuickEdit {
 	}
 }
 
+const NAMES = ["folder", "file", "favorite", "up", "link"];
+
+let images = Object.create(null);
+let cache = Object.create(null);
+
+async function createImage(name) {
+	let src = `../img/${name}.png`;
+	let img = node("img", {src});
+	images[name] = img;
+	return new Promise((resolve, reject) => {
+		img.onload = resolve;
+		img.onerror = reject;
+	});
+}
+
+function createCacheKey(name, options) {
+	return `${name}${options.link ? "-link" : ""}`;
+}
+
+function serialize(canvas) {
+	let url = canvas.toDataURL();
+
+	let binStr = atob(url.split(",").pop());
+	let len = binStr.length;
+	let arr = new Uint8Array(len);
+	for (let i=0; i<len; i++) { arr[i] = binStr.charCodeAt(i); }
+
+    let blob = new Blob([arr], {type: "image/png"});
+	return URL.createObjectURL(blob);
+}
+
+function createIcon(name, options) {
+	let image = images[name];
+	let canvas = node("canvas", {width:image.width, height:image.height});
+
+	let ctx = canvas.getContext("2d");
+
+	ctx.drawImage(image, 0, 0);
+	if (options.link) {
+		let link = images["link"];
+		ctx.drawImage(link, 0, image.height - link.height);
+	}
+
+	return serialize(canvas);
+}
+
+async function init$2() {
+	let promises = NAMES.map(createImage);
+	return Promise.all(promises);
+}
+
+function get(name, options = {}) {
+	let key = createCacheKey(name, options);
+	if (!(key in cache)) { cache[key] = createIcon(name, options); }
+	return cache[key];
+}
+
 /* fixme tezko rict, jestli cestu takto maskovat, kdyz o patro vys lze jit i klavesovou zkratkou... */
 class Up extends Path {
 	constructor(path) {
@@ -422,7 +607,7 @@ class Up extends Path {
 		this._path = path;
 	}
 
-	getImage() { return "up.png"; }
+	getImage() { return get("up"); }
 	getDescription() { return this._path.getDescription(); }
 	toString() { return this._path.toString(); }
 	activate(list) { list.setPath(this._path); }
@@ -430,56 +615,6 @@ class Up extends Path {
 	supports(what) {
 		return (what == CHILDREN);
 	}
-}
-
-let resolve;
-
-const body = document.body;
-const form = node("form", {id:"prompt", className:"dialog"});
-const text$1 = node("p");
-const input = node("input", {type:"text"});
-const ok = node("button", {type:"submit"}, "OK");
-const cancel = node("button", {type:"button"}, "Cancel");
-
-form.appendChild(text$1);
-form.appendChild(input);
-form.appendChild(ok);
-form.appendChild(cancel);
-
-form.addEventListener("submit", e => {
-	e.preventDefault();
-	close(input.value);
-});
-
-cancel.addEventListener("click", e => {
-	close(false);
-});
-
-function onKeyDown(e) {
-	if (e.key == "Escape") { close(null); }
-	e.stopPropagation();
-}
-
-function close(value) {
-	window.removeEventListener("keydown", onKeyDown, true);
-	body.classList.remove("modal");
-	form.parentNode.removeChild(form);
-	resolve(value);
-}
-
-function prompt(t, value = "") {
-	clear(text$1);
-	text$1.appendChild(text(t));
-	input.value = value;
-
-	body.classList.add("modal");
-	body.appendChild(form);
-	window.addEventListener("keydown", onKeyDown, true);
-	input.selectionStart = 0;
-	input.selectionEnd = input.value.length;
-	input.focus();
-
-	return new Promise(r => resolve = r);
 }
 
 const fs$1 = require("fs");
@@ -521,7 +656,7 @@ function open(path, flags, mode) {
 	});
 }
 
-function close$1(fd) {
+function close$2(fd) {
 	return new Promise((resolve, reject) => {
 		fs$1.close(fd, err => {
 			err ? reject(err) : resolve();
@@ -629,8 +764,9 @@ class Local extends Path {
 
 	constructor(p) {
 		super();
-		this._path = path.resolve(p); /* to get rid of a trailing slash */
-		this._target = null;
+		this._path = path.resolve(p); // to get rid of a trailing slash
+		this._target = null; // string
+		this._targetPath = null; // Local, for icon resolution
 		this._error = null;
 		this._meta = {};
 	}
@@ -640,8 +776,27 @@ class Local extends Path {
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
-	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
+	getImage() { 
+		let link = this._meta.isSymbolicLink;
+		let name;
+
+		if (link) {
+			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : "file");
+		} else {
+			name = (this._meta.isDirectory ? "folder" : "file");
+		}
+
+		return get(name, {link});
+	}
 	exists() { return ("isDirectory" in this._meta); }
+
+	getSort() {
+		if (this._meta.isSymbolicLink && this._targetPath) {
+			return this._targetPath.getSort();
+		} else {
+			return super.getSort();
+		}
+	}
 
 	/* symlink-specific */
 	isSymbolicLink() { return this._meta.isSymbolicLink; }
@@ -649,7 +804,6 @@ class Local extends Path {
 
 	getDescription() {
 		let d = this._path;
-		/* fixme relativni */
 		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
 
 		if (!this._meta.isDirectory) {
@@ -704,7 +858,7 @@ class Local extends Path {
 			return mkdir(this._path);
 		} else {
 			let handle = await open(this._path, "wx", opts.mode);
-			return close$1(handle);
+			return close$2(handle);
 		}
 	}
 
@@ -750,27 +904,17 @@ class Local extends Path {
 
 		if (!this._meta.isSymbolicLink) { return; }
 
-		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
+		// symlink: get target path (readlink), get target metadata (stat)
 		try {
-			let targetPath = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
-			this._target = targetPath;
+			let target = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
+			this._target = target;
 
-			/*
-			 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
-			 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
-			 */
-			return;
+			let targetPath = new Local(target);
+			this._targetPath = targetPath;
 
-			/* we need to get target isDirectory flag */
-			return getMetadata(this._target, {link:false}).then(meta => {
-				this._meta.isDirectory = meta.isDirectory;
-			}, e => { /* failed to stat link target */
-				delete this._meta.isDirectory;
-			});
+			await targetPath.stat();
 
-		} catch (e) { /* failed to readlink */
-			this._target = e;
-		}
+		} catch (e) {} // failed to readlink
 	}
 }
 
@@ -839,58 +983,13 @@ function register(func, key) {
 
 window.addEventListener("keydown", handler);
 
-let resolve$1;
-
-const body$1 = document.body;
-const form$1 = node("form", {id:"confirm", className:"dialog"});
-const text$2 = node("p");
-const ok$1 = node("button", {type:"submit"}, "OK");
-const cancel$1 = node("button", {type:"button"}, "Cancel");
-
-form$1.appendChild(text$2);
-form$1.appendChild(ok$1);
-form$1.appendChild(cancel$1);
-
-form$1.addEventListener("submit", e => {
-	e.preventDefault();
-	close$2(true);
-});
-
-cancel$1.addEventListener("click", e => {
-	close$2(false);
-});
-
-function onKeyDown$1(e) {
-	if (e.key == "Escape") { close$2(false); }
-	e.stopPropagation();
-}
-
-function close$2(value) {
-	window.removeEventListener("keydown", onKeyDown$1, true);
-	body$1.classList.remove("modal");
-	form$1.parentNode.removeChild(form$1);
-	resolve$1(value);
-}
-
-function confirm(t) {
-	clear(text$2);
-	text$2.appendChild(text(t));
-
-	body$1.classList.add("modal");
-	body$1.appendChild(form$1);
-	window.addEventListener("keydown", onKeyDown$1, true);
-	ok$1.focus();
-
-	return new Promise(r => resolve$1 = r);
-}
-
-const {remote: remote$3} = require('electron');
-const settings$1 = remote$3.require('electron-settings');
+const {remote: remote$4} = require('electron');
+const settings$1 = remote$4.require('electron-settings');
 let storage = []; // strings
 
 function viewFunc(i) {
 	return async () => {
-		let path = get(i);
+		let path = get$1(i);
 		if (!path) { return; }
 		getActive().getList().setPath(path);
 	};
@@ -905,7 +1004,7 @@ function setFunc(i) {
 	}
 }
 
-function init$1(saved) {
+function init$3(saved) {
 	for (let i=0; i<10; i++) {
 		let str = saved[i];
 		storage[i] = str ? fromString(str) : null;
@@ -918,7 +1017,7 @@ function init$1(saved) {
 function toJSON$1() { return storage.map(path => path && path.toString()); }
 function list() { return storage; }
 function set(path, index) { storage[index] = path; }
-function get(index) { return storage[index]; }
+function get$1(index) { return storage[index]; }
 function remove(index) { storage[index] = null; }
 
 class Favorite extends Path {
@@ -931,7 +1030,7 @@ class Favorite extends Path {
 	toString() { return this._path.toString(); }
 	getName() { return this.toString(); }
 	getSize() { return this._index; }
-	getImage() { return "favorite.png"; }
+	getImage() { return get("favorite"); }
 
 	supports(what) {
 		if (what == DELETE) { return true; }
@@ -1047,8 +1146,8 @@ function set$1(value) {
 const TEMPLATE = document.querySelector("#list");
 
 function SORT(a, b) {
-	let childScoreA = (a.supports(CHILDREN) ? 1 : 2);
-	let childScoreB = (b.supports(CHILDREN) ? 1 : 2);
+	let childScoreA = a.getSort();
+	let childScoreB = b.getSort();
 	if (childScoreA != childScoreB) { return childScoreA - childScoreB; }
 
 	return a.getName().fileLocaleCompare(b.getName());
@@ -1144,9 +1243,9 @@ class List {
 		let {node: node$$1, path} = this._items[index];
 		let name = path.getName();
 
-		let text$$1 = await this._quickEdit.start(name, node$$1.cells[0]);
-		if (text$$1 == name || text$$1 == "") { return; }
-		let newPath = path.getParent().append(text$$1);
+		let text = await this._quickEdit.start(name, node$$1.cells[0]);
+		if (text == name || text == "") { return; }
+		let newPath = path.getParent().append(text);
 
 		/* FIXME test na existenci! */
 		try {
@@ -1344,12 +1443,12 @@ class List {
 		let {node: node$$1, path} = item;
 
 		let td = node$$1.insertCell();
-		let src = `../img/${path.getImage()}`;
+		let src = path.getImage();
 		let img = node("img", {src});
 		td.appendChild(img);
 
 		let name = path.getName();
-		if (name) { td.appendChild(text(name)); }
+		if (name) { td.appendChild(text$1(name)); }
 
 		let size$$1 = path.getSize();
 		if (size$$1 === undefined) { size$$1 = item.size; } /* computed value (for directories) */
@@ -1436,7 +1535,7 @@ class List {
 
 					let strong = node("strong", {}, name.substring(0, plen));
 					cell.appendChild(strong);
-					cell.appendChild(text(name.substring(plen)));
+					cell.appendChild(text$1(name.substring(plen)));
 				}
 			}
 
@@ -1554,8 +1653,8 @@ class List {
 		this._syncSelected();
 	}
 
-	async _getPattern(text$$1) {
-		let result = await prompt(text$$1, "*");
+	async _getPattern(text) {
+		let result = await prompt(text, "*");
 		if (!result) { return; }
 
 		result = result.replace(/\./g, "\\.");
@@ -1764,7 +1863,7 @@ class Pane {
 					if (path) {
 						let label = this._labels[index];
 						clear(label);
-						label.appendChild(text(path.getName()));
+						label.appendChild(text$1(path.getName()));
 					}
 				}
 			break;
@@ -1845,7 +1944,7 @@ function getInactive() {
 	return PANES[(index+1) % 2];
 }
 
-function init(saved) {
+function init$1(saved) {
 	PANES.push(new Pane(saved.left || {}));
 	PANES.push(new Pane(saved.right || {}));
 
@@ -1884,95 +1983,6 @@ register$1("tab:new", "Ctrl+T", () => {
 register$1("tab:close", "Ctrl+W", () => {
 	getActive().removeList();
 });
-
-const Menu = require('electron').remote.Menu;
-
-function init$2() {
-	const template = [
-		{
-			label: "&File",
-			submenu: [
-				menuItem("file:rename", "&Quick rename"),
-				menuItem("fixme", "&View"),
-				menuItem("file:edit", "&Edit"),
-				menuItem("file:new", "Edit &new file"),
-				menuItem("file:copy", "&Copy"),
-				menuItem("file:move", "&Move"),
-				menuItem("file:delete", "&Delete"),
-				{type: "separator"},
-				{role: "quit"}
-			]
-		},
-		{
-			label: "&Go",
-			submenu: [
-				menuItem("list:up", "Go to &parent"),
-				menuItem("list:top", "Go to &top"),
-				menuItem("fixme", "&Drive selection"),
-				menuItem("fixme", "&Wi-Fi Access points"),
-				menuItem("list:favorites", "&Favorites"),
-				menuItem("list:home", "&Home")
-			]
-		},
-		{
-			label: "&Commands",
-			submenu: [
-				menuItem("directory:new", "Create &directory"),
-				menuItem("tab:new", "&New tab"),
-				menuItem("tab:close", "&Close tab"),
-				menuItem("fixme", "&Search"),
-				menuItem("fixme", "Create &archive"),
-				{type: "separator"}, /* fixme sort? */
-				menuItem("fixme", "O&pen console"),
-				menuItem("fixme", "&Options")
-			]
-		},
-		{
-			label: "&Help",
-			submenu: [
-				{
-					label: "&About"
-				},
-				menuItem("app:devtools", "Toggle &Devtools")
-			]
-		}
-	];
-
-	let menu = Menu.buildFromTemplate(template);
-	Menu.setApplicationMenu(menu);
-}
-
-/* Text viewer window - remote (data) part */
-
-const remote$4 = require("electron").remote;
-
-const windowOptions$2 = {
-	parent: remote$4.getCurrentWindow(),
-	resizable: true,
-	fullscreenable: true,
-	center: true,
-	width: 640,
-	height: 480,
-	useContentSize: true,
-	backgroundColor: background,
-};
-
-function view$1(path) {
-	let options = Object.assign({}, windowOptions$2, {title: path.toString()});
-
-	let window = new remote$4.BrowserWindow(options);
-	window.setMenu(null);
-	window.loadURL(`file://${__dirname}/../viewer/text/index.html`);
-
-	let webContents = window.webContents;
-	webContents.once("did-finish-load", () => {
-		webContents.send("path", path.toString());
-	});
-}
-
-function view(path) {
-	return view$1(path);
-}
 
 class Delete extends Operation {
 	constructor(path) {
@@ -2455,6 +2465,63 @@ register$1("app:devtools", "F12", () => {
 	require("electron").remote.getCurrentWindow().toggleDevTools();
 });
 
+const Menu = require('electron').remote.Menu;
+
+function init$4() {
+	const template = [
+		{
+			label: "&File",
+			submenu: [
+				menuItem("file:rename", "&Quick rename"),
+				menuItem("fixme", "&View"),
+				menuItem("file:edit", "&Edit"),
+				menuItem("file:new", "Edit &new file"),
+				menuItem("file:copy", "&Copy"),
+				menuItem("file:move", "&Move"),
+				menuItem("file:delete", "&Delete"),
+				{type: "separator"},
+				{role: "quit"}
+			]
+		},
+		{
+			label: "&Go",
+			submenu: [
+				menuItem("list:up", "Go to &parent"),
+				menuItem("list:top", "Go to &top"),
+				menuItem("fixme", "&Drive selection"),
+				menuItem("fixme", "&Wi-Fi Access points"),
+				menuItem("list:favorites", "&Favorites"),
+				menuItem("list:home", "&Home")
+			]
+		},
+		{
+			label: "&Commands",
+			submenu: [
+				menuItem("directory:new", "Create &directory"),
+				menuItem("tab:new", "&New tab"),
+				menuItem("tab:close", "&Close tab"),
+				menuItem("fixme", "&Search"),
+				menuItem("fixme", "Create &archive"),
+				{type: "separator"}, /* fixme sort? */
+				menuItem("fixme", "O&pen console"),
+				menuItem("fixme", "&Options")
+			]
+		},
+		{
+			label: "&Help",
+			submenu: [
+				{
+					label: "&About"
+				},
+				menuItem("app:devtools", "Toggle &Devtools")
+			]
+		}
+	];
+
+	let menu = Menu.buildFromTemplate(template);
+	Menu.setApplicationMenu(menu);
+}
+
 const {remote} = require('electron');
 const settings = remote.require('electron-settings');
 
@@ -2498,10 +2565,16 @@ function saveSettings(e) {
 	settings.set("panes", toJSON());
 	settings.set("favorites", toJSON$1());
 }
-window.addEventListener("beforeunload", saveSettings);
 
-init$2();
-init$1(settings.get("favorites", []));
-init(settings.get("panes", {}));
+async function init() {
+	await init$2();
+
+	init$4();
+	init$3(settings.get("favorites", []));
+	init$1(settings.get("panes", {}));
+	window.addEventListener("beforeunload", saveSettings);
+}
+
+init();
 
 }());

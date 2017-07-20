@@ -17,6 +17,7 @@ export default class Path {
 	async stat() {}
 
 	/* these can be called only after stat */
+	getSort() { return (this.supports(CHILDREN) ? 1 : 2); }
 	exists() {}
 	supports(what) {}
 	async getChildren() {}

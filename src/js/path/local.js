@@ -1,6 +1,7 @@
 import Path, {CHILDREN, CREATE, VIEW, EDIT, RENAME, DELETE } from "./path.js";
 import {readlink, readdir, mkdir, open, close, rename, unlink, rmdir, utimes, symlink} from "util/fs.js";
 import * as format from "util/format.js";
+import * as icons from "util/icons.js";
 
 const fs = require("fs");
 const path = require("path");
@@ -35,8 +36,9 @@ export default class Local extends Path {
 
 	constructor(p) {
 		super();
-		this._path = path.resolve(p); /* to get rid of a trailing slash */
-		this._target = null;
+		this._path = path.resolve(p); // to get rid of a trailing slash
+		this._target = null; // string
+		this._targetPath = null; // Local, for icon resolution
 		this._error = null;
 		this._meta = {};
 	}
@@ -46,8 +48,27 @@ export default class Local extends Path {
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
-	getImage() { return this._meta.isDirectory ? "folder.png" : "file.png"; }
+	getImage() { 
+		let link = this._meta.isSymbolicLink;
+		let name;
+
+		if (link) {
+			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : "file");
+		} else {
+			name = (this._meta.isDirectory ? "folder" : "file");
+		}
+
+		return icons.get(name, {link});
+	}
 	exists() { return ("isDirectory" in this._meta); }
+
+	getSort() {
+		if (this._meta.isSymbolicLink && this._targetPath) {
+			return this._targetPath.getSort();
+		} else {
+			return super.getSort();
+		}
+	}
 
 	/* symlink-specific */
 	isSymbolicLink() { return this._meta.isSymbolicLink; }
@@ -55,7 +76,6 @@ export default class Local extends Path {
 
 	getDescription() {
 		let d = this._path;
-		/* fixme relativni */
 		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
 
 		if (!this._meta.isDirectory) {
@@ -156,26 +176,16 @@ export default class Local extends Path {
 
 		if (!this._meta.isSymbolicLink) { return; }
 
-		/* symlink: get target path (readlink), get target metadata (stat), merge directory flag */
+		// symlink: get target path (readlink), get target metadata (stat)
 		try {
-			let targetPath = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
-			this._target = targetPath;
+			let target = await readlink(this._path); // fixme readlink prevede na absolutni, to je spatne
+			this._target = target;
 
-			/*
-			 FIXME: k symlinkum na adresare povetsinou neni duvod chovat se jako k adresarum (nechceme je dereferencovat pri listovani/kopirovani...).
-			 Jedina vyjimka je ikonka, ktera si zaslouzi vlastni handling, jednoho dne.
-			 */
-			return;
+			let targetPath = new Local(target);
+			this._targetPath = targetPath;
 
-			/* we need to get target isDirectory flag */
-			return getMetadata(this._target, {link:false}).then(meta => {
-				this._meta.isDirectory = meta.isDirectory;
-			}, e => { /* failed to stat link target */
-				delete this._meta.isDirectory;
-			});
+			await targetPath.stat();
 
-		} catch (e) { /* failed to readlink */
-			this._target = e;
-		}
+		} catch (e) {} // failed to readlink
 	}
 }

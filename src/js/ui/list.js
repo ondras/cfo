@@ -14,8 +14,8 @@ import * as status from "status.js";
 const TEMPLATE = document.querySelector("#list");
 
 function SORT(a, b) {
-	let childScoreA = (a.supports(CHILDREN) ? 1 : 2);
-	let childScoreB = (b.supports(CHILDREN) ? 1 : 2);
+	let childScoreA = a.getSort();
+	let childScoreB = b.getSort();
 	if (childScoreA != childScoreB) { return childScoreA - childScoreB; }
 
 	return a.getName().fileLocaleCompare(b.getName());
@@ -311,7 +311,7 @@ export default class List {
 		let {node, path} = item;
 
 		let td = node.insertCell();
-		let src = `../img/${path.getImage()}`;
+		let src = path.getImage();
 		let img = html.node("img", {src});
 		td.appendChild(img);
 

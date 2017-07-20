@@ -1,4 +1,5 @@
 import * as favorites from "util/favorites.js";
+import * as icons from "util/icons.js";
 import Path, {DELETE} from "./path.js";
 
 export default class Favorite extends Path {
@@ -11,7 +12,7 @@ export default class Favorite extends Path {
 	toString() { return this._path.toString(); }
 	getName() { return this.toString(); }
 	getSize() { return this._index; }
-	getImage() { return "favorite.png"; }
+	getImage() { return icons.get("favorite"); }
 
 	supports(what) {
 		if (what == DELETE) { return true; }
