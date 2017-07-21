@@ -2126,10 +2126,6 @@ class Copy extends Operation {
 			await this._copyFile(record, targetPath);
 		}
 
-		let date = record.path.getDate();
-		try {
-		if (date) { await targetPath.setDate(date); } // FIXME tady to hnije pri kopirovani neexistujiciho relativniho symlinku
-		} catch (e) { console.log(e); }
 		return this._recordCopied(record);
 	}
 
@@ -2145,13 +2141,16 @@ class Copy extends Operation {
 		for (let child of record.children) {
 			await this._copy(child, targetPath);
 		}
+
+		let date = record.path.getDate();
+		return targetPath.setDate(date);
 	}
 
 	/**
 	 * @returns {Promise<bool>}
 	 */
 	async _createDirectory(path, mode) {
-		if (path.exists() && path.supports(CHILDREN)) { return true; } /* folder already exists, fine */
+		if (path.exists() && path.supports(CHILDREN)) { return true; } // folder already exists, fine
 
 		try {
 			await path.create({dir:true, mode});
@@ -2171,12 +2170,12 @@ class Copy extends Operation {
 		let progress2 = 100*this._stats.done/this._stats.total;
 		this._progress.update({row1:record.path.toString(), row2:targetPath.toString(), progress1, progress2});
 
-		if (targetPath.exists()) { /* target exists: overwrite/skip/abort */
-			if (this._issues.overwrite == "skip-all") { /* silently skip */
+		if (targetPath.exists()) { // target exists: overwrite/skip/abort
+			if (this._issues.overwrite == "skip-all") { // silently skip
 				this._stats.done += record.size;
 				return;
 			}
-			if (this._issues.overwrite != "overwrite-all") { /* raise an issue */
+			if (this._issues.overwrite != "overwrite-all") { // raise an issue
 				let result = await this._handleFileExists(targetPath);
 				switch (result) {
 					case "abort": this.abort(); return; break;
@@ -2192,8 +2191,11 @@ class Copy extends Operation {
 
 		if (record.path instanceof Local && record.path.isSymbolicLink()) {
 			return this._copyFileSymlink(record, targetPath);
+			// no setDate here, fs.utimes adjusts target's mtime instead
 		} else {
-			return this._copyFileContents(record, targetPath);
+			await this._copyFileContents(record, targetPath);
+			let date = record.path.getDate();
+			return targetPath.setDate(date);
 		}
 	}
 
