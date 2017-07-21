@@ -93,7 +93,7 @@ export default class Copy extends Operation {
 		}
 
 		let date = record.path.getDate();
-		return targetPath.setDate(date);
+		if (date) { return targetPath.setDate(date); }
 	}
 
 	/**

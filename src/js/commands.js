@@ -6,10 +6,30 @@ import * as viewers from "viewer/viewers.js";
 import * as panes from "panes.js";
 import * as command from "util/command.js";
 import * as paths from "path/paths.js";
+import * as pubsub from "util/pubsub.js";
+import * as clipboard from "util/clipboard.js";
 
 import Delete from "operation/delete.js";
 import Copy from "operation/copy.js";
 import Move from "operation/move.js";
+
+let clipMode = "";
+
+async function copyOrCut(mode) {
+	let sourceList = panes.getActive().getList();
+	let sourcePath = sourceList.getSelection({multi:true});
+
+	let items = [];
+	if (paths.isGroup(sourcePath)) {
+		items = await sourcePath.getChildren();
+	} else {
+		items = [sourcePath];
+	}
+
+	let names = items.map(path => paths.toClipboard(path));
+	clipboard.set(names);
+	clipMode = mode;
+}
 
 command.register("list:up", "Backspace", () => {
 	let list = panes.getActive().getList();
@@ -43,6 +63,31 @@ command.register("list:favorites", [], () => {
 
 command.register("list:input", "Ctrl+L", () => {
 	panes.getActive().getList().focusInput();
+});
+
+command.register("clip:copy", "Ctrl+C", () => {
+	copyOrCut("copy");
+});
+
+command.register("clip:cut", "Ctrl+X", () => {
+	copyOrCut("cut");
+});
+
+command.register("clip:paste", "Ctrl+V", async () => {
+	let list = panes.getActive().getList();
+	let path = list.getPath();
+
+	/* group of valid paths */
+	let p = clipboard.get().map(paths.fromClipboard).filter(path => path);
+	if (!p.length) { return; }
+
+	let group = paths.group(p);
+
+	let Ctor = (clipMode == "cut" ? Move : Copy);
+	let operation = new Ctor(group, path)
+	await operation.run();
+
+	pubsub.publish("path-change", null, {path});
 });
 
 command.register("directory:new", "F7", async () => {
@@ -107,7 +152,8 @@ command.register("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 	if (!result) { return; }
 	let d = new Delete(path);
 	await d.run();
-	list.reload();
+
+	pubsub.publish("path-change", null, {path: list.getPath()});
 });
 
 command.register("file:rename", "F2", () => {
@@ -130,8 +176,8 @@ command.register("file:copy", "F5", async () => {
 	targetPath = paths.fromString(name);
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
-	sourceList.reload();
-	targetList.reload();
+
+	pubsub.publish("path-change", null, {path:targetPath});
 });
 
 command.register("file:move", "F6", async () => {
@@ -147,8 +193,9 @@ command.register("file:move", "F6", async () => {
 	targetPath = paths.fromString(name);
 	let move = new Move(sourcePath, targetPath);
 	await move.run();
-	sourceList.reload();
-	targetList.reload();
+
+	pubsub.publish("path-change", null, {path:sourceList.getPath()});
+	pubsub.publish("path-change", null, {path:targetPath});
 });
 
 command.register("app:devtools", "F12", () => {

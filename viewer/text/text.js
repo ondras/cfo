@@ -692,7 +692,6 @@ class Favorites extends Path {
 
 const {app} = require("electron").remote;
 const ALL = [Favorites, Local];
-
 function fromString(str) {
 	let ctors = ALL.filter(ctor => ctor.match(str));
 	if (!ctors.length) { throw new Error(`No Path available to handle "${str}"`); }

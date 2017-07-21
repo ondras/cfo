@@ -41,7 +41,7 @@ CFO shall become a modernized version of [Fire Commander](https://addons.mozilla
   - [ ] Configuration
   - [X] Persistence
   - [X] Selection
-  - [ ] Clipboard support
+  - [X] Clipboard support
   - [ ] Logo / App icon
   - [X] Permissions font
 

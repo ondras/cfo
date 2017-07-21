@@ -47,9 +47,14 @@ export default class List {
 
 		this._quickEdit = new QuickEdit();
 		this._selected = {};
+
+		pubsub.subscribe("path-change", this);
 	}
 
-	destroy() {}
+	destroy() {
+		pubsub.unsubscribe("path-change", this);
+	}
+
 	getNode() { return this._node; }
 	getPath() { return this._path; }
 
@@ -129,6 +134,14 @@ export default class List {
 		if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
 		
 */
+	}
+
+	handleMessage(message, publisher, data) {
+		switch (message) {
+			case "path-change":
+				if (data.path.is(this._path)) { this.reload(); }
+			break;
+		}
 	}
 
 	handleEvent(e) {

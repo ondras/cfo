@@ -1099,12 +1099,25 @@ class Group extends Path {
 
 const {app} = require("electron").remote;
 const ALL = [Favorites, Local];
+const CLIP_PREFIX = "file://";
 
 function fromString(str) {
 	let ctors = ALL.filter(ctor => ctor.match(str));
 	if (!ctors.length) { throw new Error(`No Path available to handle "${str}"`); }
 	let Ctor = ctors.shift();
 	return new Ctor(str);
+}
+
+function toClipboard(path) {
+	return `${CLIP_PREFIX}${path}`;
+}
+
+function fromClipboard(name) {
+	if (name.indexOf(CLIP_PREFIX) == 0) {
+		return fromString(name.substring(CLIP_PREFIX.length));
+	} else {
+		return null;
+	}
 }
 
 function home() {
@@ -1117,6 +1130,10 @@ function favorites() {
 
 function group(paths) {
 	return new Group(paths);
+}
+
+function isGroup(path) {
+	return path instanceof Group;
 }
 
 const storage$1 = Object.create(null);
@@ -1133,6 +1150,11 @@ function publish(message, publisher, data) {
 function subscribe(message, subscriber) {
 	if (!(message in storage$1)) { storage$1[message] = []; }
 	storage$1[message].push(subscriber);
+}
+
+function unsubscribe(message, subscriber) {
+	let index = (storage$1[message] || []).indexOf(subscriber);
+	if (index > -1) { storage$1[message].splice(index, 1); }
 }
 
 const node$1 = document.querySelector("footer");
@@ -1177,9 +1199,14 @@ class List {
 
 		this._quickEdit = new QuickEdit();
 		this._selected = {};
+
+		subscribe("path-change", this);
 	}
 
-	destroy() {}
+	destroy() {
+		unsubscribe("path-change", this);
+	}
+
 	getNode() { return this._node; }
 	getPath() { return this._path; }
 
@@ -1259,6 +1286,14 @@ class List {
 		if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
 		
 */
+	}
+
+	handleMessage(message, publisher, data) {
+		switch (message) {
+			case "path-change":
+				if (data.path.is(this._path)) { this.reload(); }
+			break;
+		}
 	}
 
 	handleEvent(e) {
@@ -1982,6 +2017,17 @@ register$1("tab:close", "Ctrl+W", () => {
 	getActive().removeList();
 });
 
+const clipboard = require("electron").clipboard;
+const SEP = "\n";
+
+function set$2(names) {
+	clipboard.writeText(names.join(SEP));
+}
+
+function get$2() {
+	return clipboard.readText().split(SEP);
+}
+
 class Delete extends Operation {
 	constructor(path) {
 		super();
@@ -2143,7 +2189,7 @@ class Copy extends Operation {
 		}
 
 		let date = record.path.getDate();
-		return targetPath.setDate(date);
+		if (date) { return targetPath.setDate(date); }
 	}
 
 	/**
@@ -2322,6 +2368,24 @@ class Move extends Copy {
 	}
 }
 
+let clipMode = "";
+
+async function copyOrCut(mode) {
+	let sourceList = getActive().getList();
+	let sourcePath = sourceList.getSelection({multi:true});
+
+	let items = [];
+	if (isGroup(sourcePath)) {
+		items = await sourcePath.getChildren();
+	} else {
+		items = [sourcePath];
+	}
+
+	let names = items.map(path => toClipboard(path));
+	set$2(names);
+	clipMode = mode;
+}
+
 register$1("list:up", "Backspace", () => {
 	let list = getActive().getList();
 	let parent = list.getPath().getParent();
@@ -2354,6 +2418,31 @@ register$1("list:favorites", [], () => {
 
 register$1("list:input", "Ctrl+L", () => {
 	getActive().getList().focusInput();
+});
+
+register$1("clip:copy", "Ctrl+C", () => {
+	copyOrCut("copy");
+});
+
+register$1("clip:cut", "Ctrl+X", () => {
+	copyOrCut("cut");
+});
+
+register$1("clip:paste", "Ctrl+V", async () => {
+	let list = getActive().getList();
+	let path = list.getPath();
+
+	/* group of valid paths */
+	let p = get$2().map(fromClipboard).filter(path => path);
+	if (!p.length) { return; }
+
+	let group$$1 = group(p);
+
+	let Ctor = (clipMode == "cut" ? Move : Copy);
+	let operation = new Ctor(group$$1, path);
+	await operation.run();
+
+	publish("path-change", null, {path});
 });
 
 register$1("directory:new", "F7", async () => {
@@ -2418,7 +2507,8 @@ register$1("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 	if (!result) { return; }
 	let d = new Delete(path);
 	await d.run();
-	list.reload();
+
+	publish("path-change", null, {path: list.getPath()});
 });
 
 register$1("file:rename", "F2", () => {
@@ -2441,8 +2531,8 @@ register$1("file:copy", "F5", async () => {
 	targetPath = fromString(name);
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
-	sourceList.reload();
-	targetList.reload();
+
+	publish("path-change", null, {path:targetPath});
 });
 
 register$1("file:move", "F6", async () => {
@@ -2458,8 +2548,9 @@ register$1("file:move", "F6", async () => {
 	targetPath = fromString(name);
 	let move = new Move(sourcePath, targetPath);
 	await move.run();
-	sourceList.reload();
-	targetList.reload();
+
+	publish("path-change", null, {path:sourceList.getPath()});
+	publish("path-change", null, {path:targetPath});
 });
 
 register$1("app:devtools", "F12", () => {
