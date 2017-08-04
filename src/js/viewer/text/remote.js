@@ -14,7 +14,7 @@ export function match(path) {
 	return true;	
 }
 
-export function view(path) {
+export function view(path, list) {
 	let [width, height] = remote.getCurrentWindow().getSize();
 	let currentOptions = { title: path.toString(), width, height };
 	let options = Object.assign({}, windowOptions, currentOptions);

@@ -11,7 +11,9 @@ const image = document.querySelector("img");
 let scale = null;
 let size = null;
 let position = null;
-let path = null;
+
+let currentIndex = -1;
+let allImages = [];
 
 function syncSize() {
 	if (!image.complete) { return; }
@@ -102,10 +104,14 @@ function onMouseMove(e) {
 	document.querySelector(".mouse").textContent = pos.join(",");
 }
 
+function loadAnother(diff) {
+	let index = currentIndex + diff;
+	index = Math.max(index, 0);
+	index = Math.min(index, allImages.length-1);
+	if (index != currentIndex) { load(index); }
+}
+
 function onKeyDown(e) {
-
-	e.preventDefault();
-
 	switch (e.keyCode) {
 		case 33: /* pageup */
 		case 8: /* backspace */
@@ -134,17 +140,20 @@ function onLoad(e) {
 	syncSize();
 }
 
-electron.ipcRenderer.on("path", (e, data) => {
-	path = paths.fromString(data);
-
-	document.body.classList.add("loading");
+function load(i) {
+	currentIndex = i;
 	scale = null;
-	image.src = path.toString();
+	document.body.classList.add("loading");
+	image.src = allImages[currentIndex].toString();
+}
+
+electron.ipcRenderer.on("path", (e, all, i) => {
+	allImages = all.map(paths.fromString);
+	load(i);
 });
 
 image.addEventListener("load", onLoad);
 window.addEventListener("resize", syncSize);
-window.addEventListener("keydown", onKeyDown);
 window.addEventListener("mousemove", onMouseMove);
 
 command.register("window:close", "Escape", () => {
@@ -155,7 +164,7 @@ command.register("image:zoomin", "+", () => zoom(+1));
 command.register("image:zoomout", "-", () => zoom(-1));
 command.register("image:fit", "*", () => {
 	scale = null;
-	syncSize()
+	syncSize();
 });
 
 command.register("image:left", "ArrowLeft", () => moveBy([1, 0]));
@@ -166,8 +175,10 @@ command.register("image:down", "ArrowDown", () => moveBy([0, -1]));
 command.register("image:full", "Enter", () => {
 	let win = electron.remote.getCurrentWindow();
 	win.setFullScreen(!win.isFullScreen());
-	syncSize()
+	syncSize();
 });
+
+command.register("image:next", ["PageDown", " "], () => loadAnother(+1));
 
 /*
 Viewer.Image.prototype._loadAnother = function(which) {

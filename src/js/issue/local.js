@@ -18,9 +18,7 @@ electron.ipcRenderer.on("config", (e, data) => {
 	document.querySelector("button").focus();
 });
 
-command.register("window:close", "Escape", () => {
-	window.close();
-});
+command.register("window:close", "Escape", () => window.close());
 
 document.addEventListener("click", e => {
 	let action = e.target.dataset.action;

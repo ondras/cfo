@@ -127,10 +127,11 @@ command.register("file:new", "Shift+F4", async () => {
 });
 
 command.register("file:view", "F3", () => {
-	let file = panes.getActive().getList().getSelection({multi:false});
+	let list = panes.getActive().getList();
+	let file = list.getSelection({multi:false});
 	if (!file.supports(VIEW)) { return; }
 
-	viewers.view(file);
+	viewers.view(file, list);
 });
 
 command.register("file:edit", "F4", () => {

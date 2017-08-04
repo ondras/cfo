@@ -23,10 +23,11 @@ CFO shall become a modernized version of [Fire Commander](https://addons.mozilla
   - [X] Move
   - [ ] Search
 - Viewers
-  - [ ] Image
+  - [X] Image
+    - [ ] EXIF
+    - [ ] Navigation
   - [X] Text
-  - [ ] Audio
-  - [ ] Video
+  - [ ] Audio/Video
 - File systems
   - [X] Local
   - [ ] ZIP
