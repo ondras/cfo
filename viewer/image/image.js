@@ -301,7 +301,7 @@ function get(name, options = {}) {
 }
 
 const fs = require("fs");
-const path = require("path");
+const path$1 = require("path");
 const {shell} = require("electron").remote;
 
 function statsToMetadata(stats) {
@@ -332,7 +332,7 @@ class Local extends Path {
 
 	constructor(p) {
 		super();
-		this._path = path.resolve(p); // to get rid of a trailing slash
+		this._path = path$1.resolve(p); // to get rid of a trailing slash
 		this._target = null; // string
 		this._targetPath = null; // Local, for icon resolution
 		this._error = null;
@@ -340,7 +340,7 @@ class Local extends Path {
 	}
 
 	toString() { return this._path; }
-	getName() { return path.basename(this._path) || "/"; }
+	getName() { return path$1.basename(this._path) || "/"; }
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
@@ -383,7 +383,7 @@ class Local extends Path {
 	}
  
 	getParent() {
-		let parent = new this.constructor(path.dirname(this._path));
+		let parent = new this.constructor(path$1.dirname(this._path));
 		return (parent.is(this) ? null : parent);
 	}
 
@@ -415,7 +415,7 @@ class Local extends Path {
 	}
 
 	append(leaf) {
-		let newPath = path.resolve(this._path, leaf);
+		let newPath = path$1.resolve(this._path, leaf);
 		return new this.constructor(newPath);
 	}
 
@@ -446,7 +446,7 @@ class Local extends Path {
 	async getChildren() {
 		let names = await readdir(this._path);
 		let paths = names
-			.map(name => path.resolve(this._path, name))
+			.map(name => path$1.resolve(this._path, name))
 			.map(name => new this.constructor(name));
 
 		let promises = paths.map(path => path.stat());
@@ -478,8 +478,8 @@ class Local extends Path {
 			this._target = target;
 
 			// resolve relative path
-			let linkDir = path.dirname(this._path);
-			target = path.resolve(linkDir, target);
+			let linkDir = path$1.dirname(this._path);
+			target = path$1.resolve(linkDir, target);
 
 			let targetPath = new Local(target);
 			this._targetPath = targetPath;
@@ -708,6 +708,7 @@ const image = document.querySelector("img");
 let scale = null;
 let size = null;
 let position = null;
+let path = null;
 
 function syncSize() {
 	if (!image.complete) { return; }
@@ -738,11 +739,12 @@ function syncSize() {
 	image.style.height = `${Math.round(size[1])}px`;
 	image.style.left = `${Math.round(position[0])}px`;
 	image.style.top = `${Math.round(position[1])}px`;
-/*	
-	var percent = (this._currentSize[0]/this._originalSize[0]) * 100;
-	this._win.document.title = "(" + Math.round(percent) + "%) " + this._realPath.getPath();
-	this._win.document.querySelector("#scale").label = Math.round(percent) + "%";
-*/
+
+	let percent = Math.round(100*(size[0]/image.naturalWidth));
+	let win = electron.remote.getCurrentWindow();
+	win.setTitle(`(${percent}%) ${path}`);
+
+	document.querySelector(".scale").textContent = `${percent}%`;
 }
 
 function findScale(diff) {
@@ -787,6 +789,16 @@ function moveBy(diff) {
 	});
 }
 
+function onMouseMove(e) {
+	if (!image.complete) { return; }
+	let frac = image.naturalWidth / size[0];
+	let pos = [e.clientX, e.clientY]
+		.map((mouse, i) => frac*(mouse - position[i]))
+		.map(Math.round);
+
+	document.querySelector(".mouse").textContent = pos.join(",");
+}
+
 function onKeyDown(e) {
 
 	e.preventDefault();
@@ -815,15 +827,12 @@ function onKeyDown(e) {
 
 function onLoad(e) {
 	document.body.classList.remove("loading");
-	/*
-	this._originalSize = [this._image.naturalWidth, this._image.naturalHeight];
-	this._win.document.querySelector("#size").label = this._originalSize.join("×");
-	*/
+	document.querySelector(".size").textContent = [image.naturalWidth, image.naturalHeight].join("×");
 	syncSize();
 }
 
 electron.ipcRenderer.on("path", (e, data) => {
-	let path = fromString(data);
+	path = fromString(data);
 
 	document.body.classList.add("loading");
 	scale = null;
@@ -831,8 +840,9 @@ electron.ipcRenderer.on("path", (e, data) => {
 });
 
 image.addEventListener("load", onLoad);
-window.addEventListener("resize", e => syncSize());
+window.addEventListener("resize", syncSize);
 window.addEventListener("keydown", onKeyDown);
+window.addEventListener("mousemove", onMouseMove);
 
 register("window:close", "Escape", () => {
 	window.close();

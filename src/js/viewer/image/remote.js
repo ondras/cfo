@@ -23,6 +23,7 @@ export function view(path) {
 	let window = new remote.BrowserWindow(options);
 	window.setMenu(null);
 	window.loadURL(`file://${__dirname}/../viewer/image/index.html`);
+	window.toggleDevTools();
 
 	let webContents = window.webContents;
 	webContents.once("did-finish-load", () => {

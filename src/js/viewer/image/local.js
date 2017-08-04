@@ -11,6 +11,7 @@ const image = document.querySelector("img");
 let scale = null;
 let size = null;
 let position = null;
+let path = null;
 
 function syncSize() {
 	if (!image.complete) { return; }
@@ -41,11 +42,12 @@ function syncSize() {
 	image.style.height = `${Math.round(size[1])}px`;
 	image.style.left = `${Math.round(position[0])}px`;
 	image.style.top = `${Math.round(position[1])}px`;
-/*	
-	var percent = (this._currentSize[0]/this._originalSize[0]) * 100;
-	this._win.document.title = "(" + Math.round(percent) + "%) " + this._realPath.getPath();
-	this._win.document.querySelector("#scale").label = Math.round(percent) + "%";
-*/
+
+	let percent = Math.round(100*(size[0]/image.naturalWidth));
+	let win = electron.remote.getCurrentWindow();
+	win.setTitle(`(${percent}%) ${path}`);
+
+	document.querySelector(".scale").textContent = `${percent}%`;
 }
 
 function findScale(diff) {
@@ -97,11 +99,7 @@ function onMouseMove(e) {
 		.map((mouse, i) => frac*(mouse - position[i]))
 		.map(Math.round);
 
-	console.log(pos);
-
-/*
-	this._win.document.querySelector("#mouse").label = pos.join(",");
-	*/
+	document.querySelector(".mouse").textContent = pos.join(",");
 }
 
 function onKeyDown(e) {
@@ -132,15 +130,12 @@ function onKeyDown(e) {
 
 function onLoad(e) {
 	document.body.classList.remove("loading");
-	/*
-	this._originalSize = [this._image.naturalWidth, this._image.naturalHeight];
-	this._win.document.querySelector("#size").label = this._originalSize.join("×");
-	*/
+	document.querySelector(".size").textContent = [image.naturalWidth, image.naturalHeight].join("×");
 	syncSize();
 }
 
 electron.ipcRenderer.on("path", (e, data) => {
-	let path = paths.fromString(data);
+	path = paths.fromString(data);
 
 	document.body.classList.add("loading");
 	scale = null;
@@ -148,8 +143,9 @@ electron.ipcRenderer.on("path", (e, data) => {
 });
 
 image.addEventListener("load", onLoad);
-window.addEventListener("resize", e => syncSize());
+window.addEventListener("resize", syncSize);
 window.addEventListener("keydown", onKeyDown);
+window.addEventListener("mousemove", onMouseMove);
 
 command.register("window:close", "Escape", () => {
 	window.close();

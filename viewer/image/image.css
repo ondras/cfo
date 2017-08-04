@@ -65,15 +65,23 @@ body {
   font-weight: 700;
   src: local("Ubuntu Mono Bold Italic"), local("UbuntuMono-BoldItalic"), url("../../font/UbuntuMono-BI.ttf") format("truetype");
 }
-html,
 body {
-  height: 100%;
-}
-body {
-  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 body.loading {
   cursor: wait;
+}
+main {
+  flex: 1;
+  overflow: hidden;
+}
+footer {
+  line-height: 1.5;
+}
+footer span {
+  margin: 0 1em;
 }
 img {
   position: relative;

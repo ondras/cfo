@@ -3,14 +3,27 @@
 
 @font: "../../font";
 
-html, body { height: 100%; }
-
 body {
-	overflow: hidden;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
 }
 
 body.loading {
 	cursor: wait;
+}
+
+main {
+	flex: 1;
+	overflow: hidden;
+}
+
+footer {
+	line-height: 1.5;
+
+	span {
+		margin: 0 1em;
+	}
 }
 
 img {
