@@ -174,18 +174,19 @@ const background = "#e8e8e8";
 const remote$1 = require("electron").remote;
 
 const windowOptions = {
-	parent: remote$1.getCurrentWindow(),
-	resizable: true,
-	fullscreenable: true,
 	center: true,
-	width: 640,
-	height: 480,
-	useContentSize: true,
-	backgroundColor: background,
+	backgroundColor: background
 };
 
+/* views everything */
+function match(path) {
+	return true;	
+}
+
 function view$1(path) {
-	let options = Object.assign({}, windowOptions, {title: path.toString()});
+	let [width, height] = remote$1.getCurrentWindow().getSize();
+	let currentOptions = { title: path.toString(), width, height };
+	let options = Object.assign({}, windowOptions, currentOptions);
 
 	let window = new remote$1.BrowserWindow(options);
 	window.setMenu(null);
@@ -197,8 +198,55 @@ function view$1(path) {
 	});
 }
 
+
+var text$3 = Object.freeze({
+	match: match,
+	view: view$1
+});
+
+/* Image viewer window - remote (data) part */
+
+const remote$2 = require("electron").remote;
+
+const windowOptions$1 = {
+	center: true,
+	backgroundColor: background
+};
+
+function match$1(path) {
+	let ext = path.toString().split(".").pop();
+	if (!ext) { return; }
+	return ext.match(/jpe?g|gif|png|svg|bmp|ico/i);
+}
+
+function view$2(path) {
+	let [width, height] = remote$2.getCurrentWindow().getSize();
+	let currentOptions = { title: path.toString(), width, height };
+	let options = Object.assign({}, windowOptions$1, currentOptions);
+
+	let window = new remote$2.BrowserWindow(options);
+	window.setMenu(null);
+	window.loadURL(`file://${__dirname}/../viewer/image/index.html`);
+	window.toggleDevTools();
+
+	let webContents = window.webContents;
+	webContents.once("did-finish-load", () => {
+		webContents.send("path", path.toString());
+	});
+}
+
+
+var image = Object.freeze({
+	match: match$1,
+	view: view$2
+});
+
+const viewers = [image, text$3];
+
 function view(path) {
-	return view$1(path);
+	for (let viewer of viewers) {
+		if (viewer.match(path)) { return viewer.view(path); }
+	}
 }
 
 let issues = [];
@@ -240,11 +288,11 @@ function removeProgress(window) {
 
 /* Progress window - remote (data) part */
 
-const remote$2 = require("electron").remote;
+const remote$3 = require("electron").remote;
 const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
-const windowOptions$1 = {
-	parent: remote$2.getCurrentWindow(),
+const windowOptions$2 = {
+	parent: remote$3.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -264,8 +312,8 @@ class Progress {
 	}
 
 	open() {
-		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
-		this._window = new remote$2.BrowserWindow(options);
+		let options = Object.assign({}, windowOptions$2, {title: this._config.title});
+		this._window = new remote$3.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../progress/index.html`);
 
@@ -310,9 +358,9 @@ class Progress {
 
 /* Issue window - remote (data) part */
 
-const remote$3 = require("electron").remote;
-const windowOptions$2 = {
-	parent: remote$3.getCurrentWindow(),
+const remote$4 = require("electron").remote;
+const windowOptions$3 = {
+	parent: remote$4.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,
@@ -332,8 +380,8 @@ class Issue {
 	}
 
 	open() {
-		let options = Object.assign({}, windowOptions$2, {title: this._config.title});
-		this._window = new remote$3.BrowserWindow(options);
+		let options = Object.assign({}, windowOptions$3, {title: this._config.title});
+		this._window = new remote$4.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../issue/index.html`);
 
@@ -343,7 +391,7 @@ class Issue {
 			webContents.send("config", this._config);
 		});
 
-		remote$3.ipcMain.once("action", (e, action) => {
+		remote$4.ipcMain.once("action", (e, action) => {
 			let w = this._window;
 			removeIssue(w);
 			this._window = null;
@@ -981,8 +1029,8 @@ function register(func, key) {
 
 window.addEventListener("keydown", handler);
 
-const {remote: remote$4} = require('electron');
-const settings$1 = remote$4.require('electron-settings');
+const {remote: remote$5} = require('electron');
+const settings$1 = remote$5.require('electron-settings');
 let storage = []; // strings
 
 function viewFunc(i) {

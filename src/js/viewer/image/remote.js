@@ -1,4 +1,4 @@
-/* Text viewer window - remote (data) part */
+/* Image viewer window - remote (data) part */
 
 import * as conf from "conf.js";
 
@@ -9,9 +9,10 @@ const windowOptions = {
 	backgroundColor: conf.background
 }
 
-/* views everything */
 export function match(path) {
-	return true;	
+	let ext = path.toString().split(".").pop();
+	if (!ext) { return; }
+	return ext.match(/jpe?g|gif|png|svg|bmp|ico/i);
 }
 
 export function view(path) {
@@ -21,7 +22,7 @@ export function view(path) {
 
 	let window = new remote.BrowserWindow(options);
 	window.setMenu(null);
-	window.loadURL(`file://${__dirname}/../viewer/text/index.html`);
+	window.loadURL(`file://${__dirname}/../viewer/image/index.html`);
 
 	let webContents = window.webContents;
 	webContents.once("did-finish-load", () => {
