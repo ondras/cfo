@@ -111,7 +111,7 @@ function close$1(value) {
 	resolve$1(value);
 }
 
-function confirm(t) {
+function confirm$1(t) {
 	clear(text$2);
 	text$2.appendChild(text$1(t));
 
@@ -996,7 +996,7 @@ function viewFunc(i) {
 function setFunc(i) {
 	return async () => {
 		let path = getActive().getList().getPath();
-		let result = await confirm(`Set "${path}" as favorite? It will be accessible as Ctrl+${i}.`);
+		let result = await confirm$1(`Set "${path}" as favorite? It will be accessible as Ctrl+${i}.`);
 		if (!result) { return; }
 		set(path, i);
 	}
@@ -1272,20 +1272,18 @@ class List {
 		if (text == name || text == "") { return; }
 		let newPath = path.getParent().append(text);
 
-		/* FIXME test na existenci! */
+		await newPath.stat();
+		if (newPath.exists()) {
+			let result = await confirm(`Target path "${path}" already exists. Overwrite?`);
+			if (!result) { return; }
+		}
+
 		try {
 			await path.rename(newPath);
 			this.reload(newPath);
 		} catch (e) {
 			alert(e.message);
 		}
-
-/*
-		var data = _("rename.exists", newFile);
-		var title = _("rename.title");
-		if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
-		
-*/
 	}
 
 	handleMessage(message, publisher, data) {
@@ -1310,14 +1308,17 @@ class List {
 			case "keydown":
 				if (e.target == this._input) { 
 					this._handleInputKey(e.key);
-				} else if (e.ctrlKey) { // ctrl+a = vyber vseho
+					return;
+				}
+
+				if (e.ctrlKey) { // ctrl+a = vyber vseho
 					if (e.key == "a") { 
-						this._selectAll();
 						e.preventDefault();
+						this._selectAll();
 					}
-				} else if (!e.ctrlKey) { // nechceme aby ctrl+l hledalo od "l"
-					let handled = this._handleKey(e.key);
-					if (handled) { e.preventDefault(); } // FIXME nefunguje, handleKey je async!
+				} else { // nechceme aby ctrl+l hledalo od "l"
+					e.preventDefault();
+					this._handleKey(e.key);
 				}
 			break;
 		}
@@ -1408,11 +1409,8 @@ class List {
 
 			default:
 				if (key.length == 1) { this._search(key.toLowerCase()); }
-				return false;
 			break;
 		}
-
-		return true;
 	}
 
 	async _loadPathContents(path) {
@@ -2503,7 +2501,7 @@ register$1("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 	let path = list.getSelection({multi:true});
 	if (!path.supports(DELETE)) { return; }
 
-	let result = await confirm(`Really delete "${path}" ?`);
+	let result = await confirm$1(`Really delete "${path}" ?`);
 	if (!result) { return; }
 	let d = new Delete(path);
 	await d.run();

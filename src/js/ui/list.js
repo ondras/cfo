@@ -120,20 +120,18 @@ export default class List {
 		if (text == name || text == "") { return; }
 		let newPath = path.getParent().append(text);
 
-		/* FIXME test na existenci! */
+		await newPath.stat();
+		if (newPath.exists()) {
+			let result = await confirm(`Target path "${path}" already exists. Overwrite?`);
+			if (!result) { return; }
+		}
+
 		try {
 			await path.rename(newPath);
 			this.reload(newPath);
 		} catch (e) {
 			alert(e.message);
 		}
-
-/*
-		var data = _("rename.exists", newFile);
-		var title = _("rename.title");
-		if (newFile.exists() && !this._fc.showConfirm(data, title)) { return; }
-		
-*/
 	}
 
 	handleMessage(message, publisher, data) {
@@ -158,14 +156,17 @@ export default class List {
 			case "keydown":
 				if (e.target == this._input) { 
 					this._handleInputKey(e.key);
-				} else if (e.ctrlKey) { // ctrl+a = vyber vseho
+					return;
+				}
+
+				if (e.ctrlKey) { // ctrl+a = vyber vseho
 					if (e.key == "a") { 
-						this._selectAll();
 						e.preventDefault();
+						this._selectAll();
 					}
-				} else if (!e.ctrlKey) { // nechceme aby ctrl+l hledalo od "l"
-					let handled = this._handleKey(e.key);
-					if (handled) { e.preventDefault(); } // FIXME nefunguje, handleKey je async!
+				} else { // nechceme aby ctrl+l hledalo od "l"
+					e.preventDefault();
+					this._handleKey(e.key);
 				}
 			break;
 		}
@@ -256,11 +257,8 @@ export default class List {
 
 			default:
 				if (key.length == 1) { this._search(key.toLowerCase()); }
-				return false;
 			break;
 		}
-
-		return true;
 	}
 
 	async _loadPathContents(path) {
