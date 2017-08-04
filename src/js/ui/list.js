@@ -67,6 +67,7 @@ export default class List {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
 		let loaded = await this._loadPathContents(path);
 		loaded && pubsub.publish("list-change", this);
+		return loaded;
 	}
 
 	focusInput() {
@@ -262,14 +263,9 @@ export default class List {
 	}
 
 	async _loadPathContents(path) {
-		this._path = path;
-
-		/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
-		await path.stat();
-
 		try {
 			let paths = await path.getChildren();
-			if (!this._path.is(path)) { return false; } /* got a new one in the meantime */
+			this._path = path;
 			this._show(paths);
 			return true;
 		} catch (e) {
@@ -333,7 +329,7 @@ export default class List {
 
 		let size = path.getSize();
 		if (size === undefined) { size = item.size; } /* computed value (for directories) */
-		node.insertCell().innerHTML = (size === undefined ? "" : format.size(size));
+		node.insertCell().innerHTML = (size === undefined ? "" : format.size(size, {auto:true}));
 
 		let date = path.getDate();
 		node.insertCell().innerHTML = (date === undefined ? "" : format.date(date));
@@ -457,7 +453,7 @@ export default class List {
 				}
 			});
 			
-			str = `Selected ${format.size(bytes)} bytes in ${fileCount} files and ${dirCount} directories`;
+			str = `Selected ${format.size(bytes, {auto:false})} bytes in ${fileCount} files and ${dirCount} directories`;
 		}
 
 		status.set(str);

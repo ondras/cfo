@@ -252,8 +252,17 @@ function symlink(target, path) {
 	});
 }
 
-function size$1(bytes) {
-	{
+function size$1(bytes, options = {}) {
+	if (0 /*this.getPreference("autosize") */ && options.auto) {
+		var units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
+		var step = 1 << 10;
+		var index = 0;
+		while (bytes / step >= 1 && index+1 < units.length) {
+			bytes /= step;
+			index++;
+		}
+		return `${bytes.toFixed(2)} ${units[index]}`;
+	} else {
 		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
 	}
 }
@@ -333,8 +342,8 @@ class Local extends Path {
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); // to get rid of a trailing slash
-		this._target = null; // string
-		this._targetPath = null; // Local, for icon resolution
+		this._target = null; // string, relative or absolute
+		this._targetPath = null; // Local, absolute, for icon resolution
 		this._error = null;
 		this._meta = {};
 	}
@@ -376,8 +385,8 @@ class Local extends Path {
 
 		if (!this._meta.isDirectory) {
 			let size = this.getSize();
-			/* fixme vynuceny vypnuty autoformat */
-			if (size !== undefined) { d = `${d}, ${size$1(size)} bytes`; }
+			/* force raw bytes, no auto units */
+			if (size !== undefined) { d = `${d}, ${size$1(size, {auto:false})} bytes`; }
 		}
 		return d;
 	}

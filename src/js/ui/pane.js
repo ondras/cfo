@@ -71,7 +71,7 @@ export default class Pane {
 		panes.activate(this);
 	}
 
-	addList(path) {
+	async addList(path) {
 		if (!path) { /* either duplicate or home */
 			let index = this._tabs.selectedIndex;
 			if (index == -1) { throw new Error("Cannot add new list: no path specified and duplication is not possible"); }
@@ -86,7 +86,8 @@ export default class Pane {
 
 		this._tabs.selectedIndex = this._labels.length-1;
 
-		list.setPath(path); 
+		let loaded = await list.setPath(path);
+		if (!loaded) { list.setPath(paths.home()); }
 	}
 
 	removeList() {

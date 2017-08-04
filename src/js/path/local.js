@@ -36,8 +36,8 @@ export default class Local extends Path {
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); // to get rid of a trailing slash
-		this._target = null; // string
-		this._targetPath = null; // Local, for icon resolution
+		this._target = null; // string, relative or absolute
+		this._targetPath = null; // Local, absolute, for icon resolution
 		this._error = null;
 		this._meta = {};
 	}
@@ -79,8 +79,8 @@ export default class Local extends Path {
 
 		if (!this._meta.isDirectory) {
 			let size = this.getSize();
-			/* fixme vynuceny vypnuty autoformat */
-			if (size !== undefined) { d = `${d}, ${format.size(size)} bytes`; }
+			/* force raw bytes, no auto units */
+			if (size !== undefined) { d = `${d}, ${format.size(size, {auto:false})} bytes`; }
 		}
 		return d;
 	}

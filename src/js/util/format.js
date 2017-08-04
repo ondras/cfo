@@ -19,8 +19,8 @@ export function date(date) {
 	return `${d}.${mo}.${y} ${h}:${m}:${s}`;
 }
 
-export function size(bytes) {
-	if (0 /*this.getPreference("autosize") */) {
+export function size(bytes, options = {}) {
+	if (0 /*this.getPreference("autosize") */ && options.auto) {
 		var units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
 		var step = 1 << 10;
 		var index = 0;

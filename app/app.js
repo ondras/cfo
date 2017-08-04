@@ -774,8 +774,17 @@ function date(date) {
 	return `${d}.${mo}.${y} ${h}:${m}:${s}`;
 }
 
-function size(bytes) {
-	{
+function size(bytes, options = {}) {
+	if (0 /*this.getPreference("autosize") */ && options.auto) {
+		var units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
+		var step = 1 << 10;
+		var index = 0;
+		while (bytes / step >= 1 && index+1 < units.length) {
+			bytes /= step;
+			index++;
+		}
+		return `${bytes.toFixed(2)} ${units[index]}`;
+	} else {
 		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
 	}
 }
@@ -813,8 +822,8 @@ class Local extends Path {
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); // to get rid of a trailing slash
-		this._target = null; // string
-		this._targetPath = null; // Local, for icon resolution
+		this._target = null; // string, relative or absolute
+		this._targetPath = null; // Local, absolute, for icon resolution
 		this._error = null;
 		this._meta = {};
 	}
@@ -856,8 +865,8 @@ class Local extends Path {
 
 		if (!this._meta.isDirectory) {
 			let size$$1 = this.getSize();
-			/* fixme vynuceny vypnuty autoformat */
-			if (size$$1 !== undefined) { d = `${d}, ${size(size$$1)} bytes`; }
+			/* force raw bytes, no auto units */
+			if (size$$1 !== undefined) { d = `${d}, ${size(size$$1, {auto:false})} bytes`; }
 		}
 		return d;
 	}
@@ -1273,6 +1282,7 @@ class List {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
 		let loaded = await this._loadPathContents(path);
 		loaded && publish("list-change", this);
+		return loaded;
 	}
 
 	focusInput() {
@@ -1468,14 +1478,9 @@ class List {
 	}
 
 	async _loadPathContents(path) {
-		this._path = path;
-
-		/* FIXME stat je tu jen proto, aby si cesta v metadatech nastavila isDirectory=true (kdyby se nekdo ptal na supports) */
-		await path.stat();
-
 		try {
 			let paths = await path.getChildren();
-			if (!this._path.is(path)) { return false; } /* got a new one in the meantime */
+			this._path = path;
 			this._show(paths);
 			return true;
 		} catch (e) {
@@ -1539,7 +1544,7 @@ class List {
 
 		let size$$1 = path.getSize();
 		if (size$$1 === undefined) { size$$1 = item.size; } /* computed value (for directories) */
-		node$$1.insertCell().innerHTML = (size$$1 === undefined ? "" : size(size$$1));
+		node$$1.insertCell().innerHTML = (size$$1 === undefined ? "" : size(size$$1, {auto:true}));
 
 		let date$$1 = path.getDate();
 		node$$1.insertCell().innerHTML = (date$$1 === undefined ? "" : date(date$$1));
@@ -1663,7 +1668,7 @@ class List {
 				}
 			});
 			
-			str = `Selected ${size(bytes)} bytes in ${fileCount} files and ${dirCount} directories`;
+			str = `Selected ${size(bytes, {auto:false})} bytes in ${fileCount} files and ${dirCount} directories`;
 		}
 
 		set$1(str);
@@ -1898,7 +1903,7 @@ class Pane {
 		activate(this);
 	}
 
-	addList(path) {
+	async addList(path) {
 		if (!path) { /* either duplicate or home */
 			let index = this._tabs.selectedIndex;
 			if (index == -1) { throw new Error("Cannot add new list: no path specified and duplication is not possible"); }
@@ -1913,7 +1918,8 @@ class Pane {
 
 		this._tabs.selectedIndex = this._labels.length-1;
 
-		list.setPath(path); 
+		let loaded = await list.setPath(path);
+		if (!loaded) { list.setPath(home()); }
 	}
 
 	removeList() {
