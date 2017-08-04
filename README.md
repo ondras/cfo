@@ -25,7 +25,7 @@ CFO shall become a modernized version of [Fire Commander](https://addons.mozilla
 - Viewers
   - [X] Image
     - [ ] EXIF
-    - [ ] Navigation
+    - [X] Navigation
   - [X] Text
   - [ ] Audio/Video
 - File systems

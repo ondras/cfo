@@ -301,7 +301,7 @@ function get(name, options = {}) {
 }
 
 const fs = require("fs");
-const path$1 = require("path");
+const path = require("path");
 const {shell} = require("electron").remote;
 
 function statsToMetadata(stats) {
@@ -332,7 +332,7 @@ class Local extends Path {
 
 	constructor(p) {
 		super();
-		this._path = path$1.resolve(p); // to get rid of a trailing slash
+		this._path = path.resolve(p); // to get rid of a trailing slash
 		this._target = null; // string
 		this._targetPath = null; // Local, for icon resolution
 		this._error = null;
@@ -340,7 +340,7 @@ class Local extends Path {
 	}
 
 	toString() { return this._path; }
-	getName() { return path$1.basename(this._path) || "/"; }
+	getName() { return path.basename(this._path) || "/"; }
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
@@ -383,7 +383,7 @@ class Local extends Path {
 	}
  
 	getParent() {
-		let parent = new this.constructor(path$1.dirname(this._path));
+		let parent = new this.constructor(path.dirname(this._path));
 		return (parent.is(this) ? null : parent);
 	}
 
@@ -415,7 +415,7 @@ class Local extends Path {
 	}
 
 	append(leaf) {
-		let newPath = path$1.resolve(this._path, leaf);
+		let newPath = path.resolve(this._path, leaf);
 		return new this.constructor(newPath);
 	}
 
@@ -446,7 +446,7 @@ class Local extends Path {
 	async getChildren() {
 		let names = await readdir(this._path);
 		let paths = names
-			.map(name => path$1.resolve(this._path, name))
+			.map(name => path.resolve(this._path, name))
 			.map(name => new this.constructor(name));
 
 		let promises = paths.map(path => path.stat());
@@ -478,8 +478,8 @@ class Local extends Path {
 			this._target = target;
 
 			// resolve relative path
-			let linkDir = path$1.dirname(this._path);
-			target = path$1.resolve(linkDir, target);
+			let linkDir = path.dirname(this._path);
+			target = path.resolve(linkDir, target);
 
 			let targetPath = new Local(target);
 			this._targetPath = targetPath;
@@ -546,13 +546,13 @@ cancel.addEventListener("click", e => {
 	close$1(false);
 });
 
-function onKeyDown$1(e) {
+function onKeyDown(e) {
 	if (e.key == "Escape") { close$1(null); }
 	e.stopPropagation();
 }
 
 function close$1(value) {
-	window.removeEventListener("keydown", onKeyDown$1, true);
+	window.removeEventListener("keydown", onKeyDown, true);
 	body.classList.remove("modal");
 	form.parentNode.removeChild(form);
 	resolve(value);
@@ -623,13 +623,13 @@ cancel$1.addEventListener("click", e => {
 	close$2(false);
 });
 
-function onKeyDown$2(e) {
+function onKeyDown$1(e) {
 	if (e.key == "Escape") { close$2(false); }
 	e.stopPropagation();
 }
 
 function close$2(value) {
-	window.removeEventListener("keydown", onKeyDown$2, true);
+	window.removeEventListener("keydown", onKeyDown$1, true);
 	body$1.classList.remove("modal");
 	form$1.parentNode.removeChild(form$1);
 	resolve$1(value);
@@ -708,7 +708,9 @@ const image = document.querySelector("img");
 let scale = null;
 let size = null;
 let position = null;
-let path = null;
+
+let currentIndex = -1;
+let allImages = [];
 
 function syncSize() {
 	if (!image.complete) { return; }
@@ -742,6 +744,7 @@ function syncSize() {
 
 	let percent = Math.round(100*(size[0]/image.naturalWidth));
 	let win = electron.remote.getCurrentWindow();
+	let path = allImages[currentIndex];
 	win.setTitle(`(${percent}%) ${path}`);
 
 	document.querySelector(".scale").textContent = `${percent}%`;
@@ -799,30 +802,11 @@ function onMouseMove(e) {
 	document.querySelector(".mouse").textContent = pos.join(",");
 }
 
-function onKeyDown(e) {
-
-	e.preventDefault();
-
-	switch (e.keyCode) {
-		case 33: /* pageup */
-		case 8: /* backspace */
-//			this._loadAnother(-1);
-		break;
-		
-		case 34: /* pagedown */
-		case 13: /* enter */
-		case 32: /* spacebar */
-//			this._loadAnother(+1);
-		break;
-		
-		case 36: /* home */
-//			this._loadAnother(-Infinity);
-		break;
-		
-		case 35: /* end */
-//			this._loadAnother(Infinity);
-		break;
-	}
+function loadAnother(diff) {
+	let index = currentIndex + diff;
+	index = Math.max(index, 0);
+	index = Math.min(index, allImages.length-1);
+	if (index != currentIndex) { load(index); }
 }
 
 function onLoad(e) {
@@ -831,17 +815,20 @@ function onLoad(e) {
 	syncSize();
 }
 
-electron.ipcRenderer.on("path", (e, data) => {
-	path = fromString(data);
-
-	document.body.classList.add("loading");
+function load(i) {
+	currentIndex = i;
 	scale = null;
-	image.src = path.toString();
+	document.body.classList.add("loading");
+	image.src = allImages[currentIndex].toString();
+}
+
+electron.ipcRenderer.on("path", (e, all, i) => {
+	allImages = all.map(fromString);
+	load(i);
 });
 
 image.addEventListener("load", onLoad);
 window.addEventListener("resize", syncSize);
-window.addEventListener("keydown", onKeyDown);
 window.addEventListener("mousemove", onMouseMove);
 
 register("window:close", "Escape", () => {
@@ -866,49 +853,9 @@ register("image:full", "Enter", () => {
 	syncSize();
 });
 
-/*
-Viewer.Image.prototype._loadAnother = function(which) {
-	var index = this._items.indexOf(this._originalPath);
-	if (index == -1) { return; } // not found, wtf FIXME
-	
-	var current = null;
-	var dir = null;
-	
-	switch (which) {
-		case +1:
-		case -1:
-			current = index;
-			dir = which;
-		break;
-		
-		case Infinity:
-			current = this._items.length-1;
-			dir = -1;
-		break;
-
-		case -Infinity:
-			current = 0;
-			dir = 1;
-		break;
-	}
-	
-	// scan for first image
-	while (current >= 0 && current < this._items.length) {
-		if (current != index) {
-			var path = this._items[current];
-			var handler = this._fc.getViewerHandler(path);
-			if (handler == Viewer.Image) {
-				if (this._realPath != this._originalPath) { this._realPath.delete(); }
-				this._originalPath = path;
-				this._preparePath();
-				return;
-			}
-		}
-		current += dir;
-	}
-
-	// image not found
-}
-*/
+register("image:next", ["PageDown", " "], () => loadAnother(+1));
+register("image:prev", ["PageUp", "Backspace"], () => loadAnother(-1));
+register("image:prev", "Home", () => loadAnother(-Infinity));
+register("image:prev", "End", () => loadAnother(+Infinity));
 
 }());

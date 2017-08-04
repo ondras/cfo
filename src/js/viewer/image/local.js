@@ -47,6 +47,7 @@ function syncSize() {
 
 	let percent = Math.round(100*(size[0]/image.naturalWidth));
 	let win = electron.remote.getCurrentWindow();
+	let path = allImages[currentIndex];
 	win.setTitle(`(${percent}%) ${path}`);
 
 	document.querySelector(".scale").textContent = `${percent}%`;
@@ -111,29 +112,6 @@ function loadAnother(diff) {
 	if (index != currentIndex) { load(index); }
 }
 
-function onKeyDown(e) {
-	switch (e.keyCode) {
-		case 33: /* pageup */
-		case 8: /* backspace */
-//			this._loadAnother(-1);
-		break;
-		
-		case 34: /* pagedown */
-		case 13: /* enter */
-		case 32: /* spacebar */
-//			this._loadAnother(+1);
-		break;
-		
-		case 36: /* home */
-//			this._loadAnother(-Infinity);
-		break;
-		
-		case 35: /* end */
-//			this._loadAnother(Infinity);
-		break;
-	}
-}
-
 function onLoad(e) {
 	document.body.classList.remove("loading");
 	document.querySelector(".size").textContent = [image.naturalWidth, image.naturalHeight].join("×");
@@ -179,48 +157,6 @@ command.register("image:full", "Enter", () => {
 });
 
 command.register("image:next", ["PageDown", " "], () => loadAnother(+1));
-
-/*
-Viewer.Image.prototype._loadAnother = function(which) {
-	var index = this._items.indexOf(this._originalPath);
-	if (index == -1) { return; } // not found, wtf FIXME
-	
-	var current = null;
-	var dir = null;
-	
-	switch (which) {
-		case +1:
-		case -1:
-			current = index;
-			dir = which;
-		break;
-		
-		case Infinity:
-			current = this._items.length-1;
-			dir = -1;
-		break;
-
-		case -Infinity:
-			current = 0;
-			dir = 1;
-		break;
-	}
-	
-	// scan for first image
-	while (current >= 0 && current < this._items.length) {
-		if (current != index) {
-			var path = this._items[current];
-			var handler = this._fc.getViewerHandler(path);
-			if (handler == Viewer.Image) {
-				if (this._realPath != this._originalPath) { this._realPath.delete(); }
-				this._originalPath = path;
-				this._preparePath();
-				return;
-			}
-		}
-		current += dir;
-	}
-
-	// image not found
-}
-*/
+command.register("image:prev", ["PageUp", "Backspace"], () => loadAnother(-1));
+command.register("image:prev", "Home", () => loadAnother(-Infinity));
+command.register("image:prev", "End", () => loadAnother(+Infinity));

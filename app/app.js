@@ -183,7 +183,7 @@ function match(path) {
 	return true;	
 }
 
-function view$1(path) {
+function view$1(path, list) {
 	let [width, height] = remote$1.getCurrentWindow().getSize();
 	let currentOptions = { title: path.toString(), width, height };
 	let options = Object.assign({}, windowOptions, currentOptions);
@@ -219,7 +219,7 @@ function match$1(path) {
 	return ext.match(/jpe?g|gif|png|svg|bmp|ico/i);
 }
 
-function view$2(path) {
+async function view$2(path, list) {
 	let [width, height] = remote$2.getCurrentWindow().getSize();
 	let currentOptions = { title: path.toString(), width, height };
 	let options = Object.assign({}, windowOptions$1, currentOptions);
@@ -229,9 +229,16 @@ function view$2(path) {
 	window.loadURL(`file://${__dirname}/../viewer/image/index.html`);
 	window.toggleDevTools();
 
+	let paths = await list.getPath().getChildren();
+	paths = paths.filter(path => path.supports(VIEW))
+				.filter(match$1)
+				.map(path => path.toString());
+	let index = paths.indexOf(path.toString());
+	if (index == -1) { throw new Error(`Path ${path} not found in its list`); }
+
 	let webContents = window.webContents;
 	webContents.once("did-finish-load", () => {
-		webContents.send("path", path.toString());
+		webContents.send("path", paths, index);
 	});
 }
 
@@ -243,9 +250,9 @@ var image = Object.freeze({
 
 const viewers = [image, text$3];
 
-function view(path) {
+function view(path, list) {
 	for (let viewer of viewers) {
-		if (viewer.match(path)) { return viewer.view(path); }
+		if (viewer.match(path)) { return viewer.view(path, list); }
 	}
 }
 
@@ -2528,10 +2535,11 @@ register$1("file:new", "Shift+F4", async () => {
 });
 
 register$1("file:view", "F3", () => {
-	let file = getActive().getList().getSelection({multi:false});
+	let list = getActive().getList();
+	let file = list.getSelection({multi:false});
 	if (!file.supports(VIEW)) { return; }
 
-	view(file);
+	view(file, list);
 });
 
 register$1("file:edit", "F4", () => {
