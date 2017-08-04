@@ -227,7 +227,6 @@ async function view$2(path, list) {
 	let window = new remote$2.BrowserWindow(options);
 	window.setMenu(null);
 	window.loadURL(`file://${__dirname}/../viewer/image/index.html`);
-	window.toggleDevTools();
 
 	let paths = await list.getPath().getChildren();
 	paths = paths.filter(path => path.supports(VIEW))
@@ -1270,10 +1269,10 @@ class List {
 		this._loadPathContents(this._path);
 	}
 
-	setPath(path) {
+	async setPath(path) {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
-		this._loadPathContents(path);
-		publish("list-change", this);
+		let loaded = await this._loadPathContents(path);
+		loaded && publish("list-change", this);
 	}
 
 	focusInput() {
@@ -1476,11 +1475,13 @@ class List {
 
 		try {
 			let paths = await path.getChildren();
-			if (!this._path.is(path)) { return; } /* got a new one in the meantime */
+			if (!this._path.is(path)) { return false; } /* got a new one in the meantime */
 			this._show(paths);
+			return true;
 		} catch (e) {
 			// "{"errno":-13,"code":"EACCES","syscall":"scandir","path":"/tmp/aptitude-root.4016:Xf20YI"}"
 			alert(e.message);
+			return false;
 		}
 	}
 
