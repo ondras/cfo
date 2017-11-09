@@ -1,8 +1,9 @@
 ALL := app/app.js app/app.css \
 		progress/progress.js progress/progress.css \
 		issue/issue.js issue/issue.css \
-		viewer/text/text.js viewer/text/text.css \
-		viewer/image/image.js viewer/image/image.css
+		viewer/text/viewer.js viewer/text/viewer.css \
+		viewer/image/viewer.js viewer/image/viewer.css \
+		viewer/av/viewer.js viewer/av/viewer.css
 JS := $(shell find src/js -name '*.js')
 CSS := $(shell find src/css -name '*.less')
 ROLLUP := npm -s run rollup -- -c src/rollup.config.js
@@ -28,17 +29,11 @@ issue/issue.js: $(JS)
 issue/issue.css: $(CSS)
 	$(LESSC) src/css/issue.less > $@
 
-viewer/text/text.js: $(JS)
-	$(ROLLUP) src/js/viewer/text/local.js -o $@
+viewer/%/viewer.js: $(JS)
+	$(ROLLUP) src/js/viewer/$*/local.js -o $@
 
-viewer/image/image.js: $(JS)
-	$(ROLLUP) src/js/viewer/image/local.js -o $@
-
-viewer/text/text.css: $(CSS)
-	$(LESSC) src/css/viewer/text.less > $@
-
-viewer/image/image.css: $(CSS)
-	$(LESSC) src/css/viewer/image.less > $@
+viewer/%/viewer.css: $(CSS)
+	$(LESSC) src/css/viewer/$*.less > $@
 
 clean:
 	rm -rf $(ALL)

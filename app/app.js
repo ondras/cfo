@@ -247,7 +247,46 @@ var image = Object.freeze({
 	view: view$2
 });
 
-const viewers = [image, text$3];
+/* Audio/Video viewer window - remote (data) part */
+
+const remote$3 = require("electron").remote;
+const audio = /ogg|mp3|wav/i;
+const video = /mpe?g|mkv|webm|mov/i;
+
+const windowOptions$2 = {
+	center: true,
+	backgroundColor: background
+};
+
+function match$2(path) {
+	let ext = path.toString().split(".").pop();
+	return ext.match(audio) || ext.match(video);
+}
+
+function view$3(path, list) {
+	let [width, height] = remote$3.getCurrentWindow().getSize();
+	let currentOptions = { title: path.toString(), width, height };
+	let options = Object.assign({}, windowOptions$2, currentOptions);
+
+	let window = new remote$3.BrowserWindow(options);
+	window.setMenu(null);
+	window.loadURL(`file://${__dirname}/../viewer/av/index.html`);
+
+	let webContents = window.webContents;
+	webContents.once("did-finish-load", () => {
+		let ext = path.toString().split(".").pop();
+		let nodeName = (ext.match(audio) ? "audio" : "vide");
+		webContents.send("path", path.toString(), nodeName);
+	});
+}
+
+
+var av = Object.freeze({
+	match: match$2,
+	view: view$3
+});
+
+const viewers = [image, av, text$3];
 
 function view(path, list) {
 	for (let viewer of viewers) {
@@ -294,11 +333,11 @@ function removeProgress(window) {
 
 /* Progress window - remote (data) part */
 
-const remote$3 = require("electron").remote;
+const remote$4 = require("electron").remote;
 const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
-const windowOptions$2 = {
-	parent: remote$3.getCurrentWindow(),
+const windowOptions$3 = {
+	parent: remote$4.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -318,8 +357,8 @@ class Progress {
 	}
 
 	open() {
-		let options = Object.assign({}, windowOptions$2, {title: this._config.title});
-		this._window = new remote$3.BrowserWindow(options);
+		let options = Object.assign({}, windowOptions$3, {title: this._config.title});
+		this._window = new remote$4.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../progress/index.html`);
 
@@ -364,9 +403,9 @@ class Progress {
 
 /* Issue window - remote (data) part */
 
-const remote$4 = require("electron").remote;
-const windowOptions$3 = {
-	parent: remote$4.getCurrentWindow(),
+const remote$5 = require("electron").remote;
+const windowOptions$4 = {
+	parent: remote$5.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,
@@ -386,8 +425,8 @@ class Issue {
 	}
 
 	open() {
-		let options = Object.assign({}, windowOptions$3, {title: this._config.title});
-		this._window = new remote$4.BrowserWindow(options);
+		let options = Object.assign({}, windowOptions$4, {title: this._config.title});
+		this._window = new remote$5.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../issue/index.html`);
 
@@ -397,7 +436,7 @@ class Issue {
 			webContents.send("config", this._config);
 		});
 
-		remote$4.ipcMain.once("action", (e, action) => {
+		remote$5.ipcMain.once("action", (e, action) => {
 			let w = this._window;
 			removeIssue(w);
 			this._window = null;
@@ -1044,8 +1083,8 @@ function register(func, key) {
 
 window.addEventListener("keydown", handler);
 
-const {remote: remote$5} = require('electron');
-const settings$1 = remote$5.require('electron-settings');
+const {remote: remote$6} = require('electron');
+const settings$1 = remote$6.require('electron-settings');
 let storage = []; // strings
 
 function viewFunc(i) {
