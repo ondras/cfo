@@ -296,6 +296,7 @@ const electron = require("electron");
 
 electron.ipcRenderer.on("path", (e, data, nodeName) => {
 	let node$$1 = document.createElement(nodeName);
+	node$$1.addEventListener("error", e => alert(e.message));
 	node$$1.src = data;
 	node$$1.controls = true;
 	node$$1.autoplay = true;

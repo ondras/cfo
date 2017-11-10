@@ -272,10 +272,12 @@ function view$3(path, list) {
 	window.setMenu(null);
 	window.loadURL(`file://${__dirname}/../viewer/av/index.html`);
 
+//	window.toggleDevTools();
+
 	let webContents = window.webContents;
 	webContents.once("did-finish-load", () => {
 		let ext = path.toString().split(".").pop();
-		let nodeName = (ext.match(audio) ? "audio" : "vide");
+		let nodeName = (ext.match(audio) ? "audio" : "video");
 		webContents.send("path", path.toString(), nodeName);
 	});
 }

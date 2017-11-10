@@ -8,6 +8,7 @@ const electron = require("electron");
 
 electron.ipcRenderer.on("path", (e, data, nodeName) => {
 	let node = document.createElement(nodeName);
+	node.addEventListener("error", e => alert(e.message));
 	node.src = data;
 	node.controls = true;
 	node.autoplay = true;
