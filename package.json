@@ -4,8 +4,8 @@
   "main": "index.js",
   "devDependencies": {
     "less": "^2.7.1",
-    "rollup": "^0.43.0",
-    "rollup-plugin-graph": "^1.0.1",
+    "rollup": "^0.51.3",
+    "rollup-plugin-graph": "^1.2.0",
     "rollup-plugin-includepaths": "^0.1.7"
   },
   "scripts": {
@@ -14,7 +14,7 @@
     "lessc": "lessc"
   },
   "dependencies": {
-    "electron": "^1.7.5",
+    "electron": "^1.7.9",
     "electron-settings": "^3.1.1"
   }
 }

@@ -3,8 +3,8 @@
 import * as conf from "conf.js";
 
 const remote = require("electron").remote;
-const audio = /ogg|mp3|wav/i;
-const video = /mpe?g|mkv|webm|mov/i;
+const audio = /ogg|mp3|wav|m4a/i;
+const video = /mpe?g|mkv|webm|mov|mp4/i;
 
 const windowOptions = {
 	center: true,

@@ -250,8 +250,8 @@ var image = Object.freeze({
 /* Audio/Video viewer window - remote (data) part */
 
 const remote$3 = require("electron").remote;
-const audio = /ogg|mp3|wav/i;
-const video = /mpe?g|mkv|webm|mov/i;
+const audio = /ogg|mp3|wav|m4a/i;
+const video = /mpe?g|mkv|webm|mov|mp4/i;
 
 const windowOptions$2 = {
 	center: true,
@@ -814,16 +814,7 @@ function date(date) {
 }
 
 function size(bytes, options = {}) {
-	if (0 /*this.getPreference("autosize") */ && options.auto) {
-		var units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
-		var step = 1 << 10;
-		var index = 0;
-		while (bytes / step >= 1 && index+1 < units.length) {
-			bytes /= step;
-			index++;
-		}
-		return `${bytes.toFixed(2)} ${units[index]}`;
-	} else {
+	{
 		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
 	}
 }

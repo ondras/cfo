@@ -6,6 +6,8 @@ let includePathsOptions = {
 };
 
 export default {
-	format: "iife",
+	output: {
+		format: "iife"
+	},
 	plugins: [ includePaths(includePathsOptions) ]
 };

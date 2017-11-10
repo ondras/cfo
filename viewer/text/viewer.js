@@ -253,16 +253,7 @@ function symlink(target, path) {
 }
 
 function size(bytes, options = {}) {
-	if (0 /*this.getPreference("autosize") */ && options.auto) {
-		var units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
-		var step = 1 << 10;
-		var index = 0;
-		while (bytes / step >= 1 && index+1 < units.length) {
-			bytes /= step;
-			index++;
-		}
-		return `${bytes.toFixed(2)} ${units[index]}`;
-	} else {
+	{
 		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
 	}
 }
