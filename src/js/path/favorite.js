@@ -12,7 +12,7 @@ export default class Favorite extends Path {
 	toString() { return this._path.toString(); }
 	getName() { return this.toString(); }
 	getSize() { return this._index; }
-	getImage() { return icons.get("favorite"); }
+	getImage() { return icons.create("favorite"); }
 
 	supports(what) {
 		if (what == DELETE) { return true; }

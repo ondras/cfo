@@ -320,8 +320,7 @@ export default class List {
 		let {node, path} = item;
 
 		let td = node.insertCell();
-		let src = path.getImage();
-		let img = html.node("img", {src});
+		let img = path.getImage();
 		td.appendChild(img);
 
 		let name = path.getName();
@@ -406,7 +405,7 @@ export default class List {
 				let nameL = name.toLowerCase();
 				if (nameL.indexOf(this._prefix) == 0) {
 					let cell = node.cells[0];
-					let image = cell.querySelector("img");
+					let image = cell.querySelector("img, canvas");
 					html.clear(cell);
 					cell.appendChild(image);
 

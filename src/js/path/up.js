@@ -8,7 +8,7 @@ export default class Up extends Path {
 		this._path = path;
 	}
 
-	getImage() { return icons.get("up"); }
+	getImage() { return icons.create("up"); }
 	getDescription() { return this._path.getDescription(); }
 	toString() { return this._path.toString(); }
 	activate(list) { list.setPath(this._path); }

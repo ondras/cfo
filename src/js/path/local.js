@@ -6,6 +6,7 @@ import * as icons from "util/icons.js";
 const fs = require("fs");
 const path = require("path");
 const {shell} = require("electron").remote;
+const mime = require("mime");
 
 function statsToMetadata(stats) {
 	return {
@@ -47,17 +48,19 @@ export default class Local extends Path {
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
-	getImage() { 
+	getImage() {
+		let mimeType = mime.getType(this.toString()) || "file"; 
+
 		let link = this._meta.isSymbolicLink;
 		let name;
 
 		if (link) {
-			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : "file");
+			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : mimeType);
 		} else {
-			name = (this._meta.isDirectory ? "folder" : "file");
+			name = (this._meta.isDirectory ? "folder" : mimeType);
 		}
 
-		return icons.get(name, {link});
+		return icons.create(name, {link});
 	}
 	exists() { return ("isDirectory" in this._meta); }
 

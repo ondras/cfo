@@ -48,9 +48,7 @@ function saveSettings(e) {
 	settings.set("favorites", favorites.toJSON());
 }
 
-async function init() {
-	await icons.init();
-
+function init() {
 	menu.init();
 	favorites.init(settings.get("favorites", []));
 	panes.init(settings.get("panes", {}));

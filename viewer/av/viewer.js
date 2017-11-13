@@ -139,6 +139,7 @@ const fs$1 = require("fs");
 const fs = require("fs");
 const path = require("path");
 const {shell} = require("electron").remote;
+const mime = require("mime");
 
 const background = "#e8e8e8";
 

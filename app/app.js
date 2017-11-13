@@ -638,25 +638,21 @@ class QuickEdit {
 	}
 }
 
-const NAMES = ["folder", "file", "favorite", "up", "link"];
+const SIZE = 16;
+const THEME = "gnome";
+const PATH = `/usr/share/icons/${THEME}/${SIZE}x${SIZE}`;
+const EXT = "png";
 
-let images = Object.create(null);
+const LOCAL = ["up", "favorite", "link", "folder"]; // fixme folder je tu 2x
+const KEYWORD = {
+	"folder": "places/folder",
+	"file": "mimetypes/gtk-file"
+};
+
 let cache = Object.create(null);
+let link = null;
 
-async function createImage(name) {
-	let src = `../img/${name}.png`;
-	let img = node("img", {src});
-	images[name] = img;
-	return new Promise((resolve, reject) => {
-		img.onload = resolve;
-		img.onerror = reject;
-	});
-}
-
-function createCacheKey(name, options) {
-	return `${name}${options.link ? "-link" : ""}`;
-}
-
+/*
 function serialize(canvas) {
 	let url = canvas.toDataURL();
 
@@ -668,31 +664,75 @@ function serialize(canvas) {
     let blob = new Blob([arr], {type: "image/png"});
 	return URL.createObjectURL(blob);
 }
+*/
 
-function createIcon(name, options) {
-	let image = images[name];
-	let canvas = node("canvas", {width:image.width, height:image.height});
+async function createImage(src) {
+	let img = node("img", {src});
+	return new Promise((resolve, reject) => {
+		img.onload = e => resolve(img);
+		img.onerror = reject;
+	});
+}
 
+function createCacheKey(name, options) {
+	return `${name}${options.link ? "-link" : ""}`;
+}
+
+function nameToPath(name) {
+	if (name.indexOf("/") == -1) { // not a mime type
+		if (LOCAL.indexOf(name) > -1) { return `../img/${name}.png`; } // local image
+		name = KEYWORD[name]; // keyword-to-mimetype mapping
+	} else {
+		name = name.replace(/\//g, "-");
+		name = `mimetypes/${name}`; // valid mime type
+	}
+	let path = `${PATH}/${name}.${EXT}`;
+	return path;
+}
+
+async function createIcon(name, options) {
+	let canvas = node("canvas", {width:SIZE, height:SIZE});
 	let ctx = canvas.getContext("2d");
+
+	let path = nameToPath(name);
+	let image;
+
+	try {
+		image = await createImage(path);
+	} catch (e) {
+		image = await createImage(nameToPath("file"));
+	}
 
 	ctx.drawImage(image, 0, 0);
 	if (options.link) {
-		let link = images["link"];
-		ctx.drawImage(link, 0, image.height - link.height);
+		if (!link) { 
+			link = await createIcon("link", {link:false});
+		}
+		ctx.drawImage(link, 0, SIZE - link.height);
 	}
 
-	return serialize(canvas);
+	return canvas;
 }
 
-async function init$2() {
-	let promises = NAMES.map(createImage);
-	return Promise.all(promises);
+function drawFromCache(canvas, key) {
+	let cached = cache[key];
+	canvas.getContext("2d").drawImage(cached, 0, 0);
 }
 
-function get(name, options = {}) {
+function create(name, options = {}) {
+	let canvas = node("canvas", {width:SIZE, height:SIZE});
 	let key = createCacheKey(name, options);
-	if (!(key in cache)) { cache[key] = createIcon(name, options); }
-	return cache[key];
+
+	if (key in cache) { 
+		drawFromCache(canvas, key);
+	} else {
+		createIcon(name, options).then(icon => {
+			cache[key] = icon;
+			drawFromCache(canvas, key);
+		});
+	}
+
+	return canvas;
 }
 
 /* fixme tezko rict, jestli cestu takto maskovat, kdyz o patro vys lze jit i klavesovou zkratkou... */
@@ -702,7 +742,7 @@ class Up extends Path {
 		this._path = path;
 	}
 
-	getImage() { return get("up"); }
+	getImage() { return create("up"); }
 	getDescription() { return this._path.getDescription(); }
 	toString() { return this._path.toString(); }
 	activate(list) { list.setPath(this._path); }
@@ -824,6 +864,7 @@ function size(bytes, options = {}) {
 const fs = require("fs");
 const path = require("path");
 const {shell} = require("electron").remote;
+const mime = require("mime");
 
 function statsToMetadata(stats) {
 	return {
@@ -865,17 +906,19 @@ class Local extends Path {
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
-	getImage() { 
+	getImage() {
+		let mimeType = mime.getType(this.toString()) || "file"; 
+
 		let link = this._meta.isSymbolicLink;
 		let name;
 
 		if (link) {
-			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : "file");
+			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : mimeType);
 		} else {
-			name = (this._meta.isDirectory ? "folder" : "file");
+			name = (this._meta.isDirectory ? "folder" : mimeType);
 		}
 
-		return get(name, {link});
+		return create(name, {link});
 	}
 	exists() { return ("isDirectory" in this._meta); }
 
@@ -1082,7 +1125,7 @@ let storage = []; // strings
 
 function viewFunc(i) {
 	return async () => {
-		let path = get$1(i);
+		let path = get(i);
 		if (!path) { return; }
 		getActive().getList().setPath(path);
 	};
@@ -1097,7 +1140,7 @@ function setFunc(i) {
 	}
 }
 
-function init$3(saved) {
+function init$2(saved) {
 	for (let i=0; i<10; i++) {
 		let str = saved[i];
 		storage[i] = str ? fromString(str) : null;
@@ -1110,7 +1153,7 @@ function init$3(saved) {
 function toJSON$1() { return storage.map(path => path && path.toString()); }
 function list() { return storage; }
 function set(path, index) { storage[index] = path; }
-function get$1(index) { return storage[index]; }
+function get(index) { return storage[index]; }
 function remove(index) { storage[index] = null; }
 
 class Favorite extends Path {
@@ -1123,7 +1166,7 @@ class Favorite extends Path {
 	toString() { return this._path.toString(); }
 	getName() { return this.toString(); }
 	getSize() { return this._index; }
-	getImage() { return get("favorite"); }
+	getImage() { return create("favorite"); }
 
 	supports(what) {
 		if (what == DELETE) { return true; }
@@ -1567,8 +1610,7 @@ class List {
 		let {node: node$$1, path} = item;
 
 		let td = node$$1.insertCell();
-		let src = path.getImage();
-		let img = node("img", {src});
+		let img = path.getImage();
 		td.appendChild(img);
 
 		let name = path.getName();
@@ -1653,7 +1695,7 @@ class List {
 				let nameL = name.toLowerCase();
 				if (nameL.indexOf(this._prefix) == 0) {
 					let cell = node$$1.cells[0];
-					let image = cell.querySelector("img");
+					let image = cell.querySelector("img, canvas");
 					clear(cell);
 					cell.appendChild(image);
 
@@ -2116,7 +2158,7 @@ function set$2(names) {
 	clipboard.writeText(names.join(SEP));
 }
 
-function get$2() {
+function get$1() {
 	return clipboard.readText().split(SEP);
 }
 
@@ -2525,7 +2567,7 @@ register$1("clip:paste", "Ctrl+V", async () => {
 	let path = list.getPath();
 
 	/* group of valid paths */
-	let p = get$2().map(fromClipboard).filter(path => path);
+	let p = get$1().map(fromClipboard).filter(path => path);
 	if (!p.length) { return; }
 
 	let group$$1 = group(p);
@@ -2652,7 +2694,7 @@ register$1("app:devtools", "F12", () => {
 
 const Menu = require('electron').remote.Menu;
 
-function init$4() {
+function init$3() {
 	const template = [
 		{
 			label: "&File",
@@ -2751,11 +2793,9 @@ function saveSettings(e) {
 	settings.set("favorites", toJSON$1());
 }
 
-async function init() {
-	await init$2();
-
-	init$4();
-	init$3(settings.get("favorites", []));
+function init() {
+	init$3();
+	init$2(settings.get("favorites", []));
 	init$1(settings.get("panes", {}));
 	window.addEventListener("beforeunload", saveSettings);
 }
