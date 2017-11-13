@@ -39,6 +39,7 @@ body {
 }
 .list input {
   width: 100%;
+  font-family: system-ui;
 }
 .list img,
 .list canvas {

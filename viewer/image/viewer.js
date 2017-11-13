@@ -259,14 +259,15 @@ function size$1(bytes, options = {}) {
 }
 
 const SIZE = 16;
-const THEME = "gnome";
-const PATH = `/usr/share/icons/${THEME}/${SIZE}x${SIZE}`;
-const EXT = "png";
+const THEME = "papirus";
+//const PATH = `/usr/share/icons/${THEME}/${SIZE}x${SIZE}`;
+const PATH = `../img/${THEME}/${SIZE}x${SIZE}`;
+const EXT = "svg";
 
-const LOCAL = ["up", "favorite", "link", "folder"]; // fixme folder je tu 2x
+const LOCAL = ["up", "favorite", "link"]; // fixme folder je tu 2x
 const KEYWORD = {
 	"folder": "places/folder",
-	"file": "mimetypes/gtk-file"
+	"file": "mimetypes/text-plain"
 };
 
 let cache = Object.create(null);
@@ -299,6 +300,8 @@ function createCacheKey(name, options) {
 }
 
 function nameToPath(name) {
+	if (name == "application/x-sh") { name = "application/x-shellscript"; } // fixme
+
 	if (name.indexOf("/") == -1) { // not a mime type
 		if (LOCAL.indexOf(name) > -1) { return `../img/${name}.png`; } // local image
 		name = KEYWORD[name]; // keyword-to-mimetype mapping
