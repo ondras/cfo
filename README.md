@@ -6,12 +6,14 @@ CFO is a traditional two-pane file manager. It is aimed at power users, built to
 
 CFO shall become a modernized version of [Fire Commander](https://addons.mozilla.org/en-us/firefox/addon/fire-commander/). Fire Commander is built using XUL/XPCOM, a tech stack that is becoming obsolete. Electron-based CFO will continue its mission.
 
+CFO is using icons from the [Numix project](https://github.com/numixproject/numix-icon-theme).
+
 ## Feature + Task list
 
 - Directory listing
   - [X] Tabs
   - [X] Statusbar
-  - [ ] Filetype icons
+  - [X] Filetype icons
   - [X] Symlink icons
   - [X] Quick search
   - [X] Fast rename

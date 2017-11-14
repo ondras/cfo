@@ -23,8 +23,12 @@ const KEYS = {
 
 const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
+const INPUTS = new Set(["input", "textarea", "button"]);
 
 function handler(e) {
+	let nodeName = e.target.nodeName.toLowerCase();
+	if (INPUTS.has(nodeName)) { return; }
+
 	let available = REGISTRY.filter(reg => {
 		for (let m in reg.modifiers) {
 			if (reg.modifiers[m] != e[m]) { return false; }
@@ -259,19 +263,63 @@ function size(bytes, options = {}) {
 }
 
 const SIZE = 16;
-const THEME = "papirus";
-//const PATH = `/usr/share/icons/${THEME}/${SIZE}x${SIZE}`;
-const PATH = `../img/${THEME}/${SIZE}x${SIZE}`;
 const EXT = "svg";
 
-const LOCAL = ["up", "favorite", "link"]; // fixme folder je tu 2x
+/* papirus
+const THEME = "papirus";
+const EXT = "svg";
+/**/
+
+/* xfce 
+const THEME = "xubuntu-artwork/usr/share/icons/elementary-xfce";
+const EXT = "png";
+/**/
+
+/* wildfire 
+const THEME = "wildfire/icons/Xenlism-Wildfire";
+const EXT = "svg";
+/**/
+
+/* oxygen 
+const THEME = "oxygen-icons5";
+const EXT = "png";
+/**/
+
+const LOCAL = ["link"];
 const KEYWORD = {
-	"folder": "places/folder",
-	"file": "mimetypes/text-plain"
+	"folder": {
+		type: "place",
+		name: "folder"
+	},
+	"file": {
+		type: "mime",
+		name: "text-plain"
+	},
+	"up": { // fixme najit hezci?
+		type: "action",
+		name: "go-up"
+	},
+	"favorite": {
+		type: "emblem",
+		name: "emblem-favorite"
+	},
+};
+const TYPES = {
+	"mime": "mimetypes",
+	"place": "places",
+	"action": "actions",
+	"emblem": "emblems"
 };
 
 let cache = Object.create(null);
 let link = null;
+
+function formatPath(path) {
+	let name = path.name;
+	if (name == "application/x-sh") { name = "application/x-shellscript"; } // fixme
+	name = name.replace(/\//g, "-");
+	return `../img/icons/${TYPES[path.type]}/${name}.${EXT}`;
+}
 
 /*
 function serialize(canvas) {
@@ -282,7 +330,7 @@ function serialize(canvas) {
 	let arr = new Uint8Array(len);
 	for (let i=0; i<len; i++) { arr[i] = binStr.charCodeAt(i); }
 
-    let blob = new Blob([arr], {type: "image/png"});
+	let blob = new Blob([arr], {type: "image/png"});
 	return URL.createObjectURL(blob);
 }
 */
@@ -300,17 +348,14 @@ function createCacheKey(name, options) {
 }
 
 function nameToPath(name) {
-	if (name == "application/x-sh") { name = "application/x-shellscript"; } // fixme
-
-	if (name.indexOf("/") == -1) { // not a mime type
+	let path;
+	if (name.indexOf("/") == -1) { // keyword
 		if (LOCAL.indexOf(name) > -1) { return `../img/${name}.png`; } // local image
-		name = KEYWORD[name]; // keyword-to-mimetype mapping
+		path = KEYWORD[name]; // keyword-to-mimetype mapping
 	} else {
-		name = name.replace(/\//g, "-");
-		name = `mimetypes/${name}`; // valid mime type
+		path = {name, type:"mime"};
 	}
-	let path = `${PATH}/${name}.${EXT}`;
-	return path;
+	return formatPath(path);
 }
 
 async function createIcon(name, options) {
@@ -326,7 +371,7 @@ async function createIcon(name, options) {
 		image = await createImage(nameToPath("file"));
 	}
 
-	ctx.drawImage(image, 0, 0);
+	ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
 	if (options.link) {
 		if (!link) { 
 			link = await createIcon("link", {link:false});
@@ -339,6 +384,8 @@ async function createIcon(name, options) {
 
 function drawFromCache(canvas, key) {
 	let cached = cache[key];
+	canvas.width = cached.width;
+	canvas.height = cached.height;
 	canvas.getContext("2d").drawImage(cached, 0, 0);
 }
 
@@ -346,7 +393,7 @@ function create(name, options = {}) {
 	let canvas = node("canvas", {width:SIZE, height:SIZE});
 	let key = createCacheKey(name, options);
 
-	if (key in cache) { 
+	if (key in cache) { // fixme already pending?
 		drawFromCache(canvas, key);
 	} else {
 		createIcon(name, options).then(icon => {

@@ -23,8 +23,12 @@ const KEYS = {
 
 const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
+const INPUTS = new Set(["input", "textarea", "button"]);
 
 function handler(e) {
+	let nodeName = e.target.nodeName.toLowerCase();
+	if (INPUTS.has(nodeName)) { return; }
+
 	let available = REGISTRY.filter(reg => {
 		for (let m in reg.modifiers) {
 			if (reg.modifiers[m] != e[m]) { return false; }

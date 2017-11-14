@@ -35,7 +35,11 @@ viewer/%/viewer.js: $(JS)
 viewer/%/viewer.css: $(CSS)
 	$(LESSC) src/css/viewer/$*.less > $@
 
+icons:
+	cd ~/git/numix-icon-theme && git pull
+	rsync -r -l ~/git/numix-icon-theme/Numix/16/ img/icons/
+
 clean:
 	rm -rf $(ALL)
 
-.PHONY: all clean
+.PHONY: all clean icons
