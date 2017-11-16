@@ -3,6 +3,8 @@ import * as html from "util/html.js";
 const SIZE = 16;
 const EXT = "svg";
 
+// fixme vyzkouset Faenza
+
 /* papirus
 const THEME = "papirus";
 const EXT = "svg";
@@ -42,21 +44,32 @@ const KEYWORD = {
 		name: "emblem-favorite"
 	},
 }
-const TYPES = {
+const TYPE = {
 	"mime": "mimetypes",
 	"place": "places",
 	"action": "actions",
 	"emblem": "emblems"
 }
+const FALLBACK = {
+	"audio/wav": "audio/x-wav",
+	"application/x-httpd-php": "application/x-php",
+	"application/x-sh": "application/x-shellscript",
+	"audio/ogg": "audio/x-vorbis+ogg",
+	"text/less": "text/x-scss",
+	"application/x-sql": "application/sql",
+	"application/font-woff": "font/woff"
+}
+
+// FIXME: text/yaml, application/vnd.ms-fontobject
 
 let cache = Object.create(null);
 let link = null;
 
 function formatPath(path) {
 	let name = path.name;
-	if (name == "application/x-sh") { name = "application/x-shellscript"; } // fixme
+	if (name in FALLBACK) { name = FALLBACK[name]; }
 	name = name.replace(/\//g, "-");
-	return `../img/icons/${TYPES[path.type]}/${name}.${EXT}`;
+	return `../img/icons/${TYPE[path.type]}/${name}.${EXT}`;
 }
 
 /*

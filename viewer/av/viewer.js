@@ -27,7 +27,8 @@ const INPUTS = new Set(["input", "textarea", "button"]);
 
 function handler(e) {
 	let nodeName = e.target.nodeName.toLowerCase();
-	if (INPUTS.has(nodeName)) { return; }
+	// jen kdyz nejsme ve formularovem prvku... s pochybnou vyjimkou readOnly <textarea>, coz je text viewer
+	if (INPUTS.has(nodeName) && !e.target.readOnly) { return; }
 
 	let available = REGISTRY.filter(reg => {
 		for (let m in reg.modifiers) {
@@ -140,10 +141,11 @@ document$1.body.addEventListener("click", e => {
 
 const fs$1 = require("fs");
 
+const mime = require("mime");
+
 const fs = require("fs");
 const path = require("path");
 const {shell} = require("electron").remote;
-const mime = require("mime");
 
 const background = "#e8e8e8";
 

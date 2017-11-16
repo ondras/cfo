@@ -27,7 +27,8 @@ const INPUTS = new Set(["input", "textarea", "button"]);
 
 function handler(e) {
 	let nodeName = e.target.nodeName.toLowerCase();
-	if (INPUTS.has(nodeName)) { return; }
+	// jen kdyz nejsme ve formularovem prvku... s pochybnou vyjimkou readOnly <textarea>, coz je text viewer
+	if (INPUTS.has(nodeName) && !e.target.readOnly) { return; }
 
 	let available = REGISTRY.filter(reg => {
 		for (let m in reg.modifiers) {
@@ -265,6 +266,8 @@ function size$1(bytes, options = {}) {
 const SIZE = 16;
 const EXT = "svg";
 
+// fixme vyzkouset Faenza
+
 /* papirus
 const THEME = "papirus";
 const EXT = "svg";
@@ -304,21 +307,32 @@ const KEYWORD = {
 		name: "emblem-favorite"
 	},
 };
-const TYPES = {
+const TYPE = {
 	"mime": "mimetypes",
 	"place": "places",
 	"action": "actions",
 	"emblem": "emblems"
 };
+const FALLBACK = {
+	"audio/wav": "audio/x-wav",
+	"application/x-httpd-php": "application/x-php",
+	"application/x-sh": "application/x-shellscript",
+	"audio/ogg": "audio/x-vorbis+ogg",
+	"text/less": "text/x-scss",
+	"application/x-sql": "application/sql",
+	"application/font-woff": "font/woff"
+};
+
+// FIXME: text/yaml, application/vnd.ms-fontobject
 
 let cache = Object.create(null);
 let link = null;
 
 function formatPath(path) {
 	let name = path.name;
-	if (name == "application/x-sh") { name = "application/x-shellscript"; } // fixme
+	if (name in FALLBACK) { name = FALLBACK[name]; }
 	name = name.replace(/\//g, "-");
-	return `../img/icons/${TYPES[path.type]}/${name}.${EXT}`;
+	return `../img/icons/${TYPE[path.type]}/${name}.${EXT}`;
 }
 
 /*
@@ -405,10 +419,20 @@ function create(name, options = {}) {
 	return canvas;
 }
 
+const mime = require("mime");
+
+function getType(str) {
+	let mt = mime.getType(str);
+	if (mt) { return mt; }
+
+	if (str.match(/\.py$/i)) { return "text/x-python"; }
+
+	return "file";
+}
+
 const fs = require("fs");
 const path = require("path");
 const {shell} = require("electron").remote;
-const mime = require("mime");
 
 function statsToMetadata(stats) {
 	return {
@@ -451,7 +475,7 @@ class Local extends Path {
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
 	getImage() {
-		let mimeType = mime.getType(this.toString()) || "file"; 
+		let mimeType = getType(this.toString()) || "file"; 
 
 		let link = this._meta.isSymbolicLink;
 		let name;

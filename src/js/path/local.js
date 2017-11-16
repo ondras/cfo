@@ -2,11 +2,11 @@ import Path, {CHILDREN, CREATE, VIEW, EDIT, RENAME, DELETE } from "./path.js";
 import {readlink, readdir, mkdir, open, close, rename, unlink, rmdir, utimes, symlink} from "util/fs.js";
 import * as format from "util/format.js";
 import * as icons from "util/icons.js";
+import * as mime from "util/mime.js";
 
 const fs = require("fs");
 const path = require("path");
 const {shell} = require("electron").remote;
-const mime = require("mime");
 
 function statsToMetadata(stats) {
 	return {

@@ -25,7 +25,8 @@ const INPUTS = new Set(["input", "textarea", "button"]);
 
 function handler(e) {
 	let nodeName = e.target.nodeName.toLowerCase();
-	if (INPUTS.has(nodeName)) { return; }
+	// jen kdyz nejsme ve formularovem prvku... s pochybnou vyjimkou readOnly <textarea>, coz je text viewer
+	if (INPUTS.has(nodeName) && !e.target.readOnly) { return; }
 
 	let available = REGISTRY.filter(reg => {
 		for (let m in reg.modifiers) {
