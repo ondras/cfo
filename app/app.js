@@ -771,8 +771,7 @@ async function createIcon(name, options) {
 	return canvas;
 }
 
-function drawFromCache(canvas, key) {
-	let cached = cache[key];
+function drawCached(canvas, cached) {
 	canvas.width = cached.width;
 	canvas.height = cached.height;
 	canvas.getContext("2d").drawImage(cached, 0, 0);
@@ -782,13 +781,17 @@ function create(name, options = {}) {
 	let canvas = node("canvas", {width:SIZE, height:SIZE});
 	let key = createCacheKey(name, options);
 
-	if (key in cache) { // fixme already pending?
-		drawFromCache(canvas, key);
-	} else {
-		createIcon(name, options).then(icon => {
-			cache[key] = icon;
-			drawFromCache(canvas, key);
-		});
+	if (key in cache) { // cached image or Promise
+		let cached = cache[key];
+		if (cached instanceof Promise) { // cached Promise
+			cached.then(icon => drawCached(canvas, icon));
+		} else { // cached image
+			drawCached(canvas, cached);
+		}
+	} else { // cache empty
+		let cached = createIcon(name, options).then(icon => cache[key] = icon);
+		cache[key] = cached;
+		cached.then(icon => drawCached(canvas, icon));
 	}
 
 	return canvas;
@@ -2775,7 +2778,7 @@ function init$3() {
 			label: "&File",
 			submenu: [
 				menuItem("file:rename", "&Quick rename"),
-				menuItem("fixme", "&View"),
+				menuItem("file:view", "&View"),
 				menuItem("file:edit", "&Edit"),
 				menuItem("file:new", "Edit &new file"),
 				menuItem("file:copy", "&Copy"),

@@ -8,7 +8,7 @@ export function init() {
 			label: "&File",
 			submenu: [
 				command.menuItem("file:rename", "&Quick rename"),
-				command.menuItem("fixme", "&View"),
+				command.menuItem("file:view", "&View"),
 				command.menuItem("file:edit", "&Edit"),
 				command.menuItem("file:new", "Edit &new file"),
 				command.menuItem("file:copy", "&Copy"),
