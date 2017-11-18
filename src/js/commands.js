@@ -93,6 +93,7 @@ command.register("clip:paste", "Ctrl+V", async () => {
 command.register("directory:new", "F7", async () => {
 	let list = panes.getActive().getList();
 	let path = list.getPath();
+	window.ppp = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
 	let name = await prompt(`Create new directory in "${path}"`);

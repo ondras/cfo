@@ -1462,18 +1462,20 @@ class List {
 	activate() {
 		if (this._active) { return; }
 
+		this._node.classList.add("active");
 		this._active = true;
 		document.addEventListener("keydown", this);
 
 		this._focusPath(this._pathToBeFocused, 0);
 		this._pathToBeFocused = null;
-		this._scroll.focus();
 	}
 
 	deactivate() {
 		if (!this._active) { return; }
+
 		this._active = false;
 		document.removeEventListener("keydown", this);
+		this._node.classList.remove("active");
 
 		this._quickEdit.stop();
 
@@ -2664,6 +2666,7 @@ register$1("clip:paste", "Ctrl+V", async () => {
 register$1("directory:new", "F7", async () => {
 	let list = getActive().getList();
 	let path = list.getPath();
+	window.ppp = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
 	let name = await prompt(`Create new directory in "${path}"`);
