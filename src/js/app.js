@@ -2,7 +2,9 @@ import * as commands from "commands.js"; // fixme nema explicitni inicializaci
 import * as panes from "panes.js";
 import * as menu from "menu.js";
 import * as favorites from "util/favorites.js";
+
 import * as icons from "util/icons.js";
+import * as mime from "util/mime.js";
 
 const {remote} = require('electron');
 const settings = remote.require('electron-settings');
@@ -56,3 +58,13 @@ function init() {
 }
 
 init();
+
+window.selftest = () => {
+	var exts = require("fs").readFileSync("FILETYPES").toString().split("\n");
+	window.exts = exts;
+	exts.forEach(ext => {
+		let file = "test."+ext;
+		let mt = mime.getType(file);
+		icons.create(mt);
+	});
+}

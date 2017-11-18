@@ -12,7 +12,7 @@ export default class QuickEdit {
 	start(value, cell) {
 		this._oldValue = value; /* remember so we can put it back on escape */
 
-		let image = cell.querySelector("img");
+		let image = cell.querySelector("img, canvas");
 		while (image.nextSibling) {
 			image.nextSibling.parentNode.removeChild(image.nextSibling);
 		}

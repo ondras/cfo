@@ -50,17 +50,21 @@ const TYPE = {
 	"action": "actions",
 	"emblem": "emblems"
 }
-const FALLBACK = {
+const FALLBACK = {};
 	"audio/wav": "audio/x-wav",
-	"application/x-httpd-php": "application/x-php",
-	"application/x-sh": "application/x-shellscript",
 	"audio/ogg": "audio/x-vorbis+ogg",
-	"text/less": "text/x-scss",
-	"application/x-sql": "application/sql",
-	"application/font-woff": "font/woff"
-}
+	"application/x-httpd-php": "application/x-php",
+	"application/x-tex": "text/x-tex",
+	"application/x-sh": "application/x-shellscript",
+	"application/java-archive": "application/x-java-archive",
 
-// FIXME: text/yaml, application/vnd.ms-fontobject
+	"text/less": "text/x-scss",
+	"text/coffeescript": "application/vnd.coffeescript",
+	"application/x-sql": "application/sql",
+	"application/font-woff": "font/woff",
+	"application/font-woff2": "font/woff",
+	"application/rdf+xml": "text/rdf+xml"
+} /**/
 
 let cache = Object.create(null);
 let link = null;
@@ -69,7 +73,8 @@ function formatPath(path) {
 	let name = path.name;
 	if (name in FALLBACK) { name = FALLBACK[name]; }
 	name = name.replace(/\//g, "-");
-	return `../img/icons/${TYPE[path.type]}/${name}.${EXT}`;
+//	return `../img/icons/${TYPE[path.type]}/${name}.${EXT}`;
+	return `../img/faenza-icon-theme/Faenza/${TYPE[path.type]}/16/${name}.png`;
 }
 
 /*
@@ -119,6 +124,7 @@ async function createIcon(name, options) {
 	try {
 		image = await createImage(path);
 	} catch (e) {
+		console.warn("No icon found for", name);
 		image = await createImage(nameToPath("file"));
 	}
 
