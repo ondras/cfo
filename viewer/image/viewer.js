@@ -311,20 +311,21 @@ const TYPE = {
 	"action": "actions",
 	"emblem": "emblems"
 };
-const FALLBACK = {}; /*
+const FALLBACK = {
 	"audio/wav": "audio/x-wav",
-	"application/x-httpd-php": "application/x-php",
-	"application/x-sh": "application/x-shellscript",
 	"audio/ogg": "audio/x-vorbis+ogg",
+	"application/x-httpd-php": "application/x-php",
+	"application/x-tex": "text/x-tex",
+	"application/x-sh": "application/x-shellscript",
+	"application/java-archive": "application/x-java-archive",
+
 	"text/less": "text/x-scss",
 	"text/coffeescript": "application/vnd.coffeescript",
 	"application/x-sql": "application/sql",
 	"application/font-woff": "font/woff",
 	"application/font-woff2": "font/woff",
-	"application/x-tex": "text/x-tex",
-	"application/rdf+xml": "text/rdf+xml",
-	"application/java-archive": "application/x-java-archive"
-} /**/
+	"application/rdf+xml": "text/rdf+xml"
+}; /**/
 
 let cache = Object.create(null);
 let link = null;

@@ -50,7 +50,7 @@ const TYPE = {
 	"action": "actions",
 	"emblem": "emblems"
 }
-const FALLBACK = {};
+const FALLBACK = {
 	"audio/wav": "audio/x-wav",
 	"audio/ogg": "audio/x-vorbis+ogg",
 	"application/x-httpd-php": "application/x-php",
