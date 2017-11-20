@@ -37,7 +37,10 @@ viewer/%/viewer.css: $(CSS)
 
 icons:
 	cd ~/git/numix-icon-theme && git pull
-	rsync -r -l ~/git/numix-icon-theme/Numix/16/ img/icons/
+	rsync -r -l ~/git/numix-icon-theme/Numix/16/ img/numix/
+	cd ~/git/faenza-icon-theme && git pull
+	rsync -r -l ~/git/faenza-icon-theme/Faenza/ img/faenza/
+	find img/faenza -type l -or -type f | grep -v 16 | xargs rm
 
 clean:
 	rm -rf $(ALL)

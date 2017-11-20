@@ -263,30 +263,46 @@ function size$1(bytes, options = {}) {
 	}
 }
 
+const type$1 = {
+	"mime": "mimetypes",
+	"place": "places",
+	"action": "actions",
+	"emblem": "emblems"
+};
+
+const fallback$1 = {
+	"audio/wav": "audio/x-wav",
+	"audio/ogg": "audio/x-vorbis+ogg",
+	"application/x-httpd-php": "application/x-php",
+	"application/x-tex": "text/x-tex",
+	"application/x-sh": "application/x-shellscript",
+	"application/java-archive": "application/x-java-archive",
+	"text/less": "text/x-scss",
+	"text/coffeescript": "application/vnd.coffeescript",
+	"application/x-sql": "application/sql",
+	"application/font-woff": "font/woff",
+	"application/font-woff2": "font/woff",
+	"application/rdf+xml": "text/rdf+xml"
+};
+
+function formatPath$1(path) {
+	let name = path.name;
+	if (name in fallback$1) { name = fallback$1[name]; }
+	name = name.replace(/\//g, "-");
+	return `../img/numix/${type$1[path.type]}/${name}.svg`;
+}
+
+
+
+var numix = Object.freeze({
+	formatPath: formatPath$1
+});
+
 const SIZE = 16;
-// fixme vyzkouset Faenza
-
-/* papirus
-const THEME = "papirus";
-const EXT = "svg";
-/**/
-
-/* xfce 
-const THEME = "xubuntu-artwork/usr/share/icons/elementary-xfce";
-const EXT = "png";
-/**/
-
-/* wildfire 
-const THEME = "wildfire/icons/Xenlism-Wildfire";
-const EXT = "svg";
-/**/
-
-/* oxygen 
-const THEME = "oxygen-icons5";
-const EXT = "png";
-/**/
+const THEME = numix;
 
 const LOCAL = ["link"];
+
 const KEYWORD = {
 	"folder": {
 		type: "place",
@@ -296,7 +312,7 @@ const KEYWORD = {
 		type: "mime",
 		name: "text-plain"
 	},
-	"up": { // fixme najit hezci?
+	"up": {
 		type: "action",
 		name: "go-up"
 	},
@@ -305,52 +321,9 @@ const KEYWORD = {
 		name: "emblem-favorite"
 	},
 };
-const TYPE = {
-	"mime": "mimetypes",
-	"place": "places",
-	"action": "actions",
-	"emblem": "emblems"
-};
-const FALLBACK = {
-	"audio/wav": "audio/x-wav",
-	"audio/ogg": "audio/x-vorbis+ogg",
-	"application/x-httpd-php": "application/x-php",
-	"application/x-tex": "text/x-tex",
-	"application/x-sh": "application/x-shellscript",
-	"application/java-archive": "application/x-java-archive",
-
-	"text/less": "text/x-scss",
-	"text/coffeescript": "application/vnd.coffeescript",
-	"application/x-sql": "application/sql",
-	"application/font-woff": "font/woff",
-	"application/font-woff2": "font/woff",
-	"application/rdf+xml": "text/rdf+xml"
-}; /**/
 
 let cache = Object.create(null);
 let link = null;
-
-function formatPath(path) {
-	let name = path.name;
-	if (name in FALLBACK) { name = FALLBACK[name]; }
-	name = name.replace(/\//g, "-");
-//	return `../img/icons/${TYPE[path.type]}/${name}.${EXT}`;
-	return `../img/faenza-icon-theme/Faenza/${TYPE[path.type]}/16/${name}.png`;
-}
-
-/*
-function serialize(canvas) {
-	let url = canvas.toDataURL();
-
-	let binStr = atob(url.split(",").pop());
-	let len = binStr.length;
-	let arr = new Uint8Array(len);
-	for (let i=0; i<len; i++) { arr[i] = binStr.charCodeAt(i); }
-
-	let blob = new Blob([arr], {type: "image/png"});
-	return URL.createObjectURL(blob);
-}
-*/
 
 async function createImage(src) {
 	let img = node("img", {src});
@@ -372,7 +345,7 @@ function nameToPath(name) {
 	} else {
 		path = {name, type:"mime"};
 	}
-	return formatPath(path);
+	return THEME.formatPath(path);
 }
 
 async function createIcon(name, options) {
