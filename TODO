@@ -16,28 +16,19 @@ app.js:761 No icon found for text/yaml
 
 faenza missing with fallbacks:
 
-app.js:762 No icon found for text/markdown
-app.js:762 No icon found for text/csv
+app.js:762 No icon found for text/yaml
 app.js:762 No icon found for text/less
-app.js:762 No icon found for application/json
-app.js:762 No icon found for application/xml-dtd
-app.js:762 No icon found for audio/x-flac
-app.js:762 No icon found for audio/mp4
-app.js:762 No icon found for application/geo+json
-app.js:762 No icon found for application/x-x509-ca-cert
-app.js:762 No icon found for application/x-perl
-app.js:762 No icon found for application/rdf+xml
-app.js:762 No icon found for application/x-sql
-app.js:762 No icon found for application/x-font-ttf
-app.js:762 No icon found for application/font-woff
-app.js:762 No icon found for application/font-woff2
-app.js:762 No icon found for font/otf
-app.js:762 No icon found for application/x-xpinstall
-app.js:762 No icon found for image/x-xpixmap
-
-app.js:762 No icon found for application/vnd.ms-fontobject
-app.js:762 No icon found for application/x-install-instructions
+app.js:762 No icon found for text/csv
+app.js:762 No icon found for text/markdown
 app.js:762 No icon found for text/cache-manifest
 app.js:762 No icon found for text/x-processing
+app.js:762 No icon found for application/json
+app.js:762 No icon found for application/xml-dtd
+app.js:762 No icon found for application/geo+json
+app.js:762 No icon found for application/x-x509-ca-cert
+app.js:762 No icon found for application/rdf+xml
+app.js:762 No icon found for application/x-xpinstall
+app.js:762 No icon found for application/x-perl
+app.js:762 No icon found for application/vnd.ms-fontobject
+app.js:762 No icon found for application/x-install-instructions
 app.js:762 No icon found for application/vnd.mozilla.xul+xml
-app.js:762 No icon found for text/yaml

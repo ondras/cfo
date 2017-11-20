@@ -3,7 +3,7 @@ import * as faenza from "./icons/faenza.js"
 import * as numix from "./icons/numix.js"
 
 const SIZE = 16;
-const THEME = numix;
+const THEME = faenza;
 
 const LOCAL = ["link"];
 

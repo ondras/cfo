@@ -263,43 +263,44 @@ function size(bytes, options = {}) {
 	}
 }
 
-const type$1 = {
+const type = {
 	"mime": "mimetypes",
 	"place": "places",
 	"action": "actions",
 	"emblem": "emblems"
 };
 
-const fallback$1 = {
+const fallback = {
 	"audio/wav": "audio/x-wav",
 	"audio/ogg": "audio/x-vorbis+ogg",
 	"application/x-httpd-php": "application/x-php",
 	"application/x-tex": "text/x-tex",
 	"application/x-sh": "application/x-shellscript",
 	"application/java-archive": "application/x-java-archive",
-	"text/less": "text/x-scss",
-	"text/coffeescript": "application/vnd.coffeescript",
-	"application/x-sql": "application/sql",
-	"application/font-woff": "font/woff",
-	"application/font-woff2": "font/woff",
-	"application/rdf+xml": "text/rdf+xml"
+	"application/x-sql": "text/x-sql",
+	"audio/x-flac": "audio/x-flac+ogg",
+	"image/x-pixmap": "gnome-mime-image/x-xpixmap",
+	"font/otf": "font/x-generic",
+	"application/font-woff": "font/x-generic",
+	"application/font-woff2": "font/x-generic",
+	"application/x-font-ttf": "font/x-generic",
+	"audio/mp4": "audio/x-generic"
 };
 
-function formatPath$1(path) {
+function formatPath(path) {
 	let name = path.name;
-	if (name in fallback$1) { name = fallback$1[name]; }
+	if (name in fallback) { name = fallback[name]; }
 	name = name.replace(/\//g, "-");
-	return `../img/numix/${type$1[path.type]}/${name}.svg`;
+	return `../img/faenza/${type[path.type]}/16/${name}.png`;
 }
 
 
-
-var numix = Object.freeze({
-	formatPath: formatPath$1
+var faenza = Object.freeze({
+	formatPath: formatPath
 });
 
 const SIZE = 16;
-const THEME = numix;
+const THEME = faenza;
 
 const LOCAL = ["link"];
 
