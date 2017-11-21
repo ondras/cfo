@@ -28,17 +28,21 @@ body {
 }
 .list {
   height: 100%;
-  background-color: #fff;
   display: flex;
   flex-direction: column;
+  padding: 1px;
 }
 .list .scroll {
   flex: 1;
   overflow: auto;
   padding: 1px;
+  background-color: #fff;
 }
-.list.active .scroll {
-  box-shadow: inset 0 0 2px blue;
+.list:not(.active) {
+  background-color: #fff;
+}
+.list.active {
+  background-color: goldenrod;
 }
 .list input {
   width: 100%;
