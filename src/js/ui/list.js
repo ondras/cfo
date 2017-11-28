@@ -65,6 +65,7 @@ export default class List {
 
 	async setPath(path) {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
+		await path.stat();
 		let loaded = await this._loadPathContents(path);
 		loaded && pubsub.publish("list-change", this);
 		return loaded;

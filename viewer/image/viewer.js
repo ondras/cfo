@@ -81,6 +81,17 @@ function register$1(func, key) {
 
 window.addEventListener("keydown", handler);
 
+const storage = Object.create(null);
+
+function publish(message, publisher, data) {
+	let subscribers = storage[message] || [];
+	subscribers.forEach(subscriber => {
+		typeof(subscriber) == "function"
+			? subscriber(message, publisher, data)
+			: subscriber.handleMessage(message, publisher, data);
+	});
+}
+
 const document$1 = window.document;
 const registry = Object.create(null);
 
@@ -751,6 +762,7 @@ function close$2(value) {
 const {remote} = require('electron');
 const settings = remote.require('electron-settings');
 let storage$1 = []; // strings
+let root = null; // root fav: path
 
 
 
@@ -758,7 +770,10 @@ let storage$1 = []; // strings
 function list() { return storage$1; }
 
 
-function remove(index) { storage$1[index] = null; }
+function remove(index) { 
+	storage$1[index] = null;
+	publish("path-change", null, {path:root});
+}
 
 class Favorite extends Path {
 	constructor(path, index) {

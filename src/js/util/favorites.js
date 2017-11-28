@@ -1,3 +1,4 @@
+import * as pubsub from "util/pubsub.js";
 import * as keyboard from "util/keyboard.js";
 import * as panes from "panes.js";
 import * as paths from "path/paths.js";
@@ -8,6 +9,7 @@ const settings = remote.require('electron-settings');
 const COUNT = 10;
 
 let storage = []; // strings
+let root = null; // root fav: path
 
 function viewFunc(i) {
 	return async () => {
@@ -27,6 +29,8 @@ function setFunc(i) {
 }
 
 export function init(saved) {
+	root = paths.fromString("fav:");
+
 	for (let i=0; i<10; i++) {
 		let str = saved[i];
 		storage[i] = str ? paths.fromString(str) : null;
@@ -38,6 +42,12 @@ export function init(saved) {
 
 export function toJSON() { return storage.map(path => path && path.toString()); }
 export function list() { return storage; }
-export function set(path, index) { storage[index] = path; }
+export function set(path, index) { 
+	storage[index] = path;
+	pubsub.publish("path-change", null, {path:root});
+}
 export function get(index) { return storage[index]; }
-export function remove(index) { storage[index] = null; }
+export function remove(index) { 
+	storage[index] = null;
+	pubsub.publish("path-change", null, {path:root});
+}

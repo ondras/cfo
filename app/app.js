@@ -1105,6 +1105,27 @@ class Local extends Path {
 	}
 }
 
+const storage$1 = Object.create(null);
+
+function publish(message, publisher, data) {
+	let subscribers = storage$1[message] || [];
+	subscribers.forEach(subscriber => {
+		typeof(subscriber) == "function"
+			? subscriber(message, publisher, data)
+			: subscriber.handleMessage(message, publisher, data);
+	});
+}
+
+function subscribe(message, subscriber) {
+	if (!(message in storage$1)) { storage$1[message] = []; }
+	storage$1[message].push(subscriber);
+}
+
+function unsubscribe(message, subscriber) {
+	let index = (storage$1[message] || []).indexOf(subscriber);
+	if (index > -1) { storage$1[message].splice(index, 1); }
+}
+
 /* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
 const KEYS = {
 	"return": "enter",
@@ -1178,6 +1199,7 @@ window.addEventListener("keydown", handler);
 const {remote: remote$6} = require('electron');
 const settings$1 = remote$6.require('electron-settings');
 let storage = []; // strings
+let root = null; // root fav: path
 
 function viewFunc(i) {
 	return async () => {
@@ -1197,6 +1219,8 @@ function setFunc(i) {
 }
 
 function init$2(saved) {
+	root = fromString("fav:");
+
 	for (let i=0; i<10; i++) {
 		let str = saved[i];
 		storage[i] = str ? fromString(str) : null;
@@ -1208,9 +1232,15 @@ function init$2(saved) {
 
 function toJSON$1() { return storage.map(path => path && path.toString()); }
 function list() { return storage; }
-function set(path, index) { storage[index] = path; }
+function set(path, index) { 
+	storage[index] = path;
+	publish("path-change", null, {path:root});
+}
 function get(index) { return storage[index]; }
-function remove(index) { storage[index] = null; }
+function remove(index) { 
+	storage[index] = null;
+	publish("path-change", null, {path:root});
+}
 
 class Favorite extends Path {
 	constructor(path, index) {
@@ -1330,27 +1360,6 @@ function isGroup(path) {
 	return path instanceof Group;
 }
 
-const storage$1 = Object.create(null);
-
-function publish(message, publisher, data) {
-	let subscribers = storage$1[message] || [];
-	subscribers.forEach(subscriber => {
-		typeof(subscriber) == "function"
-			? subscriber(message, publisher, data)
-			: subscriber.handleMessage(message, publisher, data);
-	});
-}
-
-function subscribe(message, subscriber) {
-	if (!(message in storage$1)) { storage$1[message] = []; }
-	storage$1[message].push(subscriber);
-}
-
-function unsubscribe(message, subscriber) {
-	let index = (storage$1[message] || []).indexOf(subscriber);
-	if (index > -1) { storage$1[message].splice(index, 1); }
-}
-
 const node$1 = document.querySelector("footer");
 
 function set$1(value) {
@@ -1411,6 +1420,7 @@ class List {
 
 	async setPath(path) {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
+		await path.stat();
 		let loaded = await this._loadPathContents(path);
 		loaded && publish("list-change", this);
 		return loaded;
