@@ -1,6 +1,5 @@
 import prompt from "ui/prompt.js";
 import confirm from "ui/confirm.js";
-RENAME
 import { CHILDREN, CREATE, READ, WRITE  } from "path/path.js";
 import * as viewers from "viewer/viewers.js";
 import * as panes from "panes.js";

@@ -6,6 +6,7 @@ ALL := app/app.js app/app.css \
 		viewer/av/viewer.js viewer/av/viewer.css
 JS := $(shell find src/js -name '*.js')
 CSS := $(shell find src/css -name '*.less')
+TESTS := $(shell find tests/src -name '*.js' | sed -e s^/src^^)
 ROLLUP := npm -s run rollup -- -c src/rollup.config.js
 LESSC := npm -s run lessc --
 
@@ -42,7 +43,13 @@ icons:
 	rsync -r -l ~/git/faenza-icon-theme/Faenza/ img/faenza/
 	find img/faenza -type l -or -type f | grep -v 16 | xargs rm
 
+$(TESTS): tests/%: tests/src/%
+	npm -s run rollup -- -c tests/rollup.config.js $^ -o $@
+
+tests: $(TESTS)
+	cd tests && node .
+
 clean:
 	rm -rf $(ALL)
 
-.PHONY: all clean icons
+.PHONY: all clean icons tests
