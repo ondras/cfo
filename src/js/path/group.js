@@ -1,4 +1,4 @@
-import Path, {CHILDREN, DELETE, COPY, RENAME} from "./path.js";
+import Path, {CHILDREN} from "./path.js";
 
 export default class Group extends Path {
 	constructor(paths) {
@@ -13,16 +13,12 @@ export default class Group extends Path {
 	supports(what) {
 		switch (what) {
 			case CHILDREN:
-			case DELETE:
-			case COPY:
 				return true;
 			break;
 
-			case RENAME:
+			default:
 				return this._paths.every(item => item.supports(what));
 			break;
-
-			default: return false; break;
 		}
 	}
 

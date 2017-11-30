@@ -1,5 +1,4 @@
 import Copy from "./copy.js";
-import {RENAME} from "path/path.js";
 
 export default class Move extends Copy {
 	constructor(sourcePath, targetPath) {
@@ -11,14 +10,14 @@ export default class Move extends Copy {
 	}
 
 	async _startCopying(root) {
-		if (root.path.supports(RENAME)) {
-			let targetPath = this._targetPath;
-			await targetPath.stat();
-			if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
-			try {
-				return root.path.rename(targetPath);
-			} catch (e) {} // quick rename failed, need to copy+delete
-		}
+		let targetPath = this._targetPath;
+		await targetPath.stat();
+		if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
+
+		try {
+			return root.path.rename(targetPath);
+		} catch (e) {} // quick rename failed, need to copy+delete
+
 		return super._startCopying(root);
 	}
 

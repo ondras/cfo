@@ -1,7 +1,7 @@
 import prompt from "ui/prompt.js";
 import confirm from "ui/confirm.js";
-
-import { CREATE, EDIT, RENAME, DELETE, VIEW } from "path/path.js";
+RENAME
+import { CHILDREN, CREATE, READ, WRITE  } from "path/path.js";
 import * as viewers from "viewer/viewers.js";
 import * as panes from "panes.js";
 import * as command from "util/command.js";
@@ -130,14 +130,14 @@ command.register("file:new", "Shift+F4", async () => {
 command.register("file:view", "F3", () => {
 	let list = panes.getActive().getList();
 	let file = list.getSelection({multi:false});
-	if (!file.supports(VIEW)) { return; }
+	if (file.supports(CHILDREN) || !file.supports(READ)) { return; }
 
 	viewers.view(file, list);
 });
 
 command.register("file:edit", "F4", () => {
 	let file = panes.getActive().getList().getSelection({multi:false});
-	if (!file.supports(EDIT)) { return; }
+	if (file.supports(CHILDREN) || !file.supports(WRITE)) { return; }
 
 	/* fixme configurable */
 	let child = require("child_process").spawn("/usr/bin/subl", [file]);
@@ -148,7 +148,7 @@ command.register("file:edit", "F4", () => {
 command.register("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 	let list = panes.getActive().getList();
 	let path = list.getSelection({multi:true});
-	if (!path.supports(DELETE)) { return; }
+	if (!path.supports(WRITE)) { return; }
 
 	let result = await confirm(`Really delete "${path}" ?`);
 	if (!result) { return; }
@@ -161,7 +161,7 @@ command.register("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 command.register("file:rename", "F2", () => {
 	let list = panes.getActive().getList();
 	let file = list.getSelection({multi:false});
-	if (!file.supports(RENAME)) { return; }
+	if (!file.supports(WRITE)) { return; }
 	list.startEditing();
 });
 
@@ -170,6 +170,8 @@ command.register("file:copy", "F5", async () => {
 	let sourcePath = sourceList.getSelection({multi:true});
 	let targetList = panes.getInactive().getList();
 	let targetPath = targetList.getPath();
+
+	if (!sourcePath.supports(READ)) { return; }
 
 	/* fixme parent->child test */
 
@@ -187,6 +189,9 @@ command.register("file:move", "F6", async () => {
 	let sourcePath = sourceList.getSelection({multi:true});
 	let targetList = panes.getInactive().getList();
 	let targetPath = targetList.getPath();
+
+	if (!sourcePath.supports(READ)) { return; }
+	if (!sourcePath.supports(WRITE)) { return; }
 
 	/* fixme parent->child test */
 

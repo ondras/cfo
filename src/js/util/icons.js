@@ -24,6 +24,10 @@ const KEYWORD = {
 		type: "emblem",
 		name: "emblem-favorite"
 	},
+	"broken": {
+		type: "action",
+		name: "gtk-cancel"
+	}
 }
 
 let cache = Object.create(null);

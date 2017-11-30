@@ -1,7 +1,7 @@
 /* Image viewer window - remote (data) part */
 
 import * as conf from "conf.js";
-import { VIEW } from "path/path.js";
+import { CHILDREN, READ } from "path/path.js";
 
 const remote = require("electron").remote;
 
@@ -26,7 +26,7 @@ export async function view(path, list) {
 	window.loadURL(`file://${__dirname}/../viewer/image/index.html`);
 
 	let paths = await list.getPath().getChildren();
-	paths = paths.filter(path => path.supports(VIEW))
+	paths = paths.filter(path => path.supports(READ) && !path.supports(CHILDREN))
 				.filter(match)
 				.map(path => path.toString());
 	let index = paths.indexOf(path.toString());

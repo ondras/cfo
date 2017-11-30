@@ -143,13 +143,17 @@ document$1.body.addEventListener("click", e => {
 });
 
 const CHILDREN = 0; // list children
-const CREATE = 1; // create descendants
-const EDIT = 2; // edit file via the default text editor
-const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
-const DELETE = 4; // self-explanatory
- // copy from FIXME pouzivat pro detekci
-const VIEW = 6; // view using an internal viewer
+const CREATE   = 1; // create descendants
+const READ     = 2; // can we read contents?
+const WRITE    = 3; // can we rename / modify contents?
 
+/*
+export const EDIT     = 2; // edit file via the default text editor
+export const RENAME   = 3; // quickedit or attempt to move (on a same filesystem)
+export const DELETE   = 4; // self-explanatory
+export const COPY     = 5; // copy from FIXME pouzivat pro detekci
+export const VIEW     = 6; // view using an internal viewer
+*/
 class Path {
 	static match(str) { return false; }
 	is(other) { return other.toString() == this.toString(); }
@@ -332,6 +336,10 @@ const KEYWORD = {
 		type: "emblem",
 		name: "emblem-favorite"
 	},
+	"broken": {
+		type: "action",
+		name: "gtk-cancel"
+	}
 };
 
 let cache = Object.create(null);
@@ -455,8 +463,8 @@ class Local extends Path {
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); // to get rid of a trailing slash
-		this._target = null; // string, relative or absolute
-		this._targetPath = null; // Local, absolute, for icon resolution
+		this._target = null; // string, relative or absolute; null when failed to readlink
+		this._targetPath = null; // Local, absolute, for icon resolution, might not exist
 		this._error = null;
 		this._meta = {};
 	}
@@ -470,12 +478,16 @@ class Local extends Path {
 		let mimeType = getType(this.toString()) || "file"; 
 
 		let link = this._meta.isSymbolicLink;
-		let name;
+		let name = mimeType; // regular file
 
 		if (link) {
-			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : mimeType);
-		} else {
-			name = (this._meta.isDirectory ? "folder" : mimeType);
+			if (!this._targetPath || !this._targetPath.exists()) { // unreadable/broken symlink
+				name = "broken";
+			} else if (this._targetPath.supports(CHILDREN)) { // symlink to existing directory
+				name = "folder";
+			}
+		} else if (this.supports(CHILDREN)) { // regular directory
+			name = "folder";
 		}
 
 		return create(name, {link});
@@ -518,13 +530,8 @@ class Local extends Path {
 				return this._meta.isDirectory;
 			break;
 
-			case VIEW:
-			case EDIT:
-				return !this._meta.isDirectory;
-			break;
-
-			case RENAME:
-			case DELETE:
+			case READ:
+			case WRITE:
 				return true;
 			break;
 		}
@@ -786,9 +793,10 @@ class Favorite extends Path {
 	getName() { return this.toString(); }
 	getSize() { return this._index; }
 	getImage() { return create("favorite"); }
+	getSort() { return (this._index == 0 ? 10 : this._index); }
 
 	supports(what) {
-		if (what == DELETE) { return true; }
+		if (what == WRITE) { return true; }
 		return false;
 	}
 

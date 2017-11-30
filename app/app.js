@@ -124,13 +124,17 @@ function confirm$1(t) {
 }
 
 const CHILDREN = 0; // list children
-const CREATE = 1; // create descendants
-const EDIT = 2; // edit file via the default text editor
-const RENAME = 3; // quickedit or attempt to move (on a same filesystem)
-const DELETE = 4; // self-explanatory
-const COPY = 5; // copy from FIXME pouzivat pro detekci
-const VIEW = 6; // view using an internal viewer
+const CREATE   = 1; // create descendants
+const READ     = 2; // can we read contents?
+const WRITE    = 3; // can we rename / modify contents?
 
+/*
+export const EDIT     = 2; // edit file via the default text editor
+export const RENAME   = 3; // quickedit or attempt to move (on a same filesystem)
+export const DELETE   = 4; // self-explanatory
+export const COPY     = 5; // copy from FIXME pouzivat pro detekci
+export const VIEW     = 6; // view using an internal viewer
+*/
 class Path {
 	static match(str) { return false; }
 	is(other) { return other.toString() == this.toString(); }
@@ -229,7 +233,7 @@ async function view$2(path, list) {
 	window.loadURL(`file://${__dirname}/../viewer/image/index.html`);
 
 	let paths = await list.getPath().getChildren();
-	paths = paths.filter(path => path.supports(VIEW))
+	paths = paths.filter(path => path.supports(READ) && !path.supports(CHILDREN))
 				.filter(match$1)
 				.map(path => path.toString());
 	let index = paths.indexOf(path.toString());
@@ -696,6 +700,10 @@ const KEYWORD = {
 		type: "emblem",
 		name: "emblem-favorite"
 	},
+	"broken": {
+		type: "action",
+		name: "gtk-cancel"
+	}
 };
 
 let cache = Object.create(null);
@@ -946,8 +954,8 @@ class Local extends Path {
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); // to get rid of a trailing slash
-		this._target = null; // string, relative or absolute
-		this._targetPath = null; // Local, absolute, for icon resolution
+		this._target = null; // string, relative or absolute; null when failed to readlink
+		this._targetPath = null; // Local, absolute, for icon resolution, might not exist
 		this._error = null;
 		this._meta = {};
 	}
@@ -961,12 +969,16 @@ class Local extends Path {
 		let mimeType = getType(this.toString()) || "file"; 
 
 		let link = this._meta.isSymbolicLink;
-		let name;
+		let name = mimeType; // regular file
 
 		if (link) {
-			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : mimeType);
-		} else {
-			name = (this._meta.isDirectory ? "folder" : mimeType);
+			if (!this._targetPath || !this._targetPath.exists()) { // unreadable/broken symlink
+				name = "broken";
+			} else if (this._targetPath.supports(CHILDREN)) { // symlink to existing directory
+				name = "folder";
+			}
+		} else if (this.supports(CHILDREN)) { // regular directory
+			name = "folder";
 		}
 
 		return create(name, {link});
@@ -1009,13 +1021,8 @@ class Local extends Path {
 				return this._meta.isDirectory;
 			break;
 
-			case VIEW:
-			case EDIT:
-				return !this._meta.isDirectory;
-			break;
-
-			case RENAME:
-			case DELETE:
+			case READ:
+			case WRITE:
 				return true;
 			break;
 		}
@@ -1253,9 +1260,10 @@ class Favorite extends Path {
 	getName() { return this.toString(); }
 	getSize() { return this._index; }
 	getImage() { return create("favorite"); }
+	getSort() { return (this._index == 0 ? 10 : this._index); }
 
 	supports(what) {
-		if (what == DELETE) { return true; }
+		if (what == WRITE) { return true; }
 		return false;
 	}
 
@@ -1298,16 +1306,12 @@ class Group extends Path {
 	supports(what) {
 		switch (what) {
 			case CHILDREN:
-			case DELETE:
-			case COPY:
 				return true;
 			break;
 
-			case RENAME:
+			default:
 				return this._paths.every(item => item.supports(what));
 			break;
-
-			default: return false; break;
 		}
 	}
 
@@ -2539,14 +2543,14 @@ class Move extends Copy {
 	}
 
 	async _startCopying(root) {
-		if (root.path.supports(RENAME)) {
-			let targetPath = this._targetPath;
-			await targetPath.stat();
-			if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
-			try {
-				return root.path.rename(targetPath);
-			} catch (e) {} // quick rename failed, need to copy+delete
-		}
+		let targetPath = this._targetPath;
+		await targetPath.stat();
+		if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
+
+		try {
+			return root.path.rename(targetPath);
+		} catch (e) {} // quick rename failed, need to copy+delete
+
 		return super._startCopying(root);
 	}
 
@@ -2687,14 +2691,14 @@ register$1("file:new", "Shift+F4", async () => {
 register$1("file:view", "F3", () => {
 	let list = getActive().getList();
 	let file = list.getSelection({multi:false});
-	if (!file.supports(VIEW)) { return; }
+	if (file.supports(CHILDREN) || !file.supports(READ)) { return; }
 
 	view(file, list);
 });
 
 register$1("file:edit", "F4", () => {
 	let file = getActive().getList().getSelection({multi:false});
-	if (!file.supports(EDIT)) { return; }
+	if (file.supports(CHILDREN) || !file.supports(WRITE)) { return; }
 
 	/* fixme configurable */
 	let child = require("child_process").spawn("/usr/bin/subl", [file]);
@@ -2705,7 +2709,7 @@ register$1("file:edit", "F4", () => {
 register$1("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 	let list = getActive().getList();
 	let path = list.getSelection({multi:true});
-	if (!path.supports(DELETE)) { return; }
+	if (!path.supports(WRITE)) { return; }
 
 	let result = await confirm$1(`Really delete "${path}" ?`);
 	if (!result) { return; }
@@ -2718,7 +2722,7 @@ register$1("file:delete", ["F8", "Delete", "Shift+Delete"], async () => {
 register$1("file:rename", "F2", () => {
 	let list = getActive().getList();
 	let file = list.getSelection({multi:false});
-	if (!file.supports(RENAME)) { return; }
+	if (!file.supports(WRITE)) { return; }
 	list.startEditing();
 });
 
@@ -2727,6 +2731,8 @@ register$1("file:copy", "F5", async () => {
 	let sourcePath = sourceList.getSelection({multi:true});
 	let targetList = getInactive().getList();
 	let targetPath = targetList.getPath();
+
+	if (!sourcePath.supports(READ)) { return; }
 
 	/* fixme parent->child test */
 
@@ -2744,6 +2750,9 @@ register$1("file:move", "F6", async () => {
 	let sourcePath = sourceList.getSelection({multi:true});
 	let targetList = getInactive().getList();
 	let targetPath = targetList.getPath();
+
+	if (!sourcePath.supports(READ)) { return; }
+	if (!sourcePath.supports(WRITE)) { return; }
 
 	/* fixme parent->child test */
 

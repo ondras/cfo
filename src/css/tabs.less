@@ -9,13 +9,17 @@
 		display: inline-block;
 		cursor: pointer;
 		padding: 0 3px;
+		border: 1px solid transparent;
+		border-bottom: 0;
+		border-radius: 3px 3px 0 0;
 
 		&:not(.active) {
 			opacity: 0.8;
 		}
 
-		&.active { 
-			background-color: #ccc;
+		&.active {
+			font-weight: bold;
+			border-color: goldenrod;
 		}
 	}
 }

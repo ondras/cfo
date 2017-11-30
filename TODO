@@ -25,3 +25,35 @@ app.js:762 No icon found for application/x-perl
 app.js:762 No icon found for application/vnd.ms-fontobject
 app.js:762 No icon found for application/x-install-instructions
 app.js:762 No icon found for application/vnd.mozilla.xul+xml
+
+
+
+EDIT
+  - f4
+  - soubor jo, dir ne, soubor v archivu ne, soubor v iso ne
+
+VIEW
+  - f3
+  - soubor jo (incl. archiv/iso), dir ne, 
+
+COPY
+  - ctrl+c, f5, pack
+  - soubor jo, dir jo, iso jo, archiv jo
+
+RENAME
+  - f6, f2
+  - soubor jo, dir jo, zip ne
+
+DELETE
+  - f8
+
+hypotezy:
+  CHILDREN: soubor ne, dir jo
+  READ: vsichni jo, fav ne
+  WRITE: soubor jo, dir jo, ostatni ne
+
+  f4: WRITE a !CHILDREN
+  f3: READ a !CHILDREN
+  ctrl+c / f5 / pack: READ
+  f2/f6: WRITE
+  f8: WRITE

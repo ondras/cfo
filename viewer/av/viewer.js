@@ -133,11 +133,8 @@ document$1.body.addEventListener("click", e => {
 
 // list children
  // create descendants
- // edit file via the default text editor
- // quickedit or attempt to move (on a same filesystem)
- // self-explanatory
- // copy from FIXME pouzivat pro detekci
- // view using an internal viewer
+ // can we read contents?
+ // can we rename / modify contents?
 
 const fs$1 = require("fs");
 

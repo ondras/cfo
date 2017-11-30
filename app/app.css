@@ -88,12 +88,16 @@ body {
   display: inline-block;
   cursor: pointer;
   padding: 0 3px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 3px 3px 0 0;
 }
 .tabs li:not(.active) {
   opacity: 0.8;
 }
 .tabs li.active {
-  background-color: #ccc;
+  font-weight: bold;
+  border-color: goldenrod;
 }
 #prompt input {
   display: block;

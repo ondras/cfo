@@ -1,4 +1,4 @@
-import Path, {CHILDREN, CREATE, VIEW, EDIT, RENAME, DELETE } from "./path.js";
+import Path, {CHILDREN, CREATE, READ, WRITE} from "./path.js";
 import {readlink, readdir, mkdir, open, close, rename, unlink, rmdir, utimes, symlink} from "util/fs.js";
 import * as format from "util/format.js";
 import * as icons from "util/icons.js";
@@ -37,8 +37,8 @@ export default class Local extends Path {
 	constructor(p) {
 		super();
 		this._path = path.resolve(p); // to get rid of a trailing slash
-		this._target = null; // string, relative or absolute
-		this._targetPath = null; // Local, absolute, for icon resolution
+		this._target = null; // string, relative or absolute; null when failed to readlink
+		this._targetPath = null; // Local, absolute, for icon resolution, might not exist
 		this._error = null;
 		this._meta = {};
 	}
@@ -52,12 +52,16 @@ export default class Local extends Path {
 		let mimeType = mime.getType(this.toString()) || "file"; 
 
 		let link = this._meta.isSymbolicLink;
-		let name;
+		let name = mimeType; // regular file
 
 		if (link) {
-			name = (this._targetPath && this._targetPath.supports(CHILDREN) ? "folder" : mimeType);
-		} else {
-			name = (this._meta.isDirectory ? "folder" : mimeType);
+			if (!this._targetPath || !this._targetPath.exists()) { // unreadable/broken symlink
+				name = "broken";
+			} else if (this._targetPath.supports(CHILDREN)) { // symlink to existing directory
+				name = "folder";
+			}
+		} else if (this.supports(CHILDREN)) { // regular directory
+			name = "folder";
 		}
 
 		return icons.create(name, {link});
@@ -100,13 +104,8 @@ export default class Local extends Path {
 				return this._meta.isDirectory;
 			break;
 
-			case VIEW:
-			case EDIT:
-				return !this._meta.isDirectory;
-			break;
-
-			case RENAME:
-			case DELETE:
+			case READ:
+			case WRITE:
 				return true;
 			break;
 		}

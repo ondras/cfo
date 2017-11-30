@@ -1,6 +1,6 @@
 import * as favorites from "util/favorites.js";
 import * as icons from "util/icons.js";
-import Path, {DELETE} from "./path.js";
+import Path, {WRITE} from "./path.js";
 
 export default class Favorite extends Path {
 	constructor(path, index) {
@@ -13,9 +13,10 @@ export default class Favorite extends Path {
 	getName() { return this.toString(); }
 	getSize() { return this._index; }
 	getImage() { return icons.create("favorite"); }
+	getSort() { return (this._index == 0 ? 10 : this._index); }
 
 	supports(what) {
-		if (what == DELETE) { return true; }
+		if (what == WRITE) { return true; }
 		return false;
 	}
 
