@@ -21,32 +21,6 @@ const KEYS = {
 
 const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
-const INPUTS = new Set(["input", "textarea", "button"]);
-
-function handler(e) {
-	let nodeName = e.target.nodeName.toLowerCase();
-	// jen kdyz nejsme ve formularovem prvku... s pochybnou vyjimkou readOnly <textarea>, coz je text viewer
-	if (INPUTS.has(nodeName) && !e.target.readOnly) { return; }
-
-	let available = REGISTRY.filter(reg => {
-		for (let m in reg.modifiers) {
-			if (reg.modifiers[m] != e[m]) { return false; }
-		}
-
-		if (reg.key != e.key.toLowerCase() && reg.key != e.code.toLowerCase()) { return false; }
-
-		return true;
-	});
-
-	while (available.length) {
-		let executed = available.pop().func();
-		if (executed) { 
-			e.preventDefault();
-			return;
-		}
-	}
-}
-
 function parse(key) {
 	let result = {
 		func: null,
@@ -77,9 +51,6 @@ function register$1(func, key) {
 	REGISTRY.push(item);
 }
 
-window.addEventListener("keydown", handler);
-
-const document$1 = window.document;
 const registry = Object.create(null);
 
 function register(command, keys, func) {
@@ -112,22 +83,6 @@ function register(command, keys, func) {
 function isEnabled(command) {
 	return registry[command].enabled;
 }
-
-function execute(command) {
-	return registry[command].func();
-}
-
-
-
-document$1.body.addEventListener("click", e => {
-	let node = e.target;
-	while (node) {
-		let c = node.getAttribute("data-command");
-		if (c) { return execute(c); }
-		if (node == event.currentTarget) { break; }
-		node = node.parentNode;
-	}
-});
 
 /* Progress window - local (ui) part */
 

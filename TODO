@@ -55,3 +55,17 @@ hypotezy:
   ctrl+c / f5 / pack: READ
   f2/f6: WRITE
   f8: WRITE
+
+
+
+file -> file = no append, copyof?, content (=>overwrite)
+file -> dir = append, copyof?, content
+file -> ? = append (to parent), content
+
+dir -> file = error
+dir -> dir = copyof?, append, copyof?, create, recurse (copyof?)
+dir -> ? = append (to parent), create, recurse
+
+
+root/a/ -> root/
+root/a/ -> root/a

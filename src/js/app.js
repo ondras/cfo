@@ -1,6 +1,7 @@
 import * as commands from "commands.js"; // fixme nema explicitni inicializaci
 import * as panes from "panes.js";
 import * as menu from "menu.js";
+import * as keyboard from "util/keyboard.js";
 import * as favorites from "util/favorites.js";
 
 import * as icons from "util/icons.js";
@@ -51,6 +52,7 @@ function saveSettings(e) {
 }
 
 function init() {
+	keyboard.init();
 	menu.init();
 	favorites.init(settings.get("favorites", []));
 	panes.init(settings.get("panes", {}));

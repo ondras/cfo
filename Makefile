@@ -43,11 +43,11 @@ icons:
 	rsync -r -l ~/git/faenza-icon-theme/Faenza/ img/faenza/
 	find img/faenza -type l -or -type f | grep -v 16 | xargs rm
 
-$(TESTS): tests/%: tests/src/%
-	npm -s run rollup -- -c tests/rollup.config.js $^ -o $@
+$(TESTS): tests/%: tests/src/% $(JS)
+	npm -s run rollup -- -c tests/rollup.config.js $< -o $@
 
 tests: $(TESTS)
-	cd tests && node .
+	@cd tests && node .
 
 clean:
 	rm -rf $(ALL)

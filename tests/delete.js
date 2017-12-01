@@ -1,100 +1,206 @@
 (function () {
 'use strict';
 
-function text(t) {
-	return document.createTextNode(t);
+let issues = [];
+let progresses = [];
+let current = null;
+
+function sync() {
+	let active = null;
+	if (progresses.length) { active = progresses[0]; }
+	if (issues.length) { active = issues[0]; }
+	if (current && current != active) { current.hide(); }
+	current = active;
+	if (current) { current.show(); }
 }
 
-function node(name, attrs = {}, content = "") {
-	let n = document.createElement(name);
-	content && n.appendChild(text(content));
-	return Object.assign(n, attrs);
+function addIssue(window) {
+	issues.unshift(window);
+	sync();
 }
 
-/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
-const KEYS = {
-	"return": "enter",
-	"left": "arrowleft",
-	"up": "arrowup",
-	"right": "arrowright",
-	"down": "arrowdown",
-	"esc": "escape"
+function removeIssue(window) {
+	let index = issues.indexOf(window);
+	issues.splice(index, 1);
+	if (current == window) { current = null; } // will hide/close itself
+	sync();
+}
+
+function addProgress(window) {
+	progresses.unshift(window);
+	sync();
+}
+
+function removeProgress(window) {
+	let index = progresses.indexOf(window);
+	progresses.splice(index, 1);
+	if (current == window) { current = null; } // will hide/close itself
+	sync();
+}
+
+const background = "#e8e8e8";
+
+/* Progress window - remote (data) part */
+
+const remote = require("electron").remote;
+const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
+
+const windowOptions = {
+	parent: remote.getCurrentWindow(),
+	resizable: false,
+	fullscreenable: false,
+	center: true,
+	width: 500,
+	height: 100,
+	show: false,
+	useContentSize: true,
+	backgroundColor: background
 };
 
-const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
-const REGISTRY = [];
-function parse(key) {
-	let result = {
-		func: null,
-		modifiers: {}
-	};
-
-	key = key.toLowerCase();
-
-	MODIFIERS.forEach(mod => {
-		let mkey = mod + "Key";
-		result.modifiers[mkey] = false;
-
-		let re = new RegExp(mod + "[+-]");
-		key = key.replace(re, () => {
-			result.modifiers[mkey] = true;
-			return "";
-		});
-	});
-
-	result.key = KEYS[key] || key;
-
-	return result;
-}
-
-function register$1(func, key) {
-	let item = parse(key);
-	item.func = func;
-	REGISTRY.push(item);
-}
-
-const storage = Object.create(null);
-
-function publish(message, publisher, data) {
-	let subscribers = storage[message] || [];
-	subscribers.forEach(subscriber => {
-		typeof(subscriber) == "function"
-			? subscriber(message, publisher, data)
-			: subscriber.handleMessage(message, publisher, data);
-	});
-}
-
-const registry = Object.create(null);
-
-function register(command, keys, func) {
-	function wrap() {
-		if (isEnabled(command)) {
-			func(command);
-			return true;
-		} else {
-			return false;
-		}
+class Progress {
+	constructor(config) {
+		this._config = config;
+		this._data = {};
+		this._window = null;
+		this._timeout = null;
 	}
 
-	keys = [].concat(keys || []);
+	open() {
+		let options = Object.assign({}, windowOptions, {title: this._config.title});
+		this._window = new remote.BrowserWindow(options);
+		this._window.setMenu(null);
+		this._window.loadURL(`file://${__dirname}/../progress/index.html`);
 
-	registry[command] = {
-		func: wrap,
-		enabled: true,
-		key: keys[0]
-	};
+		let webContents = this._window.webContents;
+		webContents.once("did-finish-load", () => {
+			// fixme can throw when called after the window is closed
+			webContents.send("config", this._config);
+			webContents.send("data", this._data);
+		});
 
-	keys.forEach(key => register$1(wrap, key));
+		this._window.on("closed", () => {
+			if (!this._window) { return; } // closed programatically, ignore
+			removeProgress(this._window);
+			this._window = null;
+			this.onClose();
+		});
 
-	return command;
+		addProgress(this._window);
+	}
+
+	close() {
+		let w = this._window;
+		if (!w) { return; }
+		removeProgress(w);
+		this._window = null;
+		w.destroy();
+	}
+
+	update(data) {
+		Object.assign(this._data, data);
+		if (!this._window || this._timeout) { return; }
+
+		this._timeout = setTimeout(() => {
+			// fixme can throw when called after the window is closed (but before the "closed" event) 
+			this._timeout = null;
+			this._window && this._window.webContents.send("data", this._data);
+		}, TIMEOUT);
+	}
+
+	onClose() {}
 }
 
+/* Issue window - remote (data) part */
 
+const remote$1 = require("electron").remote;
+const windowOptions$1 = {
+	parent: remote$1.getCurrentWindow(),
+	resizable: false,
+	fullscreenable: false,
+	alwaysOnTop: true,
+	center: true,
+	width: 500,
+	height: 60,
+	show: false,
+	useContentSize: true,
+	backgroundColor: background
+};
 
+class Issue {
+	constructor(config) {
+		this._config = config;
+		this._window = null;
+		this._resolve = null;
+	}
 
+	open() {
+		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
+		this._window = new remote$1.BrowserWindow(options);
+		this._window.setMenu(null);
+		this._window.loadURL(`file://${__dirname}/../issue/index.html`);
 
-function isEnabled(command) {
-	return registry[command].enabled;
+		let webContents = this._window.webContents;
+		webContents.once("did-finish-load", () => {
+			// fixme can throw when called after the window is closed
+			webContents.send("config", this._config);
+		});
+
+		remote$1.ipcMain.once("action", (e, action) => {
+			let w = this._window;
+			removeIssue(w);
+			this._window = null;
+			w.close();
+			this._resolve(action);
+		});
+
+		this._window.on("closed", () => {
+			if (!this._window) { return; } // closed programatically, ignore
+			removeIssue(this._window);
+			this._window = null;
+			this._resolve("abort");
+		});
+		addIssue(this._window);
+		return new Promise(resolve => this._resolve = resolve);
+	}
+}
+
+const TIMEOUT$1 = 500;
+
+class Operation {
+	constructor() {
+		this._timeout = null;
+		this._progress = null;
+		this._aborted = false;
+		this._issues = {}; // list of potential issues and user resolutions
+	}
+
+	async run() {
+		this._timeout = setTimeout(() => this._showProgress(), TIMEOUT$1);
+	}
+
+	abort() {
+		this._aborted = true;
+	}
+
+	_end() {
+		clearTimeout(this._timeout);
+		this._progress && this._progress.close();
+	}
+
+	_showProgress() {
+		this._progress && this._progress.open();
+	}
+
+	async _processIssue(type, config) {
+		if (type in this._issues) {
+			return this._issues[type];
+		} else {
+			let issue = new Issue(config);
+			let result = await issue.open();
+			if (result.match("-all")) { this._issues[type] = result; } // remember for futher occurences
+			return result;
+		}
+	}
 }
 
 const CHILDREN = 0; // list children
@@ -142,6 +248,164 @@ class Path {
 
 	activate(list) {
 		if (this.supports(CHILDREN)) { list.setPath(this); }
+	}
+}
+
+function createRecord(path) {
+	return {
+		path,
+		children: null,
+		count: 1,
+		size: 0
+	};
+}
+
+class Scan extends Operation {
+	constructor(path) {
+		super();
+
+		this._path = path;
+
+		let options = {
+			title: "Directory scan in progress",
+			row1: "Scanning:",
+			progress1: ""
+		};
+		this._progress = new Progress(options);
+		this._progress.onClose = () => this.abort();
+	}
+
+	async run() {
+		super.run(); // schedule progress window
+		let result = await this._analyze(this._path);
+		this._end();
+		return result;
+	}
+
+	async _analyze(path) {
+		if (this._aborted) { return null; }
+		this._progress.update({row1: path.toString()});
+
+		await path.stat();
+
+		if (path.supports(CHILDREN)) { /* descend, recurse */
+			return this._analyzeDirectory(path);
+		} else { /* compute */
+			return this._analyzeFile(path);
+		}
+	}
+
+	async _analyzeDirectory(path) {
+		try {
+			let record = createRecord(path);
+			record.children = [];
+
+			let children = await path.getChildren();
+			let promises = children.map(childPath => this._analyze(childPath));
+			children = await Promise.all(promises);
+
+			children.forEach(child => {
+				record.children.push(child);
+				if (!child) { return; }
+				record.count += child.count;
+				record.size += child.size;
+			});
+			return record;
+		} catch (e) {
+			return this._handleError(e, path);
+		}
+	}
+
+	_analyzeFile(path) {
+		let record = createRecord(path);
+		record.size = record.path.getSize();
+		return record;
+	}
+
+	async _handleError(e, path) {
+		let text = e.message;
+		let title = "Error reading file/directory";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let result = await this._processIssue("scan", { text, title, buttons });
+
+		switch (result) {
+			case "retry": return this._analyze(path); break;
+			case "abort": this.abort(); return null; break;
+			default: return null; break;
+		}
+	}
+}
+
+class Delete extends Operation {
+	constructor(path) {
+		super();
+		this._path = path;
+		this._stats = {
+			total: 0,
+			done: 0
+		};
+	}
+
+	async run() {
+		let scan = new Scan(this._path);
+		let root = await scan.run(); 
+		if (!root) { return false; }
+
+		this._stats.total = root.count;
+		await this._startDeleting(root);
+		this._end();
+	}
+
+	async _startDeleting(record) {
+		let options = {
+			title: "Deletion in progress",
+			row1: "Deleting:",
+			progress1: "Total:"
+		};
+		this._progress = new Progress(options);
+		this._progress.onClose = () => this.abort();
+
+		super.run(); // schedule progress window
+
+		return this._delete(record);
+	}
+
+	async _delete(record) {
+		if (this._aborted) { return false; }
+
+		let deleted = true;
+
+		if (record.children !== null) {
+			for (let child of record.children) {
+				let childDeleted = await this._delete(child); 
+				if (!childDeleted) { deleted = false; }
+			}
+		}
+
+		if (!deleted) { return false; }
+
+		var path = record.path;
+		this._progress.update({row1:path.toString(), progress1:100*this._stats.done/this._stats.total});
+
+		try {
+			await path.delete();
+			this._stats.done++;
+			return true;
+		} catch (e) {
+			return this._handleError(e, record);
+		}
+	}
+
+	async _handleError(e, record) {
+		let text = e.message;
+		let title = "Error deleting file/directory";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let result = await this._processIssue("delete", { text, title, buttons });
+		switch (result) {
+			case "retry": return this._delete(record); break;
+			case "abort": this.abort(); break;
+		}
+		return false;
 	}
 }
 
@@ -227,10 +491,20 @@ function symlink(target, path) {
 	});
 }
 
-function size$1(bytes, options = {}) {
+function size(bytes, options = {}) {
 	{
 		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
 	}
+}
+
+function text(t) {
+	return document.createTextNode(t);
+}
+
+function node(name, attrs = {}, content = "") {
+	let n = document.createElement(name);
+	content && n.appendChild(text(content));
+	return Object.assign(n, attrs);
 }
 
 const type = {
@@ -386,7 +660,7 @@ function getType(str) {
 }
 
 const fs = require("fs");
-const path = require("path");
+const path$1 = require("path");
 const {shell} = require("electron").remote;
 
 function statsToMetadata(stats) {
@@ -417,7 +691,7 @@ class Local extends Path {
 
 	constructor(p) {
 		super();
-		this._path = path.resolve(p); // to get rid of a trailing slash
+		this._path = path$1.resolve(p); // to get rid of a trailing slash
 		this._target = null; // string, relative or absolute; null when failed to readlink
 		this._targetPath = null; // Local, absolute, for icon resolution, might not exist
 		this._error = null;
@@ -425,7 +699,7 @@ class Local extends Path {
 	}
 
 	toString() { return this._path; }
-	getName() { return path.basename(this._path) || "/"; }
+	getName() { return path$1.basename(this._path) || "/"; }
 	getDate() { return this._meta.date; }
 	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
 	getMode() { return this._meta.mode; }
@@ -466,15 +740,15 @@ class Local extends Path {
 		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
 
 		if (!this._meta.isDirectory) {
-			let size = this.getSize();
+			let size$$1 = this.getSize();
 			/* force raw bytes, no auto units */
-			if (size !== undefined) { d = `${d}, ${size$1(size, {auto:false})} bytes`; }
+			if (size$$1 !== undefined) { d = `${d}, ${size(size$$1, {auto:false})} bytes`; }
 		}
 		return d;
 	}
  
 	getParent() {
-		let parent = new this.constructor(path.dirname(this._path));
+		let parent = new this.constructor(path$1.dirname(this._path));
 		return (parent.is(this) ? null : parent);
 	}
 
@@ -501,7 +775,7 @@ class Local extends Path {
 	}
 
 	append(leaf) {
-		let newPath = path.resolve(this._path, leaf);
+		let newPath = path$1.resolve(this._path, leaf);
 		return new this.constructor(newPath);
 	}
 
@@ -532,7 +806,7 @@ class Local extends Path {
 	async getChildren() {
 		let names = await readdir(this._path);
 		let paths = names
-			.map(name => path.resolve(this._path, name))
+			.map(name => path$1.resolve(this._path, name))
 			.map(name => new this.constructor(name));
 
 		let promises = paths.map(path => path.stat());
@@ -564,8 +838,8 @@ class Local extends Path {
 			this._target = target;
 
 			// resolve relative path
-			let linkDir = path.dirname(this._path);
-			target = path.resolve(linkDir, target);
+			let linkDir = path$1.dirname(this._path);
+			target = path$1.resolve(linkDir, target);
 
 			let targetPath = new Local(target);
 			this._targetPath = targetPath;
@@ -576,38 +850,58 @@ class Local extends Path {
 	}
 }
 
-const background = "#e8e8e8";
+const storage$1 = Object.create(null);
 
-/* Progress window - remote (data) part */
+function publish(message, publisher, data) {
+	let subscribers = storage$1[message] || [];
+	subscribers.forEach(subscriber => {
+		typeof(subscriber) == "function"
+			? subscriber(message, publisher, data)
+			: subscriber.handleMessage(message, publisher, data);
+	});
+}
 
-const remote = require("electron").remote;
-const windowOptions = {
-	parent: remote.getCurrentWindow(),
-	resizable: false,
-	fullscreenable: false,
-	center: true,
-	width: 500,
-	height: 100,
-	show: false,
-	useContentSize: true,
-	backgroundColor: background
+/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
+const KEYS = {
+	"return": "enter",
+	"left": "arrowleft",
+	"up": "arrowup",
+	"right": "arrowright",
+	"down": "arrowdown",
+	"esc": "escape"
 };
 
-/* Issue window - remote (data) part */
+const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
+const REGISTRY = [];
+function parse(key) {
+	let result = {
+		func: null,
+		modifiers: {}
+	};
 
-const remote$1 = require("electron").remote;
-const windowOptions$1 = {
-	parent: remote$1.getCurrentWindow(),
-	resizable: false,
-	fullscreenable: false,
-	alwaysOnTop: true,
-	center: true,
-	width: 500,
-	height: 60,
-	show: false,
-	useContentSize: true,
-	backgroundColor: background
-};
+	key = key.toLowerCase();
+
+	MODIFIERS.forEach(mod => {
+		let mkey = mod + "Key";
+		result.modifiers[mkey] = false;
+
+		let re = new RegExp(mod + "[+-]");
+		key = key.replace(re, () => {
+			result.modifiers[mkey] = true;
+			return "";
+		});
+	});
+
+	result.key = KEYS[key] || key;
+
+	return result;
+}
+
+function register(func, key) {
+	let item = parse(key);
+	item.func = func;
+	REGISTRY.push(item);
+}
 
 let resolve;
 
@@ -648,6 +942,39 @@ const node$1 = document.querySelector("footer");
 
 const TEMPLATE = document.querySelector("#list");
 
+const registry = Object.create(null);
+
+function register$1(command, keys, func) {
+	function wrap() {
+		if (isEnabled(command)) {
+			func(command);
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	keys = [].concat(keys || []);
+
+	registry[command] = {
+		func: wrap,
+		enabled: true,
+		key: keys[0]
+	};
+
+	keys.forEach(key => register(wrap, key));
+
+	return command;
+}
+
+
+
+
+
+function isEnabled(command) {
+	return registry[command].enabled;
+}
+
 const PANES = [];
 let index = -1;
 
@@ -667,24 +994,24 @@ function getActive() {
 
 
 
-register("pane:toggle", "Tab", () => {
+register$1("pane:toggle", "Tab", () => {
 	let i = (index + 1) % PANES.length;
 	activate(PANES[i]);
 });
 
-register("tab:next", "Ctrl+Tab", () => {
+register$1("tab:next", "Ctrl+Tab", () => {
 	getActive().adjustTab(+1);
 });
 
-register("tab:prev", "Ctrl+Shift+Tab", () => {
+register$1("tab:prev", "Ctrl+Shift+Tab", () => {
 	getActive().adjustTab(-1);
 });
 
-register("tab:new", "Ctrl+T", () => {
+register$1("tab:new", "Ctrl+T", () => {
 	getActive().addList();
 });
 
-register("tab:close", "Ctrl+W", () => {
+register$1("tab:close", "Ctrl+W", () => {
 	getActive().removeList();
 });
 
@@ -721,17 +1048,17 @@ function close$2(value) {
 	resolve$1(value);
 }
 
-let storage$1 = []; // strings
+let storage = []; // strings
 let root = null; // root fav: path
 
 
 
 
-function list() { return storage$1; }
+function list() { return storage; }
 
 
 function remove(index) { 
-	storage$1[index] = null;
+	storage[index] = null;
 	publish("path-change", null, {path:root});
 }
 
@@ -779,6 +1106,38 @@ class Favorites extends Path {
 	}
 }
 
+class Group extends Path {
+	constructor(paths) {
+		super();
+		this._paths = paths;
+	}
+
+	getName() { return ""; } /* appending this group's name = noop; useful for recursive operations */
+
+	async getChildren() { return this._paths; }
+
+	supports(what) {
+		switch (what) {
+			case CHILDREN:
+				return true;
+			break;
+
+			default:
+				return this._paths.every(item => item.supports(what));
+			break;
+		}
+	}
+
+	toString() { return `${this._paths.length} items`; }
+
+	async rename(newPath) {
+		for (let path of this._paths) {
+			let child = newPath.append(path.getName());
+			await path.rename(child);
+		}
+	}
+}
+
 const {app} = require("electron").remote;
 const ALL = [Favorites, Local];
 function fromString(str) {
@@ -788,163 +1147,69 @@ function fromString(str) {
 	return new Ctor(str);
 }
 
-/* Image viewer window - local (ui) part */
 
-const electron = require("electron");
-const SCALES = [1/40, 1/30, 1/20, 1/16, 1/12, 1/10, 1/8, 1/6, 1/4, 1/3, 1/2, 2/3, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 16, 20, 30, 40];
-const image = document.querySelector("img");
 
-let scale = null;
-let size = null;
-let position = null;
 
-let currentIndex = -1;
-let allImages = [];
 
-function syncSize() {
-	if (!image.complete) { return; }
-	let box = image.parentNode;
-	let avail = [box.offsetWidth, box.offsetHeight];
-	size = [image.naturalWidth, image.naturalHeight];
 
-	if (scale === null) { /* auto size */
-		let rx = size[0]/avail[0];
-		let ry = size[1]/avail[1];
-		let r = Math.max(rx, ry);
-		if (r > 1) { 
-			size[0] /= r;
-			size[1] /= r;
-		}
-	} else {
-		let coef = SCALES[scale];
-		size[0] *= coef;
-		size[1] *= coef;
-	}
-	
-	position = [
-		(avail[0]-size[0])/2,
-		(avail[1]-size[1])/2
-	];
 
-	image.style.width = `${Math.round(size[0])}px`;
-	image.style.height = `${Math.round(size[1])}px`;
-	image.style.left = `${Math.round(position[0])}px`;
-	image.style.top = `${Math.round(position[1])}px`;
 
-	let percent = Math.round(100*(size[0]/image.naturalWidth));
-	let win = electron.remote.getCurrentWindow();
-	let path = allImages[currentIndex];
-	win.setTitle(`(${percent}%) ${path}`);
 
-	document.querySelector(".scale").textContent = `${percent}%`;
+function group(paths) {
+	return new Group(paths);
 }
 
-function findScale(diff) {
-	let frac = size[0]/image.naturalWidth;
-	let index = (diff > 0 ? 0 : SCALES.length-1);
-		
-	while (index >= 0 && index < SCALES.length) {
-		if (diff * (SCALES[index] - frac) > 0) { return index; }
-		index += diff;
-	}
+const path = require("path");
+const { createTree, assert, assertTree } = require("./test-utils.js");
 
-	return null;
-}
+exports.testDeleteFile = async function testDeleteFile(tmp) {
+	const root = path.join(tmp, "a");
+	const contents = "test file";
 
-function zoom(diff) {
-	if (scale === null) {
-		scale = findScale(diff);
-		syncSize();
-	} else {
-		let s = scale + diff;
-		if (s >= 0 && s+1 < SCALES.length) {
-			scale = s;
-			syncSize();
-		}
-	}
-}
+	createTree(root, contents);
+	assertTree(root, contents);
 
-function moveBy(diff) {
-	let amount = 20;
-	let props = ["left", "top"];
-	let box = image.parentNode;
-	let avail = [box.offsetWidth, box.offsetHeight];
-	props.forEach((prop, i) => {
-		let pos = position[i];
-		if (pos > 0) { return; } /* centered */
-		
-		pos += diff[i]*amount;
-		pos = Math.min(pos, 0);
-		pos = Math.max(pos, avail[i]-size[i]);
-		position[i] = pos;
-		image.style[prop] = `${Math.round(pos)}px`;
-	});
-}
+	let o = new Delete(fromString(root));
+	await o.run();
 
-function onMouseMove(e) {
-	if (!image.complete) { return; }
-	let frac = image.naturalWidth / size[0];
-	let pos = [e.clientX, e.clientY]
-		.map((mouse, i) => frac*(mouse - position[i]))
-		.map(Math.round);
+	assertTree(root, null);
+};
 
-	document.querySelector(".mouse").textContent = pos.join(",");
-}
+exports.testDeleteDirectory = async function testDeleteDirectory(tmp) {
+	const root = path.join(tmp, "a");
+	const contents = {"b": { "c": "d"}, "c": "d", "e": {}};
+	createTree(root, contents);
+	assertTree(root, contents);
 
-function loadAnother(diff) {
-	let index = currentIndex + diff;
-	index = Math.max(index, 0);
-	index = Math.min(index, allImages.length-1);
-	if (index != currentIndex) { load(index); }
-}
+	let o = new Delete(fromString(root));
+	await o.run();
 
-function onLoad(e) {
-	document.body.classList.remove("loading");
-	document.querySelector(".size").textContent = [image.naturalWidth, image.naturalHeight].join("×");
-	syncSize();
-}
+	assertTree(root, null);
+};
 
-function load(i) {
-	currentIndex = i;
-	scale = null;
-	document.body.classList.add("loading");
-	image.src = allImages[currentIndex].toString();
-}
+exports.testDeleteGroup = async function testDeleteGroup(tmp) {
+	const dir1 = path.join(tmp, "a");
+	const dir2 = path.join(tmp, "b");
+	const file1 = path.join(tmp, "c");
+	const file2 = path.join(tmp, "d");
 
-electron.ipcRenderer.on("path", (e, all, i) => {
-	allImages = all.map(fromString);
-	load(i);
-});
+	createTree(dir1, {});
+	createTree(dir2, {});
+	createTree(file1, "aaa");
+	createTree(file2, "aaa");
 
-image.addEventListener("load", onLoad);
-window.addEventListener("resize", syncSize);
-window.addEventListener("mousemove", onMouseMove);
+	let g = group([
+		fromString(dir1),
+		fromString(file1)
+	]);
 
-register("window:close", "Escape", () => {
-	window.close();
-});
+	let o = new Delete(g);
+	await o.run();
 
-register("image:zoomin", "+", () => zoom(+1));
-register("image:zoomout", "-", () => zoom(-1));
-register("image:fit", "*", () => {
-	scale = null;
-	syncSize();
-});
-
-register("image:left", "ArrowLeft", () => moveBy([1, 0]));
-register("image:right", "ArrowRight", () => moveBy([-1, 0]));
-register("image:up", "ArrowUp", () => moveBy([0, 1]));
-register("image:down", "ArrowDown", () => moveBy([0, -1]));
-
-register("image:full", "Enter", () => {
-	let win = electron.remote.getCurrentWindow();
-	win.setFullScreen(!win.isFullScreen());
-	syncSize();
-});
-
-register("image:next", ["PageDown", " "], () => loadAnother(+1));
-register("image:prev", ["PageUp", "Backspace"], () => loadAnother(-1));
-register("image:prev", "Home", () => loadAnother(-Infinity));
-register("image:prev", "End", () => loadAnother(+Infinity));
+	assertTree(dir1, null);
+	assertTree(file1, null);
+	assertTree(dir2, {});
+	assertTree(file2, "aaa");
+};
 
 }());

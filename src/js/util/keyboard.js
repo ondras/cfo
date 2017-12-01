@@ -66,4 +66,6 @@ export function register(func, key) {
 	REGISTRY.push(item);
 }
 
-window.addEventListener("keydown", handler);
+export function init() {
+	window.addEventListener("keydown", handler);
+}

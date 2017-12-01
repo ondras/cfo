@@ -5,6 +5,33 @@ import {CHILDREN} from "path/path.js";
 
 import LocalPath from "path/local.js";
 
+// copy to the same parent -- create a "copy of" prefix
+async function createCopyOf(path1, path2) {
+	do {
+		let name = `Copy of ${path1.getName()}`;
+		path1 = path1.getParent().append(name);
+		await path1.stat();
+	} while (path1.exists());
+
+	return path1;
+}
+
+async function resolveExistingTarget(targetPath, record) {
+	// existing file
+	if (!targetPath.supports(CHILDREN)) {
+		if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
+		return targetPath;
+	}
+
+	// existing dir: needs two copyOf checks
+	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
+	targetPath = targetPath.append(record.path.getName());
+	await targetPath.stat();
+	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
+
+	return targetPath;
+}
+
 export default class Copy extends Operation {
 	constructor(sourcePath, targetPath) {
 		super();
@@ -49,26 +76,15 @@ export default class Copy extends Operation {
 
 	/**
 	 * @param {object} record Source record
-	 * @param {Path} targetPath Target path without the appended part
+	 * @param {Path} targetPath Target path
 	 */
 	async _copy(record, targetPath) {
 		if (this._aborted) { return; }
 
 		await targetPath.stat();
 
-		if (targetPath.exists()) { /* append inside an existing target */
-			targetPath = targetPath.append(record.path.getName());
-			await targetPath.stat();
-
-			if (targetPath.is(record.path)) { /* copy to the same parent -- create a "copy of" prefix */
-				while (targetPath.exists()) { 
-					let name = `Copy of ${targetPath.getName()}`;
-					targetPath = targetPath.getParent().append(name);
-					await targetPath.stat();
-				}
-			} /* not the same parent */
-
-		} /* else does not exist, will be created during copy impl below */
+		if (targetPath.exists()) { targetPath = await resolveExistingTarget(targetPath, record); }
+		// does not exist => will be created during copy impl below
 
 		if (record.children !== null) {
 			await this._copyDirectory(record, targetPath);
@@ -164,10 +180,14 @@ export default class Copy extends Operation {
 		let writeStream = targetPath.createStream("w", opts);
 		readStream.pipe(writeStream);
 
-		await new Promise(resolve => {
+		await new Promise((resolve, reject) => {
 			let handleError = async e => {
-				await this._handleCopyError(e, record, targetPath);
-				resolve();
+				try {
+					await this._handleCopyError(e, record, targetPath);
+					resolve();
+				} catch (e) {
+					reject(e);
+				}
 			}
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);

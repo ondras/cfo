@@ -50,7 +50,6 @@ export default class Issue {
 			this._window = null;
 			this._resolve("abort");
 		});
-
 		wm.addIssue(this._window);
 		return new Promise(resolve => this._resolve = resolve);
 	}

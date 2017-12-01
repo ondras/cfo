@@ -1,7 +1,6 @@
 import * as keyboard from "./keyboard.js";
 import * as pubsub from "./pubsub.js";
 
-const document = window.document;
 const registry = Object.create(null);
 
 function syncDisabledAttribute(command) {
@@ -70,13 +69,3 @@ export function menuItem(command, label) {
 
 	return { label, click, accelerator };
 }
-
-document.body.addEventListener("click", e => {
-	let node = e.target;
-	while (node) {
-		let c = node.getAttribute("data-command");
-		if (c) { return execute(c); }
-		if (node == event.currentTarget) { break; }
-		node = node.parentNode;
-	}
-});

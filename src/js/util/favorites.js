@@ -4,10 +4,7 @@ import * as panes from "panes.js";
 import * as paths from "path/paths.js";
 import confirm from "ui/confirm.js";
 
-const {remote} = require('electron');
-const settings = remote.require('electron-settings');
 const COUNT = 10;
-
 let storage = []; // strings
 let root = null; // root fav: path
 

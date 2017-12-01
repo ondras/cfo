@@ -456,7 +456,6 @@ class Issue {
 			this._window = null;
 			this._resolve("abort");
 		});
-
 		addIssue(this._window);
 		return new Promise(resolve => this._resolve = resolve);
 	}
@@ -1201,10 +1200,10 @@ function register(func, key) {
 	REGISTRY.push(item);
 }
 
-window.addEventListener("keydown", handler);
+function init$3() {
+	window.addEventListener("keydown", handler);
+}
 
-const {remote: remote$6} = require('electron');
-const settings$1 = remote$6.require('electron-settings');
 let storage = []; // strings
 let root = null; // root fav: path
 
@@ -2110,7 +2109,6 @@ class Pane {
 	}
 }
 
-const document$1 = window.document;
 const registry = Object.create(null);
 
 function register$1(command, keys, func) {
@@ -2155,16 +2153,6 @@ function menuItem(command, label) {
 
 	return { label, click, accelerator };
 }
-
-document$1.body.addEventListener("click", e => {
-	let node = e.target;
-	while (node) {
-		let c = node.getAttribute("data-command");
-		if (c) { return execute(c); }
-		if (node == event.currentTarget) { break; }
-		node = node.parentNode;
-	}
-});
 
 const PANES = [];
 let index = -1;
@@ -2307,6 +2295,33 @@ class Delete extends Operation {
 	}
 }
 
+// copy to the same parent -- create a "copy of" prefix
+async function createCopyOf(path1, path2) {
+	do {
+		let name = `Copy of ${path1.getName()}`;
+		path1 = path1.getParent().append(name);
+		await path1.stat();
+	} while (path1.exists());
+
+	return path1;
+}
+
+async function resolveExistingTarget(targetPath, record) {
+	// existing file
+	if (!targetPath.supports(CHILDREN)) {
+		if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
+		return targetPath;
+	}
+
+	// existing dir: needs two copyOf checks
+	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
+	targetPath = targetPath.append(record.path.getName());
+	await targetPath.stat();
+	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
+
+	return targetPath;
+}
+
 class Copy extends Operation {
 	constructor(sourcePath, targetPath) {
 		super();
@@ -2351,26 +2366,15 @@ class Copy extends Operation {
 
 	/**
 	 * @param {object} record Source record
-	 * @param {Path} targetPath Target path without the appended part
+	 * @param {Path} targetPath Target path
 	 */
 	async _copy(record, targetPath) {
 		if (this._aborted) { return; }
 
 		await targetPath.stat();
 
-		if (targetPath.exists()) { /* append inside an existing target */
-			targetPath = targetPath.append(record.path.getName());
-			await targetPath.stat();
-
-			if (targetPath.is(record.path)) { /* copy to the same parent -- create a "copy of" prefix */
-				while (targetPath.exists()) { 
-					let name = `Copy of ${targetPath.getName()}`;
-					targetPath = targetPath.getParent().append(name);
-					await targetPath.stat();
-				}
-			} /* not the same parent */
-
-		} /* else does not exist, will be created during copy impl below */
+		if (targetPath.exists()) { targetPath = await resolveExistingTarget(targetPath, record); }
+		// does not exist => will be created during copy impl below
 
 		if (record.children !== null) {
 			await this._copyDirectory(record, targetPath);
@@ -2466,10 +2470,14 @@ class Copy extends Operation {
 		let writeStream = targetPath.createStream("w", opts);
 		readStream.pipe(writeStream);
 
-		await new Promise(resolve => {
+		await new Promise((resolve, reject) => {
 			let handleError = async e => {
-				await this._handleCopyError(e, record, targetPath);
-				resolve();
+				try {
+					await this._handleCopyError(e, record, targetPath);
+					resolve();
+				} catch (e) {
+					reject(e);
+				}
 			};
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
@@ -2772,7 +2780,7 @@ register$1("app:devtools", "F12", () => {
 
 const Menu = require('electron').remote.Menu;
 
-function init$3() {
+function init$4() {
 	const template = [
 		{
 			label: "&File",
@@ -2873,6 +2881,7 @@ function saveSettings(e) {
 
 function init() {
 	init$3();
+	init$4();
 	init$2(settings.get("favorites", []));
 	init$1(settings.get("panes", {}));
 	window.addEventListener("beforeunload", saveSettings);
