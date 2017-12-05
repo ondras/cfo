@@ -192,3 +192,51 @@ exports.testCopyGroup = async function(tmp) {
 		"c": "aaa"
 	});
 }
+
+exports.testCopyMerge = async function testCopyMerge(tmp) {
+	const source = path.join(tmp, "a");
+	const target = path.join(tmp, "b");
+
+	createTree(source, {
+		"file": "test",
+		"dir": {
+			"file": "test",
+			"subdir2": {}
+		}
+	});
+	createTree(target, {
+		"a": {
+			"existing": "existing",
+			"dir": {
+				"existing": "existing",
+				"subdir1": {}
+			}
+		}
+	});
+
+	let o = new Copy(
+		paths.fromString(source),
+		paths.fromString(target)
+	);
+	await o.run();
+
+	assertTree(source, {
+		"file": "test",
+		"dir": {
+			"file": "test",
+			"subdir2": {}
+		}
+	});
+	assertTree(target, {
+		"a": {
+			"existing": "existing",
+			"file": "test",
+			"dir": {
+				"existing": "existing",
+				"file": "test",
+				"subdir1": {},
+				"subdir2": {}
+			}
+		}
+	});
+}
