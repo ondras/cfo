@@ -11,7 +11,8 @@
   "scripts": {
     "start": "electron .",
     "rollup": "rollup",
-    "lessc": "lessc"
+    "lessc": "lessc",
+	"test": "make tests"
   },
   "dependencies": {
     "electron": "^1.7.9",
