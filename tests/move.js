@@ -777,31 +777,25 @@ class Local extends Path {
 	}
 }
 
-// copy to the same parent -- create a "copy of" prefix
-async function createCopyOf(path1, path2) {
-	do {
-		let name = `Copy of ${path1.getName()}`;
-		path1 = path1.getParent().append(name);
-		await path1.stat();
-	} while (path1.exists());
+// copy to the same parent -- create a " copy" suffix
+async function createCopyOf(path) {
+	let num = 0;
+	let parent = path.getParent();
+	let name = path.getName();
 
-	return path1;
-}
+	while (true) {
+		num++;
+		let suffix = ` (copy${num > 1 ? " "+num : ""})`;
 
-async function resolveExistingTarget(targetPath, record) {
-	// existing file
-	if (!targetPath.supports(CHILDREN)) {
-		if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
-		return targetPath;
+		let parts = name.split(".");
+		let index = (parts.length > 1 ? parts.length-2 : parts.length-1);
+		parts[index] += suffix;
+		let newName = parts.join(".");
+
+		let newPath = parent.append(newName);
+		await newPath.stat();
+		if (!newPath.exists()) { return newPath; }
 	}
-
-	// existing dir: needs two copyOf checks
-	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
-	targetPath = targetPath.append(record.path.getName());
-	await targetPath.stat();
-	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
-
-	return targetPath;
 }
 
 class Copy extends Operation {
@@ -825,11 +819,7 @@ class Copy extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.size;
-		await this._startCopying(root);
-		this._end();
-	}
 
-	async _startCopying(root) {
 		let options = {
 			title: this._texts.title,
 			row1: this._texts.row1,
@@ -843,7 +833,10 @@ class Copy extends Operation {
 
 		super.run(); // schedule progress window
 
-		return this._copy(root, this._targetPath);
+		let result = await this._copy(root, this._targetPath);
+
+		this._end();
+		return result;
 	}
 
 	/**
@@ -851,20 +844,17 @@ class Copy extends Operation {
 	 * @param {Path} targetPath Target path
 	 */
 	async _copy(record, targetPath) {
-		if (this._aborted) { return; }
+		if (this._aborted) { return false; }
 
 		await targetPath.stat();
-
-		if (targetPath.exists()) { targetPath = await resolveExistingTarget(targetPath, record); }
+		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
 		// does not exist => will be created during copy impl below
 
 		if (record.children !== null) {
-			await this._copyDirectory(record, targetPath);
+			return this._copyDirectory(record, targetPath);
 		} else {
-			await this._copyFile(record, targetPath);
+			return this._copyFile(record, targetPath);
 		}
-
-		return this._recordCopied(record);
 	}
 
 	/**
@@ -874,14 +864,18 @@ class Copy extends Operation {
 	 */
 	async _copyDirectory(record, targetPath) {
 		let created = await this._createDirectory(targetPath, record.path.getMode());
-		if (!created) { return; }
+		if (!created) { return false; }
 
+		let okay = true;
 		for (let child of record.children) {
-			await this._copy(child, targetPath);
+			let childOkay = await this._copy(child, targetPath);
+			if (!childOkay) { okay = false; }
 		}
 
 		let date = record.path.getDate();
-		if (date) { return targetPath.setDate(date); }
+		if (date) { await targetPath.setDate(date); }
+
+		return okay;
 	}
 
 	/**
@@ -911,16 +905,16 @@ class Copy extends Operation {
 		if (targetPath.exists()) { // target exists: overwrite/skip/abort
 			if (this._issues.overwrite == "skip-all") { // silently skip
 				this._stats.done += record.size;
-				return;
+				return false;
 			}
 			if (this._issues.overwrite != "overwrite-all") { // raise an issue
 				let result = await this._handleFileExists(targetPath);
 				switch (result) {
-					case "abort": this.abort(); return; break;
+					case "abort": this.abort(); return false; break;
 					case "skip":
 					case "skip-all":
 						this._stats.done += record.size;
-						return;
+						return false;
 					break;
 					/* overwrite = continue */
 				}
@@ -931,15 +925,17 @@ class Copy extends Operation {
 			return this._copyFileSymlink(record, targetPath);
 			// no setDate here, fs.utimes adjusts target's mtime instead
 		} else {
-			await this._copyFileContents(record, targetPath);
+			let contentsOkay = await this._copyFileContents(record, targetPath);
 			let date = record.path.getDate();
-			return targetPath.setDate(date);
+			await targetPath.setDate(date);
+			return contentsOkay;
 		}
 	}
 
 	async _copyFileSymlink(record, targetPath) {
 		try {
 			await targetPath.create({link:record.path.getTarget()});
+			return true;
 		} catch (e) {
 			return this._handleSymlinkError(e, record, targetPath);
 		}
@@ -952,11 +948,11 @@ class Copy extends Operation {
 		let writeStream = targetPath.createStream("w", opts);
 		readStream.pipe(writeStream);
 
-		await new Promise((resolve, reject) => {
+		return new Promise((resolve, reject) => {
 			let handleError = async e => {
 				try {
-					await this._handleCopyError(e, record, targetPath);
-					resolve();
+					let result = await this._handleCopyError(e, record, targetPath);
+					resolve(result);
 				} catch (e) {
 					reject(e);
 				}
@@ -964,7 +960,7 @@ class Copy extends Operation {
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
 
-			writeStream.on("finish", resolve);
+			writeStream.on("finish", () => resolve(true));
 
 			readStream.on("data", buffer => {
 				done += buffer.length;
@@ -976,8 +972,6 @@ class Copy extends Operation {
 			}); /* on data */
 		}); /* file copy promise */		
 	}
-
-	async _recordCopied(record) {} /* used only for moving */
 
 	async _handleFileExists(path) {
 		let text = `Target file ${path} already exists`;
@@ -1009,6 +1003,7 @@ class Copy extends Operation {
 			case "retry": return this._copyFile(record, targetPath); break;
 			case "abort": this.abort(); break;
 		}
+		return false;
 	}
 
 	async _handleSymlinkError(e, record, targetPath) {
@@ -1020,6 +1015,23 @@ class Copy extends Operation {
 			case "retry": return this._copyFileSymlink(record, targetPath); break;
 			case "abort": this.abort(); break;
 		}
+		return false;
+	}
+
+	async _resolveExistingTarget(targetPath, record) {
+		// existing file
+		if (!targetPath.supports(CHILDREN)) {
+			if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
+			return targetPath;
+		}
+
+		// existing dir: needs two copyOf checks
+		if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
+		targetPath = targetPath.append(record.path.getName());
+		await targetPath.stat();
+		if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
+
+		return targetPath;
 	}
 }
 
@@ -1032,19 +1044,14 @@ class Move extends Copy {
 		};
 	}
 
-	async _startCopying(root) {
-		let targetPath = this._targetPath;
-		await targetPath.stat();
-		if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
+	async _copy(record, targetPath) {
+//		try {
+//			return record.path.rename(targetPath);
+//		} catch (e) {} // quick rename failed, need to copy+delete
 
-		try {
-			return root.path.rename(targetPath);
-		} catch (e) {} // quick rename failed, need to copy+delete
+		await super._copy(record, targetPath);
 
-		return super._startCopying(root);
-	}
-
-	async _recordCopied(record) {
+		if (this._aborted)  { return; }
 		try {
 			await record.path.delete();
 		} catch (e) {
@@ -1061,6 +1068,17 @@ class Move extends Copy {
 			case "retry": return this._recordCopied(record); break;
 			case "abort": this.abort(); break;
 		}
+	}
+
+	async _resolveExistingTarget(targetPath, record) {
+		// existing file
+		if (!targetPath.supports(CHILDREN)) { return targetPath; }
+
+		// existing dir
+		targetPath = targetPath.append(record.path.getName());
+		await targetPath.stat();
+
+		return targetPath;
 	}
 }
 
@@ -1347,6 +1365,105 @@ exports.testMoveFile = async function testMoveFile(tmp) {
 
 	assertTree(source, null);
 	assertTree(target, contents);
+};
+
+exports.testMoveDir = async function testMoveDir(tmp) {
+	const source = path.join(tmp, "a");
+	const target = path.join(tmp, "b");
+	const contents = {
+		"file": "test file",
+		"subdir": {}
+	};
+
+	createTree(source, contents);
+
+	let o = new Move(
+		fromString(source),
+		fromString(target)
+	);
+	await o.run();
+
+	assertTree(source, null);
+	assertTree(target, contents);
+};
+
+exports.testMoveFileToDir = async function testMoveFileToDir(tmp) {
+	const source = path.join(tmp, "a");
+	const target = path.join(tmp, "b");
+	const contents = "test file";
+
+	createTree(source, contents);
+	createTree(target, {});
+
+	let o = new Move(
+		fromString(source),
+		fromString(target)
+	);
+	await o.run();
+
+	assertTree(source, null);
+	assertTree(target, {"a":contents});
+};
+
+exports.testMoveOverwrite = async function testMoveOverwrite(tmp) {
+	const source = path.join(tmp, "a");
+	const target = path.join(tmp, "b");
+	const contents = "test file";
+
+	createTree(source, contents);
+	createTree(target, {"a":"old contents"});
+
+	require("electron").remote.issueResolution = "overwrite";
+
+	let o = new Move(
+		fromString(source),
+		fromString(target)
+	);
+	await o.run();
+
+	assertTree(source, null);
+	assertTree(target, {"a":contents});
+};
+
+exports.testMoveAbort = async function testMoveAbort(tmp) {
+	const source = path.join(tmp, "a");
+	const target = path.join(tmp, "b");
+	const contents = "test file";
+
+	createTree(source, contents);
+	createTree(target, {"a":"old contents"});
+
+	require("electron").remote.issueResolution = "abort";
+
+	let o = new Move(
+		fromString(source),
+		fromString(target)
+	);
+	await o.run();
+
+	assertTree(source, contents);
+	assertTree(target, {"a":"old contents"});
+};
+
+exports.xtestMoveSkip = async function testMoveSkip(tmp) {
+	const source = path.join(tmp, "a");
+	const target = path.join(tmp, "b");
+	const contents = {"file": "test file", "file.new": "test file"};
+	const targetContents = {"a": {"file": "old contents file"}};
+
+	createTree(source, contents);
+	createTree(target, targetContents);
+
+	require("electron").remote.issueResolution = "skip";
+
+	let o = new Move(
+		fromString(source),
+		fromString(target)
+	);
+	await o.run();
+
+	assertTree(source, contents);
+	assertTree(target, targetContents);
 };
 
 }());

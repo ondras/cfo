@@ -27,6 +27,7 @@ function collectTests(files) {
 			let e = require(file);
 			let t = [];
 			for (let p in e) {
+//				if (p != "testMoveAbort") continue;
 				if (p.indexOf("test") == 0) { t.push(e[p]); }
 			}
 			if (t.length == 0) { continue; }

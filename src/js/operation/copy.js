@@ -26,22 +26,6 @@ async function createCopyOf(path) {
 	};
 }
 
-async function resolveExistingTarget(targetPath, record) {
-	// existing file
-	if (!targetPath.supports(CHILDREN)) {
-		if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
-		return targetPath;
-	}
-
-	// existing dir: needs two copyOf checks
-	if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
-	targetPath = targetPath.append(record.path.getName());
-	await targetPath.stat();
-	if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
-
-	return targetPath;
-}
-
 export default class Copy extends Operation {
 	constructor(sourcePath, targetPath) {
 		super();
@@ -63,11 +47,7 @@ export default class Copy extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.size;
-		await this._startCopying(root);
-		this._end();
-	}
 
-	async _startCopying(root) {
 		let options = {
 			title: this._texts.title,
 			row1: this._texts.row1,
@@ -81,7 +61,10 @@ export default class Copy extends Operation {
 
 		super.run(); // schedule progress window
 
-		return this._copy(root, this._targetPath);
+		let result = await this._copy(root, this._targetPath);
+
+		this._end();
+		return result;
 	}
 
 	/**
@@ -89,20 +72,17 @@ export default class Copy extends Operation {
 	 * @param {Path} targetPath Target path
 	 */
 	async _copy(record, targetPath) {
-		if (this._aborted) { return; }
+		if (this._aborted) { return false; }
 
 		await targetPath.stat();
-
-		if (targetPath.exists()) { targetPath = await resolveExistingTarget(targetPath, record); }
+		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
 		// does not exist => will be created during copy impl below
 
 		if (record.children !== null) {
-			await this._copyDirectory(record, targetPath);
+			return this._copyDirectory(record, targetPath);
 		} else {
-			await this._copyFile(record, targetPath);
+			return this._copyFile(record, targetPath);
 		}
-
-		return this._recordCopied(record);
 	}
 
 	/**
@@ -112,14 +92,18 @@ export default class Copy extends Operation {
 	 */
 	async _copyDirectory(record, targetPath) {
 		let created = await this._createDirectory(targetPath, record.path.getMode());
-		if (!created) { return; }
+		if (!created) { return false; }
 
+		let okay = true;
 		for (let child of record.children) {
-			await this._copy(child, targetPath);
+			let childOkay = await this._copy(child, targetPath);
+			if (!childOkay) { okay = false; }
 		}
 
 		let date = record.path.getDate();
-		if (date) { return targetPath.setDate(date); }
+		if (date) { await targetPath.setDate(date); }
+
+		return okay;
 	}
 
 	/**
@@ -149,16 +133,16 @@ export default class Copy extends Operation {
 		if (targetPath.exists()) { // target exists: overwrite/skip/abort
 			if (this._issues.overwrite == "skip-all") { // silently skip
 				this._stats.done += record.size;
-				return;
+				return false;
 			}
 			if (this._issues.overwrite != "overwrite-all") { // raise an issue
 				let result = await this._handleFileExists(targetPath);
 				switch (result) {
-					case "abort": this.abort(); return; break;
+					case "abort": this.abort(); return false; break;
 					case "skip":
 					case "skip-all":
 						this._stats.done += record.size;
-						return;
+						return false;
 					break;
 					/* overwrite = continue */
 				}
@@ -169,15 +153,17 @@ export default class Copy extends Operation {
 			return this._copyFileSymlink(record, targetPath);
 			// no setDate here, fs.utimes adjusts target's mtime instead
 		} else {
-			await this._copyFileContents(record, targetPath);
+			let contentsOkay = await this._copyFileContents(record, targetPath);
 			let date = record.path.getDate();
-			return targetPath.setDate(date);
+			await targetPath.setDate(date);
+			return contentsOkay;
 		}
 	}
 
 	async _copyFileSymlink(record, targetPath) {
 		try {
 			await targetPath.create({link:record.path.getTarget()});
+			return true;
 		} catch (e) {
 			return this._handleSymlinkError(e, record, targetPath);
 		}
@@ -190,11 +176,11 @@ export default class Copy extends Operation {
 		let writeStream = targetPath.createStream("w", opts);
 		readStream.pipe(writeStream);
 
-		await new Promise((resolve, reject) => {
+		return new Promise((resolve, reject) => {
 			let handleError = async e => {
 				try {
-					await this._handleCopyError(e, record, targetPath);
-					resolve();
+					let result = await this._handleCopyError(e, record, targetPath);
+					resolve(result);
 				} catch (e) {
 					reject(e);
 				}
@@ -202,7 +188,7 @@ export default class Copy extends Operation {
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
 
-			writeStream.on("finish", resolve);
+			writeStream.on("finish", () => resolve(true));
 
 			readStream.on("data", buffer => {
 				done += buffer.length;
@@ -214,8 +200,6 @@ export default class Copy extends Operation {
 			}); /* on data */
 		}); /* file copy promise */		
 	}
-
-	async _recordCopied(record) {} /* used only for moving */
 
 	async _handleFileExists(path) {
 		let text = `Target file ${path} already exists`;
@@ -247,6 +231,7 @@ export default class Copy extends Operation {
 			case "retry": return this._copyFile(record, targetPath); break;
 			case "abort": this.abort(); break;
 		}
+		return false;
 	}
 
 	async _handleSymlinkError(e, record, targetPath) {
@@ -258,5 +243,22 @@ export default class Copy extends Operation {
 			case "retry": return this._copyFileSymlink(record, targetPath); break;
 			case "abort": this.abort(); break;
 		}
+		return false;
+	}
+
+	async _resolveExistingTarget(targetPath, record) {
+		// existing file
+		if (!targetPath.supports(CHILDREN)) {
+			if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
+			return targetPath;
+		}
+
+		// existing dir: needs two copyOf checks
+		if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
+		targetPath = targetPath.append(record.path.getName());
+		await targetPath.stat();
+		if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
+
+		return targetPath;
 	}
 }

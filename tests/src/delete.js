@@ -12,8 +12,9 @@ exports.testDeleteFile = async function testDeleteFile(tmp) {
 	assertTree(root, contents);
 
 	let o = new Delete(paths.fromString(root));
-	await o.run();
+	let result = await o.run();
 
+	assert(result);
 	assertTree(root, null);
 }
 
@@ -24,8 +25,9 @@ exports.testDeleteDirectory = async function testDeleteDirectory(tmp) {
 	assertTree(root, contents);
 
 	let o = new Delete(paths.fromString(root));
-	await o.run();
+	let result = await o.run();
 
+	assert(result);
 	assertTree(root, null);
 }
 
@@ -46,8 +48,9 @@ exports.testDeleteGroup = async function testDeleteGroup(tmp) {
 	]);
 
 	let o = new Delete(g);
-	await o.run();
+	let result = await o.run();
 
+	assert(result);
 	assertTree(dir1, null);
 	assertTree(file1, null);
 	assertTree(dir2, {});

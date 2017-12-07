@@ -69,3 +69,14 @@ dir -> ? = append (to parent), create, recurse
 
 root/a/ -> root/
 root/a/ -> root/a
+
+
+
+file -> file = rename | content (overwrite) 
+file -> dir = append+rename | append, content
+file -> ? = rename | append (to parent), content
+
+dir -> file = error 
+dir -> dir = append+rename | append, create, recurse
+dir -> ? = rename | append (to parent), create, recurse
+

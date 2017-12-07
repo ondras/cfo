@@ -1,4 +1,5 @@
 import Copy from "./copy.js";
+import {CHILDREN} from "path/path.js";
 
 export default class Move extends Copy {
 	constructor(sourcePath, targetPath) {
@@ -9,19 +10,14 @@ export default class Move extends Copy {
 		}
 	}
 
-	async _startCopying(root) {
-		let targetPath = this._targetPath;
-		await targetPath.stat();
-		if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
+	async _copy(record, targetPath) {
+//		try {
+//			return record.path.rename(targetPath);
+//		} catch (e) {} // quick rename failed, need to copy+delete
 
-		try {
-			return root.path.rename(targetPath);
-		} catch (e) {} // quick rename failed, need to copy+delete
+		await super._copy(record, targetPath);
 
-		return super._startCopying(root);
-	}
-
-	async _recordCopied(record) {
+		if (this._aborted)  { return; }
 		try {
 			await record.path.delete();
 		} catch (e) {
@@ -38,5 +34,16 @@ export default class Move extends Copy {
 			case "retry": return this._recordCopied(record); break;
 			case "abort": this.abort(); break;
 		}
+	}
+
+	async _resolveExistingTarget(targetPath, record) {
+		// existing file
+		if (!targetPath.supports(CHILDREN)) { return targetPath; }
+
+		// existing dir
+		targetPath = targetPath.append(record.path.getName());
+		await targetPath.stat();
+
+		return targetPath;
 	}
 }

@@ -18,8 +18,9 @@ export default class Delete extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.count;
-		await this._startDeleting(root);
+		let result = await this._startDeleting(root);
 		this._end();
+		return result;
 	}
 
 	async _startDeleting(record) {

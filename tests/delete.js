@@ -352,8 +352,9 @@ class Delete extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.count;
-		await this._startDeleting(root);
+		let result = await this._startDeleting(root);
 		this._end();
+		return result;
 	}
 
 	async _startDeleting(record) {
@@ -1170,8 +1171,9 @@ exports.testDeleteFile = async function testDeleteFile(tmp) {
 	assertTree(root, contents);
 
 	let o = new Delete(fromString(root));
-	await o.run();
+	let result = await o.run();
 
+	assert(result);
 	assertTree(root, null);
 };
 
@@ -1182,8 +1184,9 @@ exports.testDeleteDirectory = async function testDeleteDirectory(tmp) {
 	assertTree(root, contents);
 
 	let o = new Delete(fromString(root));
-	await o.run();
+	let result = await o.run();
 
+	assert(result);
 	assertTree(root, null);
 };
 
@@ -1204,8 +1207,9 @@ exports.testDeleteGroup = async function testDeleteGroup(tmp) {
 	]);
 
 	let o = new Delete(g);
-	await o.run();
+	let result = await o.run();
 
+	assert(result);
 	assertTree(dir1, null);
 	assertTree(file1, null);
 	assertTree(dir2, {});
