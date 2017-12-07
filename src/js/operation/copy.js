@@ -5,29 +5,39 @@ import {CHILDREN} from "path/path.js";
 
 import LocalPath from "path/local.js";
 
-// copy to the same parent -- create a "copy of" prefix
-async function createCopyOf(path1, path2) {
-	do {
-		let name = `Copy of ${path1.getName()}`;
-		path1 = path1.getParent().append(name);
-		await path1.stat();
-	} while (path1.exists());
+// copy to the same parent -- create a " copy" suffix
+async function createCopyOf(path) {
+	let num = 0;
+	let parent = path.getParent();
+	let name = path.getName();
 
-	return path1;
+	while (true) {
+		num++;
+		let suffix = ` (copy${num > 1 ? " "+num : ""})`;
+
+		let parts = name.split(".");
+		let index = (parts.length > 1 ? parts.length-2 : parts.length-1);
+		parts[index] += suffix;
+		let newName = parts.join(".");
+
+		let newPath = parent.append(newName);
+		await newPath.stat();
+		if (!newPath.exists()) { return newPath; }
+	};
 }
 
 async function resolveExistingTarget(targetPath, record) {
 	// existing file
 	if (!targetPath.supports(CHILDREN)) {
-		if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
+		if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
 		return targetPath;
 	}
 
 	// existing dir: needs two copyOf checks
-	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
+	if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
 	targetPath = targetPath.append(record.path.getName());
 	await targetPath.stat();
-	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
+	if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
 
 	return targetPath;
 }

@@ -74,7 +74,29 @@ exports.testCopyFileOverwrite = async function testCopyFileOverwrite(tmp) {
 
 exports.testCopyFileSame = async function testCopyFileSame(tmp) {
 	const source = path.join(tmp, "a");
-	const target = path.join(tmp, "Copy of a");
+	const contents = "test file";
+
+	createTree(source, contents);
+	assertTree(source, contents);
+
+	for (let i=0;i<3;i++) {
+		let o = new Copy(
+			paths.fromString(source),
+			paths.fromString(source)
+		);
+		await o.run();
+	}
+
+	assertTree(tmp, {
+		"a": contents,
+		"a (copy)": contents,
+		"a (copy 2)": contents,
+		"a (copy 3)": contents
+	});
+}
+
+exports.testCopyFileSameExt = async function testCopyFileSameExt(tmp) {
+	const source = path.join(tmp, "a.test");
 	const contents = "test file";
 
 	createTree(source, contents);
@@ -86,8 +108,10 @@ exports.testCopyFileSame = async function testCopyFileSame(tmp) {
 	);
 	await o.run();
 
-	assertTree(source, contents);
-	assertTree(target, contents);
+	assertTree(tmp, {
+		"a.test": contents,
+		"a (copy).test": contents
+	});
 }
 
 exports.testCopyDir = async function testCopyDir(tmp) {
@@ -110,7 +134,7 @@ exports.testCopyDir = async function testCopyDir(tmp) {
 
 exports.testCopyDirSame = async function testCopyDirSame(tmp) {
 	const source = path.join(tmp, "a");
-	const target = path.join(tmp, "Copy of a");
+	const target = path.join(tmp, "a (copy)");
 	const contents = {"b": "test", "c": {}};
 
 	createTree(source, contents);
@@ -129,7 +153,7 @@ exports.testCopyDirSame = async function testCopyDirSame(tmp) {
 
 exports.testCopyDirSame2 = async function testCopyDirSame2(tmp) {
 	const source = path.join(tmp, "a");
-	const target = path.join(tmp, "Copy of a");
+	const target = path.join(tmp, "a (copy)");
 	const contents = {"b": "test", "c": {}};
 
 	createTree(source, contents);
