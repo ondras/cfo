@@ -16,8 +16,9 @@ exports.testCopyFile = async function testCopyFile(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, contents);
 }
@@ -36,8 +37,9 @@ exports.testCopyFileToDirectory = async function testCopyFileToDirectory(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, {"a":contents});
 }
@@ -58,7 +60,9 @@ exports.testCopyFileOverwrite = async function testCopyFileOverwrite(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
+
+	assert(!r, "copy aborted");
 	assertTree(source, contents1);
 	assertTree(target, contents2);
 
@@ -67,7 +71,9 @@ exports.testCopyFileOverwrite = async function testCopyFileOverwrite(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	r = await o.run();
+
+	assert(r, "copy ok");
 	assertTree(source, contents1);
 	assertTree(target, contents1);
 }
@@ -84,7 +90,8 @@ exports.testCopyFileSame = async function testCopyFileSame(tmp) {
 			paths.fromString(source),
 			paths.fromString(source)
 		);
-		await o.run();
+		let r = await o.run();
+		assert(r, "copy ok");
 	}
 
 	assertTree(tmp, {
@@ -106,8 +113,9 @@ exports.testCopyFileSameExt = async function testCopyFileSameExt(tmp) {
 		paths.fromString(source),
 		paths.fromString(source)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(tmp, {
 		"a.test": contents,
 		"a (copy).test": contents
@@ -126,8 +134,9 @@ exports.testCopyDir = async function testCopyDir(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, contents);
 }
@@ -145,8 +154,9 @@ exports.testCopyDirSame = async function testCopyDirSame(tmp) {
 		paths.fromString(source),
 		paths.fromString(source)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, contents);
 }
@@ -164,8 +174,9 @@ exports.testCopyDirSame2 = async function testCopyDirSame2(tmp) {
 		paths.fromString(source),
 		paths.fromString(tmp)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, contents);
 }
@@ -184,8 +195,9 @@ exports.testCopyDirToDir = async function testCopyDirToDir(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, {"a":contents});
 }
@@ -209,8 +221,9 @@ exports.testCopyGroup = async function(tmp) {
 	]);
 
 	let d = new Copy(g, paths.fromString(target));
-	await d.run();
+	let r = await d.run();
 
+	assert(r, "copy ok");
 	assertTree(target, {
 		"a": {"a":"test"},
 		"c": "aaa"
@@ -242,8 +255,9 @@ exports.testCopyMerge = async function testCopyMerge(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, {
 		"file": "test",
 		"dir": {

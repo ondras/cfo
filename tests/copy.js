@@ -848,6 +848,7 @@ class Copy extends Operation {
 
 		await targetPath.stat();
 		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
+
 		// does not exist => will be created during copy impl below
 
 		if (record.children !== null) {
@@ -910,7 +911,10 @@ class Copy extends Operation {
 			if (this._issues.overwrite != "overwrite-all") { // raise an issue
 				let result = await this._handleFileExists(targetPath);
 				switch (result) {
-					case "abort": this.abort(); return false; break;
+					case "abort":
+						this.abort();
+						return false;
+					break;
 					case "skip":
 					case "skip-all":
 						this._stats.done += record.size;
@@ -1359,8 +1363,9 @@ exports.testCopyFile = async function testCopyFile(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, contents);
 };
@@ -1379,8 +1384,9 @@ exports.testCopyFileToDirectory = async function testCopyFileToDirectory(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, {"a":contents});
 };
@@ -1401,7 +1407,9 @@ exports.testCopyFileOverwrite = async function testCopyFileOverwrite(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
+
+	assert(!r, "copy aborted");
 	assertTree(source, contents1);
 	assertTree(target, contents2);
 
@@ -1410,7 +1418,9 @@ exports.testCopyFileOverwrite = async function testCopyFileOverwrite(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	r = await o.run();
+
+	assert(r, "copy ok");
 	assertTree(source, contents1);
 	assertTree(target, contents1);
 };
@@ -1427,7 +1437,8 @@ exports.testCopyFileSame = async function testCopyFileSame(tmp) {
 			fromString(source),
 			fromString(source)
 		);
-		await o.run();
+		let r = await o.run();
+		assert(r, "copy ok");
 	}
 
 	assertTree(tmp, {
@@ -1449,8 +1460,9 @@ exports.testCopyFileSameExt = async function testCopyFileSameExt(tmp) {
 		fromString(source),
 		fromString(source)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(tmp, {
 		"a.test": contents,
 		"a (copy).test": contents
@@ -1469,8 +1481,9 @@ exports.testCopyDir = async function testCopyDir(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, contents);
 };
@@ -1488,8 +1501,9 @@ exports.testCopyDirSame = async function testCopyDirSame(tmp) {
 		fromString(source),
 		fromString(source)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, contents);
 };
@@ -1507,8 +1521,9 @@ exports.testCopyDirSame2 = async function testCopyDirSame2(tmp) {
 		fromString(source),
 		fromString(tmp)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, contents);
 };
@@ -1527,8 +1542,9 @@ exports.testCopyDirToDir = async function testCopyDirToDir(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, contents);
 	assertTree(target, {"a":contents});
 };
@@ -1552,8 +1568,9 @@ exports.testCopyGroup = async function(tmp) {
 	]);
 
 	let d = new Copy(g, fromString(target));
-	await d.run();
+	let r = await d.run();
 
+	assert(r, "copy ok");
 	assertTree(target, {
 		"a": {"a":"test"},
 		"c": "aaa"
@@ -1585,8 +1602,9 @@ exports.testCopyMerge = async function testCopyMerge(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "copy ok");
 	assertTree(source, {
 		"file": "test",
 		"dir": {

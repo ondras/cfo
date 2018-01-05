@@ -15,8 +15,9 @@ exports.testMoveFile = async function testMoveFile(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "move ok");
 	assertTree(source, null);
 	assertTree(target, contents);
 }
@@ -35,8 +36,9 @@ exports.testMoveDir = async function testMoveDir(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "move ok");
 	assertTree(source, null);
 	assertTree(target, contents);
 }
@@ -53,8 +55,9 @@ exports.testMoveFileToDir = async function testMoveFileToDir(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "move ok");
 	assertTree(source, null);
 	assertTree(target, {"a":contents});
 }
@@ -73,8 +76,9 @@ exports.testMoveOverwrite = async function testMoveOverwrite(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "move ok");
 	assertTree(source, null);
 	assertTree(target, {"a":contents});
 }
@@ -93,17 +97,18 @@ exports.testMoveAbort = async function testMoveAbort(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(!r, "move failed");
 	assertTree(source, contents);
 	assertTree(target, {"a":"old contents"});
 }
 
-exports.xtestMoveSkip = async function testMoveSkip(tmp) {
+exports.testMoveSkip = async function testMoveSkip(tmp) {
 	const source = path.join(tmp, "a");
 	const target = path.join(tmp, "b");
-	const contents = {"file": "test file", "file.new": "test file"};
-	const targetContents = {"a": {"file": "old contents file"}};
+	const contents = {"file1": "test file", "file2": "test file"};
+	const targetContents = {"a": {"file1": "old contents file"}};
 
 	createTree(source, contents);
 	createTree(target, targetContents);
@@ -114,8 +119,11 @@ exports.xtestMoveSkip = async function testMoveSkip(tmp) {
 		paths.fromString(source),
 		paths.fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(!r, "move failed");
+	targetContents["a"]["file2"] = contents["file2"];
+	delete contents["file2"];
 	assertTree(source, contents);
 	assertTree(target, targetContents);
 }

@@ -848,6 +848,7 @@ class Copy extends Operation {
 
 		await targetPath.stat();
 		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
+
 		// does not exist => will be created during copy impl below
 
 		if (record.children !== null) {
@@ -910,7 +911,10 @@ class Copy extends Operation {
 			if (this._issues.overwrite != "overwrite-all") { // raise an issue
 				let result = await this._handleFileExists(targetPath);
 				switch (result) {
-					case "abort": this.abort(); return false; break;
+					case "abort":
+						this.abort();
+						return false;
+					break;
 					case "skip":
 					case "skip-all":
 						this._stats.done += record.size;
@@ -1045,15 +1049,24 @@ class Move extends Copy {
 	}
 
 	async _copy(record, targetPath) {
-//		try {
-//			return record.path.rename(targetPath);
-//		} catch (e) {} // quick rename failed, need to copy+delete
+		if (this._aborted) { return false; }
 
-		await super._copy(record, targetPath);
+		await targetPath.stat();
+		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
 
-		if (this._aborted)  { return; }
+		try {
+//			console.log("rename", record.path+"", targetPath+"");
+			await record.path.rename(targetPath);
+//			console.log("ok");
+			return true;
+		} catch (e) { /*console.log("rename failed");*/ } // quick rename failed, need to copy+delete
+
+		let result = await super._copy(record, targetPath);
+		if (!result)  { return false; }
+
 		try {
 			await record.path.delete();
+			return true;
 		} catch (e) {
 			return this._handleDeleteError(e, record);
 		}
@@ -1074,10 +1087,9 @@ class Move extends Copy {
 		// existing file
 		if (!targetPath.supports(CHILDREN)) { return targetPath; }
 
-		// existing dir
+		// existing dir: append leaf name
 		targetPath = targetPath.append(record.path.getName());
 		await targetPath.stat();
-
 		return targetPath;
 	}
 }
@@ -1361,8 +1373,9 @@ exports.testMoveFile = async function testMoveFile(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "move ok");
 	assertTree(source, null);
 	assertTree(target, contents);
 };
@@ -1381,8 +1394,9 @@ exports.testMoveDir = async function testMoveDir(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "move ok");
 	assertTree(source, null);
 	assertTree(target, contents);
 };
@@ -1399,8 +1413,9 @@ exports.testMoveFileToDir = async function testMoveFileToDir(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "move ok");
 	assertTree(source, null);
 	assertTree(target, {"a":contents});
 };
@@ -1419,8 +1434,9 @@ exports.testMoveOverwrite = async function testMoveOverwrite(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(r, "move ok");
 	assertTree(source, null);
 	assertTree(target, {"a":contents});
 };
@@ -1439,17 +1455,18 @@ exports.testMoveAbort = async function testMoveAbort(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(!r, "move failed");
 	assertTree(source, contents);
 	assertTree(target, {"a":"old contents"});
 };
 
-exports.xtestMoveSkip = async function testMoveSkip(tmp) {
+exports.testMoveSkip = async function testMoveSkip(tmp) {
 	const source = path.join(tmp, "a");
 	const target = path.join(tmp, "b");
-	const contents = {"file": "test file", "file.new": "test file"};
-	const targetContents = {"a": {"file": "old contents file"}};
+	const contents = {"file1": "test file", "file2": "test file"};
+	const targetContents = {"a": {"file1": "old contents file"}};
 
 	createTree(source, contents);
 	createTree(target, targetContents);
@@ -1460,8 +1477,11 @@ exports.xtestMoveSkip = async function testMoveSkip(tmp) {
 		fromString(source),
 		fromString(target)
 	);
-	await o.run();
+	let r = await o.run();
 
+	assert(!r, "move failed");
+	targetContents["a"]["file2"] = contents["file2"];
+	delete contents["file2"];
 	assertTree(source, contents);
 	assertTree(target, targetContents);
 };

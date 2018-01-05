@@ -11,15 +11,25 @@ export default class Move extends Copy {
 	}
 
 	async _copy(record, targetPath) {
-//		try {
-//			return record.path.rename(targetPath);
-//		} catch (e) {} // quick rename failed, need to copy+delete
+		if (this._aborted) { return false; }
 
-		await super._copy(record, targetPath);
+		await targetPath.stat();
+		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
 
-		if (this._aborted)  { return; }
+		try {
+//			console.log("rename", record.path+"", targetPath+"");
+			await record.path.rename(targetPath);
+			this._stats.done += record.size;
+//			console.log("ok");
+			return true;
+		} catch (e) { /*console.log("rename failed");*/ } // quick rename failed, need to copy+delete
+
+		let result = await super._copy(record, targetPath);
+		if (!result)  { return false; }
+
 		try {
 			await record.path.delete();
+			return true;
 		} catch (e) {
 			return this._handleDeleteError(e, record);
 		}
@@ -40,10 +50,9 @@ export default class Move extends Copy {
 		// existing file
 		if (!targetPath.supports(CHILDREN)) { return targetPath; }
 
-		// existing dir
+		// existing dir: append leaf name
 		targetPath = targetPath.append(record.path.getName());
 		await targetPath.stat();
-
 		return targetPath;
 	}
 }

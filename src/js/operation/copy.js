@@ -76,6 +76,7 @@ export default class Copy extends Operation {
 
 		await targetPath.stat();
 		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
+
 		// does not exist => will be created during copy impl below
 
 		if (record.children !== null) {
@@ -110,7 +111,7 @@ export default class Copy extends Operation {
 	 * @returns {Promise<bool>}
 	 */
 	async _createDirectory(path, mode) {
-		if (path.exists() && path.supports(CHILDREN)) { return true; } // folder already exists, fine
+		if (path.exists() && path.supports(CHILDREN)) { return true; } // directory already exists, fine
 
 		try {
 			await path.create({dir:true, mode});
@@ -138,7 +139,10 @@ export default class Copy extends Operation {
 			if (this._issues.overwrite != "overwrite-all") { // raise an issue
 				let result = await this._handleFileExists(targetPath);
 				switch (result) {
-					case "abort": this.abort(); return false; break;
+					case "abort":
+						this.abort();
+						return false;
+					break;
 					case "skip":
 					case "skip-all":
 						this._stats.done += record.size;

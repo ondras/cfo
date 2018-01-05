@@ -1,19 +1,15 @@
 const fs = require("fs");
 const path = require("path");
 
-class AssertionException {
-	constructor(message) {
-		this.message = message;
-	}
-
-	toString() {
-		return `AssertionException: ${this.message}`;
-	}
+class AssertionException extends Error {
+	toString() { return `AssertionException: ${this.message}`; }
 }
 
 function assert(expression, message) {
 	if (!expression) { throw new AssertionException(message); }
+	assert.callCount++;
 }
+assert.callCount = 0;
 
 function createTree(name, what) {
 	switch (typeof(what)) {

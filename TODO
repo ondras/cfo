@@ -57,26 +57,22 @@ hypotezy:
   f8: WRITE
 
 
-
-file -> file = no append, copyof?, content (=>overwrite)
-file -> dir = append, copyof?, content
-file -> ? = append (to parent), content
+COPY:
+file -> file = no append, copyof | ask, content
+file -> dir = append, copyof | ask, content
+file -> ? = content
 
 dir -> file = error
-dir -> dir = copyof?, append, copyof?, create, recurse (copyof?)
-dir -> ? = append (to parent), create, recurse
+dir -> dir = copyof | append, copyof | create, recurse
+dir -> ? = create+recurse
 
 
-root/a/ -> root/
-root/a/ -> root/a
+MOVE:
+file -> file = ask; rename | content 
+file -> dir = append; rename | content
+file -> ? = rename | content
 
-
-
-file -> file = rename | content (overwrite) 
-file -> dir = append+rename | append, content
-file -> ? = rename | append (to parent), content
-
-dir -> file = error 
-dir -> dir = append+rename | append, create, recurse
-dir -> ? = rename | append (to parent), create, recurse
+dir -> file = error?
+dir -> dir = create+recurse
+dir -> ? = rename | create+recurse
 

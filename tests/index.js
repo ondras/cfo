@@ -13,6 +13,7 @@ const process = require("process");
 const child_process = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const utils = require("./test-utils.js");
 
 function collectFiles() {
 	let cwd = process.cwd();
@@ -27,7 +28,7 @@ function collectTests(files) {
 			let e = require(file);
 			let t = [];
 			for (let p in e) {
-//				if (p != "testMoveAbort") continue;
+//				if (p != "testMoveFileToDir") continue;
 				if (p.indexOf("test") == 0) { t.push(e[p]); }
 			}
 			if (t.length == 0) { continue; }
@@ -61,12 +62,15 @@ async function runTests(tests, tmp) {
 				stats.failed++;
 				process.stdout.write("F\n");
 				process.stderr.write(`${test.name}: ${e}\n`);
+				process.stderr.write(`${e.stack}\n`);
 			} finally {
 				child_process.execSync(`rm -rf "${tmp}"`);
 			}
 		}
 		process.stdout.write("\n");
 	}
+
+	stats.asserts = utils.assert.callCount;
 	return stats;
 }
 
