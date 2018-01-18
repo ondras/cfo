@@ -39,7 +39,7 @@ export function init() {
 				command.menuItem("fixme", "Create &archive"),
 				{type: "separator"}, /* fixme sort? */
 				command.menuItem("fixme", "O&pen console"),
-				command.menuItem("fixme", "&Options")
+				command.menuItem("app:settings", "&Options")
 			]
 		},
 		{

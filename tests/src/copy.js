@@ -1,3 +1,5 @@
+// FIXME test copying symlinks
+
 import Copy from "operation/copy.js";
 import * as paths from "path/paths.js";
 

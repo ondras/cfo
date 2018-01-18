@@ -1,4 +1,5 @@
 ALL := app/app.js app/app.css \
+		settings/settings.js settings/settings.css \
 		progress/progress.js progress/progress.css \
 		issue/issue.js issue/issue.css \
 		viewer/text/viewer.js viewer/text/viewer.css \
@@ -17,6 +18,12 @@ app/app.js: $(JS)
 
 app/app.css: $(CSS)
 	$(LESSC) src/css/app.less > $@
+
+settings/settings.js: $(JS)
+	$(ROLLUP) src/js/settings/local.js -o $@
+
+settings/settings.css: $(CSS)
+	$(LESSC) src/css/settings.less > $@
 
 progress/progress.js: $(JS)
 	$(ROLLUP) src/js/progress/local.js -o $@

@@ -2222,6 +2222,31 @@ function get$1() {
 	return clipboard.readText().split(SEP);
 }
 
+const remote$6 = require("electron").remote;
+let window$1;
+
+const windowOptions$5 = {
+	center: true,
+	backgroundColor: background
+};
+
+function open$1() {
+	if (window$1) { 
+		window$1.focus();
+		return;
+	}
+
+//	let [width, height] = remote.getCurrentWindow().getSize();
+//	let currentOptions = { title: path.toString(), width, height };
+	let options = Object.assign({}, windowOptions$5 /*, currentOptions */);
+
+	window$1 = new remote$6.BrowserWindow(options);
+	window$1.setMenu(null);
+	window$1.loadURL(`file://${__dirname}/../settings/index.html`);
+
+	window$1.on("closed", () => window$1 = null);
+}
+
 class Delete extends Operation {
 	constructor(path) {
 		super();
@@ -2238,8 +2263,9 @@ class Delete extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.count;
-		await this._startDeleting(root);
+		let result = await this._startDeleting(root);
 		this._end();
+		return result;
 	}
 
 	async _startDeleting(record) {
@@ -2295,31 +2321,25 @@ class Delete extends Operation {
 	}
 }
 
-// copy to the same parent -- create a "copy of" prefix
-async function createCopyOf(path1, path2) {
-	do {
-		let name = `Copy of ${path1.getName()}`;
-		path1 = path1.getParent().append(name);
-		await path1.stat();
-	} while (path1.exists());
+// copy to the same parent -- create a " copy" suffix
+async function createCopyOf(path) {
+	let num = 0;
+	let parent = path.getParent();
+	let name = path.getName();
 
-	return path1;
-}
+	while (true) {
+		num++;
+		let suffix = ` (copy${num > 1 ? " "+num : ""})`;
 
-async function resolveExistingTarget(targetPath, record) {
-	// existing file
-	if (!targetPath.supports(CHILDREN)) {
-		if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
-		return targetPath;
+		let parts = name.split(".");
+		let index = (parts.length > 1 ? parts.length-2 : parts.length-1);
+		parts[index] += suffix;
+		let newName = parts.join(".");
+
+		let newPath = parent.append(newName);
+		await newPath.stat();
+		if (!newPath.exists()) { return newPath; }
 	}
-
-	// existing dir: needs two copyOf checks
-	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
-	targetPath = targetPath.append(record.path.getName());
-	await targetPath.stat();
-	if (targetPath.is(record.path)) { return createCopyOf(targetPath, record.path); }
-
-	return targetPath;
 }
 
 class Copy extends Operation {
@@ -2343,11 +2363,7 @@ class Copy extends Operation {
 		if (!root) { return false; }
 
 		this._stats.total = root.size;
-		await this._startCopying(root);
-		this._end();
-	}
 
-	async _startCopying(root) {
 		let options = {
 			title: this._texts.title,
 			row1: this._texts.row1,
@@ -2361,7 +2377,10 @@ class Copy extends Operation {
 
 		super.run(); // schedule progress window
 
-		return this._copy(root, this._targetPath);
+		let result = await this._copy(root, this._targetPath);
+
+		this._end();
+		return result;
 	}
 
 	/**
@@ -2369,20 +2388,18 @@ class Copy extends Operation {
 	 * @param {Path} targetPath Target path
 	 */
 	async _copy(record, targetPath) {
-		if (this._aborted) { return; }
+		if (this._aborted) { return false; }
 
 		await targetPath.stat();
+		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
 
-		if (targetPath.exists()) { targetPath = await resolveExistingTarget(targetPath, record); }
 		// does not exist => will be created during copy impl below
 
 		if (record.children !== null) {
-			await this._copyDirectory(record, targetPath);
+			return this._copyDirectory(record, targetPath);
 		} else {
-			await this._copyFile(record, targetPath);
+			return this._copyFile(record, targetPath);
 		}
-
-		return this._recordCopied(record);
 	}
 
 	/**
@@ -2392,21 +2409,25 @@ class Copy extends Operation {
 	 */
 	async _copyDirectory(record, targetPath) {
 		let created = await this._createDirectory(targetPath, record.path.getMode());
-		if (!created) { return; }
+		if (!created) { return false; }
 
+		let okay = true;
 		for (let child of record.children) {
-			await this._copy(child, targetPath);
+			let childOkay = await this._copy(child, targetPath);
+			if (!childOkay) { okay = false; }
 		}
 
 		let date = record.path.getDate();
-		if (date) { return targetPath.setDate(date); }
+		if (date) { await targetPath.setDate(date); }
+
+		return okay;
 	}
 
 	/**
 	 * @returns {Promise<bool>}
 	 */
 	async _createDirectory(path, mode) {
-		if (path.exists() && path.supports(CHILDREN)) { return true; } // folder already exists, fine
+		if (path.exists() && path.supports(CHILDREN)) { return true; } // directory already exists, fine
 
 		try {
 			await path.create({dir:true, mode});
@@ -2427,37 +2448,25 @@ class Copy extends Operation {
 		this._progress.update({row1:record.path.toString(), row2:targetPath.toString(), progress1, progress2});
 
 		if (targetPath.exists()) { // target exists: overwrite/skip/abort
-			if (this._issues.overwrite == "skip-all") { // silently skip
-				this._stats.done += record.size;
-				return;
-			}
-			if (this._issues.overwrite != "overwrite-all") { // raise an issue
-				let result = await this._handleFileExists(targetPath);
-				switch (result) {
-					case "abort": this.abort(); return; break;
-					case "skip":
-					case "skip-all":
-						this._stats.done += record.size;
-						return;
-					break;
-					/* overwrite = continue */
-				}
-			}
+			let canOverwrite = await this._canOverwrite(record, targetPath);
+			if (!canOverwrite)  { return false; }
 		}
 
 		if (record.path instanceof Local && record.path.isSymbolicLink()) {
 			return this._copyFileSymlink(record, targetPath);
 			// no setDate here, fs.utimes adjusts target's mtime instead
 		} else {
-			await this._copyFileContents(record, targetPath);
+			let contentsOkay = await this._copyFileContents(record, targetPath);
 			let date = record.path.getDate();
-			return targetPath.setDate(date);
+			await targetPath.setDate(date);
+			return contentsOkay;
 		}
 	}
 
 	async _copyFileSymlink(record, targetPath) {
 		try {
 			await targetPath.create({link:record.path.getTarget()});
+			return true;
 		} catch (e) {
 			return this._handleSymlinkError(e, record, targetPath);
 		}
@@ -2470,11 +2479,11 @@ class Copy extends Operation {
 		let writeStream = targetPath.createStream("w", opts);
 		readStream.pipe(writeStream);
 
-		await new Promise((resolve, reject) => {
+		return new Promise((resolve, reject) => {
 			let handleError = async e => {
 				try {
-					await this._handleCopyError(e, record, targetPath);
-					resolve();
+					let result = await this._handleCopyError(e, record, targetPath);
+					resolve(result);
 				} catch (e) {
 					reject(e);
 				}
@@ -2482,7 +2491,7 @@ class Copy extends Operation {
 			readStream.on("error", handleError);
 			writeStream.on("error", handleError);
 
-			writeStream.on("finish", resolve);
+			writeStream.on("finish", () => resolve(true));
 
 			readStream.on("data", buffer => {
 				done += buffer.length;
@@ -2495,7 +2504,29 @@ class Copy extends Operation {
 		}); /* file copy promise */		
 	}
 
-	async _recordCopied(record) {} /* used only for moving */
+	async _canOverwrite(record, targetPath) {
+		if (this._issues.overwrite == "overwrite-all") { return true; }
+
+		if (this._issues.overwrite == "skip-all") { // silently skip
+			this._stats.done += record.size;
+			return false;
+		}
+
+		// no "-all" resolution
+		let result = await this._handleFileExists(targetPath);
+		switch (result) {
+			case "abort":
+				this.abort();
+				return false;
+			break;
+			case "skip":
+			case "skip-all":
+				this._stats.done += record.size;
+				return false;
+			break;
+			default: return true; break; // overwrite/overwrite-all
+		}
+	}
 
 	async _handleFileExists(path) {
 		let text = `Target file ${path} already exists`;
@@ -2527,6 +2558,7 @@ class Copy extends Operation {
 			case "retry": return this._copyFile(record, targetPath); break;
 			case "abort": this.abort(); break;
 		}
+		return false;
 	}
 
 	async _handleSymlinkError(e, record, targetPath) {
@@ -2538,6 +2570,23 @@ class Copy extends Operation {
 			case "retry": return this._copyFileSymlink(record, targetPath); break;
 			case "abort": this.abort(); break;
 		}
+		return false;
+	}
+
+	async _resolveExistingTarget(targetPath, record) {
+		// existing file
+		if (!targetPath.supports(CHILDREN)) {
+			if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
+			return targetPath;
+		}
+
+		// existing dir: needs two copyOf checks
+		if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
+		targetPath = targetPath.append(record.path.getName());
+		await targetPath.stat();
+		if (targetPath.is(record.path)) { return createCopyOf(targetPath); }
+
+		return targetPath;
 	}
 }
 
@@ -2550,21 +2599,41 @@ class Move extends Copy {
 		};
 	}
 
-	async _startCopying(root) {
-		let targetPath = this._targetPath;
-		await targetPath.stat();
-		if (targetPath.exists()) { targetPath = targetPath.append(root.path.getName()); }
+	async _copyDirectory(record, targetPath) {
+		let renamed = await this._rename(record, targetPath);
+		if (renamed) { return true; }
 
-		try {
-			return root.path.rename(targetPath);
-		} catch (e) {} // quick rename failed, need to copy+delete
-
-		return super._startCopying(root);
+		let copied = await super._copyDirectory(record, targetPath);
+		return (copied ? this._delete(record) : false);
 	}
 
-	async _recordCopied(record) {
+	async _copyFile(record, targetPath) {
+		if (targetPath.exists()) { // target exists: overwrite/skip/abort
+			let canOverwrite = await this._canOverwrite(record, targetPath);
+			if (!canOverwrite)  { return false; }
+		}
+
+		let renamed = await this._rename(record, targetPath);
+		if (renamed) { return true; }
+
+		let copied = await super._copyFile(record, targetPath);
+		return (copied ? this._delete(record) : false);
+	}
+
+	async _rename(record, targetPath) {
+		try {
+//			console.log("rename", record.path+"", targetPath+"");
+			await record.path.rename(targetPath);
+			this._stats.done += record.size;
+//			console.log("ok");
+			return true;
+		} catch (e) { /*console.log("rename failed");*/return false; } // quick rename failed, need to copy+delete
+	}
+
+	async _delete(record) {
 		try {
 			await record.path.delete();
+			return true;
 		} catch (e) {
 			return this._handleDeleteError(e, record);
 		}
@@ -2576,9 +2645,19 @@ class Move extends Copy {
 		let buttons = ["retry", "skip", "skip-all", "abort"];
 		let result = await this._processIssue("delete", { text, title, buttons });
 		switch (result) {
-			case "retry": return this._recordCopied(record); break;
+			case "retry": return this._delete(record); break;
 			case "abort": this.abort(); break;
 		}
+	}
+
+	async _resolveExistingTarget(targetPath, record) {
+		// existing file
+		if (!targetPath.supports(CHILDREN)) { return targetPath; }
+
+		// existing dir: append leaf name
+		targetPath = targetPath.append(record.path.getName());
+		await targetPath.stat();
+		return targetPath;
 	}
 }
 
@@ -2778,6 +2857,10 @@ register$1("app:devtools", "F12", () => {
 	require("electron").remote.getCurrentWindow().toggleDevTools();
 });
 
+register$1("app:settings", [], () => {
+	open$1();
+});
+
 const Menu = require('electron').remote.Menu;
 
 function init$4() {
@@ -2817,7 +2900,7 @@ function init$4() {
 				menuItem("fixme", "Create &archive"),
 				{type: "separator"}, /* fixme sort? */
 				menuItem("fixme", "O&pen console"),
-				menuItem("fixme", "&Options")
+				menuItem("app:settings", "&Options")
 			]
 		},
 		{

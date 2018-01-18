@@ -7,6 +7,7 @@ import * as command from "util/command.js";
 import * as paths from "path/paths.js";
 import * as pubsub from "util/pubsub.js";
 import * as clipboard from "util/clipboard.js";
+import * as settings from "settings/remote.js";
 
 import Delete from "operation/delete.js";
 import Copy from "operation/copy.js";
@@ -206,4 +207,8 @@ command.register("file:move", "F6", async () => {
 
 command.register("app:devtools", "F12", () => {
 	require("electron").remote.getCurrentWindow().toggleDevTools();
+});
+
+command.register("app:settings", [], () => {
+	settings.open();
 });
