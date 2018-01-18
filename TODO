@@ -68,7 +68,7 @@ dir -> ? = create+recurse
 
 
 MOVE:
-file -> file = ask; rename | content 
+==> file -> file = ask; rename | content 
 file -> dir = append; rename | content
 file -> ? = rename | content
 

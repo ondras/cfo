@@ -43,6 +43,28 @@ exports.testMoveDir = async function testMoveDir(tmp) {
 	assertTree(target, contents);
 }
 
+exports.testMoveDirToDir = async function testMoveDirToDir(tmp) {
+	const source = path.join(tmp, "a");
+	const target = path.join(tmp, "b");
+	const contents = {
+		"file": "test file",
+		"subdir": {}
+	};
+
+	createTree(source, contents);
+	createTree(target, {});
+
+	let o = new Move(
+		paths.fromString(source),
+		paths.fromString(target)
+	);
+	let r = await o.run();
+
+	assert(r, "move ok");
+	assertTree(source, null);
+	assertTree(target, {"a":contents});
+}
+
 exports.testMoveFileToDir = async function testMoveFileToDir(tmp) {
 	const source = path.join(tmp, "a");
 	const target = path.join(tmp, "b");

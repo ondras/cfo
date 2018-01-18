@@ -10,23 +10,38 @@ export default class Move extends Copy {
 		}
 	}
 
-	async _copy(record, targetPath) {
-		if (this._aborted) { return false; }
+	async _copyDirectory(record, targetPath) {
+		let renamed = await this._rename(record, targetPath);
+		if (renamed) { return true; }
 
-		await targetPath.stat();
-		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
+		let copied = await super._copyDirectory(record, targetPath);
+		return (copied ? this._delete(record) : false);
+	}
 
+	async _copyFile(record, targetPath) {
+		if (targetPath.exists()) { // target exists: overwrite/skip/abort
+			let canOverwrite = await this._canOverwrite(record, targetPath);
+			if (!canOverwrite)  { return false; }
+		}
+
+		let renamed = await this._rename(record, targetPath);
+		if (renamed) { return true; }
+
+		let copied = await super._copyFile(record, targetPath);
+		return (copied ? this._delete(record) : false);
+	}
+
+	async _rename(record, targetPath) {
 		try {
 //			console.log("rename", record.path+"", targetPath+"");
 			await record.path.rename(targetPath);
 			this._stats.done += record.size;
 //			console.log("ok");
 			return true;
-		} catch (e) { /*console.log("rename failed");*/ } // quick rename failed, need to copy+delete
+		} catch (e) { /*console.log("rename failed");*/return false; } // quick rename failed, need to copy+delete
+	}
 
-		let result = await super._copy(record, targetPath);
-		if (!result)  { return false; }
-
+	async _delete(record) {
 		try {
 			await record.path.delete();
 			return true;
@@ -41,7 +56,7 @@ export default class Move extends Copy {
 		let buttons = ["retry", "skip", "skip-all", "abort"];
 		let result = await this._processIssue("delete", { text, title, buttons });
 		switch (result) {
-			case "retry": return this._recordCopied(record); break;
+			case "retry": return this._delete(record); break;
 			case "abort": this.abort(); break;
 		}
 	}

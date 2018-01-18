@@ -883,7 +883,7 @@ class Copy extends Operation {
 	 * @returns {Promise<bool>}
 	 */
 	async _createDirectory(path, mode) {
-		if (path.exists() && path.supports(CHILDREN)) { return true; } // folder already exists, fine
+		if (path.exists() && path.supports(CHILDREN)) { return true; } // directory already exists, fine
 
 		try {
 			await path.create({dir:true, mode});
@@ -904,25 +904,8 @@ class Copy extends Operation {
 		this._progress.update({row1:record.path.toString(), row2:targetPath.toString(), progress1, progress2});
 
 		if (targetPath.exists()) { // target exists: overwrite/skip/abort
-			if (this._issues.overwrite == "skip-all") { // silently skip
-				this._stats.done += record.size;
-				return false;
-			}
-			if (this._issues.overwrite != "overwrite-all") { // raise an issue
-				let result = await this._handleFileExists(targetPath);
-				switch (result) {
-					case "abort":
-						this.abort();
-						return false;
-					break;
-					case "skip":
-					case "skip-all":
-						this._stats.done += record.size;
-						return false;
-					break;
-					/* overwrite = continue */
-				}
-			}
+			let canOverwrite = await this._canOverwrite(record, targetPath);
+			if (!canOverwrite)  { return false; }
 		}
 
 		if (record.path instanceof Local && record.path.isSymbolicLink()) {
@@ -975,6 +958,30 @@ class Copy extends Operation {
 				this._progress.update({progress1, progress2});
 			}); /* on data */
 		}); /* file copy promise */		
+	}
+
+	async _canOverwrite(record, targetPath) {
+		if (this._issues.overwrite == "overwrite-all") { return true; }
+
+		if (this._issues.overwrite == "skip-all") { // silently skip
+			this._stats.done += record.size;
+			return false;
+		}
+
+		// no "-all" resolution
+		let result = await this._handleFileExists(targetPath);
+		switch (result) {
+			case "abort":
+				this.abort();
+				return false;
+			break;
+			case "skip":
+			case "skip-all":
+				this._stats.done += record.size;
+				return false;
+			break;
+			default: return true; break; // overwrite/overwrite-all
+		}
 	}
 
 	async _handleFileExists(path) {
@@ -1048,22 +1055,38 @@ class Move extends Copy {
 		};
 	}
 
-	async _copy(record, targetPath) {
-		if (this._aborted) { return false; }
+	async _copyDirectory(record, targetPath) {
+		let renamed = await this._rename(record, targetPath);
+		if (renamed) { return true; }
 
-		await targetPath.stat();
-		if (targetPath.exists()) { targetPath = await this._resolveExistingTarget(targetPath, record); }
+		let copied = await super._copyDirectory(record, targetPath);
+		return (copied ? this._delete(record) : false);
+	}
 
+	async _copyFile(record, targetPath) {
+		if (targetPath.exists()) { // target exists: overwrite/skip/abort
+			let canOverwrite = await this._canOverwrite(record, targetPath);
+			if (!canOverwrite)  { return false; }
+		}
+
+		let renamed = await this._rename(record, targetPath);
+		if (renamed) { return true; }
+
+		let copied = await super._copyFile(record, targetPath);
+		return (copied ? this._delete(record) : false);
+	}
+
+	async _rename(record, targetPath) {
 		try {
 //			console.log("rename", record.path+"", targetPath+"");
 			await record.path.rename(targetPath);
+			this._stats.done += record.size;
 //			console.log("ok");
 			return true;
-		} catch (e) { /*console.log("rename failed");*/ } // quick rename failed, need to copy+delete
+		} catch (e) { /*console.log("rename failed");*/return false; } // quick rename failed, need to copy+delete
+	}
 
-		let result = await super._copy(record, targetPath);
-		if (!result)  { return false; }
-
+	async _delete(record) {
 		try {
 			await record.path.delete();
 			return true;
@@ -1078,7 +1101,7 @@ class Move extends Copy {
 		let buttons = ["retry", "skip", "skip-all", "abort"];
 		let result = await this._processIssue("delete", { text, title, buttons });
 		switch (result) {
-			case "retry": return this._recordCopied(record); break;
+			case "retry": return this._delete(record); break;
 			case "abort": this.abort(); break;
 		}
 	}
@@ -1399,6 +1422,28 @@ exports.testMoveDir = async function testMoveDir(tmp) {
 	assert(r, "move ok");
 	assertTree(source, null);
 	assertTree(target, contents);
+};
+
+exports.testMoveDirToDir = async function testMoveDirToDir(tmp) {
+	const source = path.join(tmp, "a");
+	const target = path.join(tmp, "b");
+	const contents = {
+		"file": "test file",
+		"subdir": {}
+	};
+
+	createTree(source, contents);
+	createTree(target, {});
+
+	let o = new Move(
+		fromString(source),
+		fromString(target)
+	);
+	let r = await o.run();
+
+	assert(r, "move ok");
+	assertTree(source, null);
+	assertTree(target, {"a":contents});
 };
 
 exports.testMoveFileToDir = async function testMoveFileToDir(tmp) {

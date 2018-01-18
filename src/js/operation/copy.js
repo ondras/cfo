@@ -132,25 +132,8 @@ export default class Copy extends Operation {
 		this._progress.update({row1:record.path.toString(), row2:targetPath.toString(), progress1, progress2});
 
 		if (targetPath.exists()) { // target exists: overwrite/skip/abort
-			if (this._issues.overwrite == "skip-all") { // silently skip
-				this._stats.done += record.size;
-				return false;
-			}
-			if (this._issues.overwrite != "overwrite-all") { // raise an issue
-				let result = await this._handleFileExists(targetPath);
-				switch (result) {
-					case "abort":
-						this.abort();
-						return false;
-					break;
-					case "skip":
-					case "skip-all":
-						this._stats.done += record.size;
-						return false;
-					break;
-					/* overwrite = continue */
-				}
-			}
+			let canOverwrite = await this._canOverwrite(record, targetPath);
+			if (!canOverwrite)  { return false; }
 		}
 
 		if (record.path instanceof LocalPath && record.path.isSymbolicLink()) {
@@ -203,6 +186,30 @@ export default class Copy extends Operation {
 				this._progress.update({progress1, progress2});
 			}); /* on data */
 		}); /* file copy promise */		
+	}
+
+	async _canOverwrite(record, targetPath) {
+		if (this._issues.overwrite == "overwrite-all") { return true; }
+
+		if (this._issues.overwrite == "skip-all") { // silently skip
+			this._stats.done += record.size;
+			return false;
+		}
+
+		// no "-all" resolution
+		let result = await this._handleFileExists(targetPath);
+		switch (result) {
+			case "abort":
+				this.abort();
+				return false;
+			break;
+			case "skip":
+			case "skip-all":
+				this._stats.done += record.size;
+				return false;
+			break;
+			default: return true; break; // overwrite/overwrite-all
+		}
 	}
 
 	async _handleFileExists(path) {
