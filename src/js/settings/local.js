@@ -1,22 +1,39 @@
-/* Text viewer window - local (ui) part */
-
 import * as html from "util/html.js";
 import * as command from "util/command.js";
 import * as paths from "path/paths.js";
+import * as settings from "util/settings.js";
 
-const electron = require("electron");
-let buffer = new Buffer(0);
+function fromForm(name) {
+	let node = findName(name);
+	let value = node.value;
+	settings.set(name, value);
+}
 
-electron.ipcRenderer.on("path", (e, data) => {
-	let path = paths.fromString(data);
-	let stream = path.createStream("r");
+function toForm(name) {
+	let node = findName(name);
+	let value = settings.get(name);
+	node.value = value;
+}
 
-	stream.on("data", part => {
-		buffer = Buffer.concat([buffer, part]);
-		document.querySelector("textarea").value = buffer;
-	});
-});
+function onInput(e) {
+	let node = e.target;
+	fromForm(node.name);
+}
 
-command.register("window:close", "Escape", () => {
-	window.close();
-});
+function findName(name) {
+	return document.querySelector(`[name='${name}']`);
+}
+
+function initName(name) {
+	toForm(name);
+	let node = findName(name);
+	node.addEventListener("input", onInput);
+}
+
+function init() {
+	let names = Array.from(document.querySelectorAll("[name]")).map(n => n.name);
+	names.forEach(initName);
+	command.register("window:close", "Escape", () => window.close());
+}
+
+init();

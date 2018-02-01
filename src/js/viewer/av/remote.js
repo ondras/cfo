@@ -3,8 +3,8 @@
 import * as conf from "conf.js";
 
 const remote = require("electron").remote;
-const audio = /ogg|mp3|wav|m4a/i;
-const video = /mpe?g|mkv|webm|mov|mp4/i;
+const audio = /(ogg|mp3|wav|m4a)$/i;
+const video = /(mpe?g|mkv|webm|mov|mp4)$/i;
 
 const windowOptions = {
 	center: true,
@@ -24,8 +24,6 @@ export function view(path, list) {
 	let window = new remote.BrowserWindow(options);
 	window.setMenu(null);
 	window.loadURL(`file://${__dirname}/../viewer/av/index.html`);
-
-//	window.toggleDevTools();
 
 	let webContents = window.webContents;
 	webContents.once("did-finish-load", () => {

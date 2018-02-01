@@ -137,7 +137,7 @@ window.addEventListener("mousemove", onMouseMove);
 command.register("window:close", "Escape", () => {
 	window.close();
 });
-
+// FIXME plus nefunguje se shift
 command.register("image:zoomin", "+", () => zoom(+1));
 command.register("image:zoomout", "-", () => zoom(-1));
 command.register("image:fit", "*", () => {

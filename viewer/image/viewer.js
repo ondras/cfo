@@ -23,6 +23,32 @@ const KEYS = {
 
 const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
+const INPUTS = new Set(["input", "textarea", "button"]);
+
+function handler(e) {
+	let nodeName = e.target.nodeName.toLowerCase();
+	// jen kdyz nejsme ve formularovem prvku... s pochybnou vyjimkou readOnly <textarea>, coz je text viewer
+	if (INPUTS.has(nodeName) && !e.target.readOnly) { return; }
+
+	let available = REGISTRY.filter(reg => {
+		for (let m in reg.modifiers) {
+			if (reg.modifiers[m] != e[m]) { return false; }
+		}
+
+		if (reg.key != e.key.toLowerCase() && reg.key != e.code.toLowerCase()) { return false; }
+
+		return true;
+	});
+
+	while (available.length) {
+		let executed = available.pop().func();
+		if (executed) { 
+			e.preventDefault();
+			return;
+		}
+	}
+}
+
 function parse(key) {
 	let result = {
 		func: null,
@@ -52,6 +78,8 @@ function register$1(func, key) {
 	item.func = func;
 	REGISTRY.push(item);
 }
+
+window.addEventListener("keydown", handler);
 
 const storage = Object.create(null);
 
@@ -923,7 +951,7 @@ window.addEventListener("mousemove", onMouseMove);
 register("window:close", "Escape", () => {
 	window.close();
 });
-
+// FIXME plus nefunguje se shift
 register("image:zoomin", "+", () => zoom(+1));
 register("image:zoomout", "-", () => zoom(-1));
 register("image:fit", "*", () => {

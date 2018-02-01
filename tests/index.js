@@ -8,6 +8,9 @@ global.document = {
 	createTextNode() {},
 	querySelector() {}
 }
+global.window = {
+	addEventListener() {}
+}
 
 const process = require("process");
 const child_process = require("child_process");

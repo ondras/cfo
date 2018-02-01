@@ -23,6 +23,32 @@ const KEYS = {
 
 const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
+const INPUTS = new Set(["input", "textarea", "button"]);
+
+function handler(e) {
+	let nodeName = e.target.nodeName.toLowerCase();
+	// jen kdyz nejsme ve formularovem prvku... s pochybnou vyjimkou readOnly <textarea>, coz je text viewer
+	if (INPUTS.has(nodeName) && !e.target.readOnly) { return; }
+
+	let available = REGISTRY.filter(reg => {
+		for (let m in reg.modifiers) {
+			if (reg.modifiers[m] != e[m]) { return false; }
+		}
+
+		if (reg.key != e.key.toLowerCase() && reg.key != e.code.toLowerCase()) { return false; }
+
+		return true;
+	});
+
+	while (available.length) {
+		let executed = available.pop().func();
+		if (executed) { 
+			e.preventDefault();
+			return;
+		}
+	}
+}
+
 function parse(key) {
 	let result = {
 		func: null,
@@ -53,16 +79,7 @@ function register$1(func, key) {
 	REGISTRY.push(item);
 }
 
-const storage = Object.create(null);
-
-function publish(message, publisher, data) {
-	let subscribers = storage[message] || [];
-	subscribers.forEach(subscriber => {
-		typeof(subscriber) == "function"
-			? subscriber(message, publisher, data)
-			: subscriber.handleMessage(message, publisher, data);
-	});
-}
+window.addEventListener("keydown", handler);
 
 const registry = Object.create(null);
 
@@ -97,484 +114,18 @@ function isEnabled(command) {
 	return registry[command].enabled;
 }
 
-const CHILDREN = 0; // list children
-const CREATE   = 1; // create descendants
-const READ     = 2; // can we read contents?
-const WRITE    = 3; // can we rename / modify contents?
-
-/*
-export const EDIT     = 2; // edit file via the default text editor
-export const RENAME   = 3; // quickedit or attempt to move (on a same filesystem)
-export const DELETE   = 4; // self-explanatory
-export const COPY     = 5; // copy from FIXME pouzivat pro detekci
-export const VIEW     = 6; // view using an internal viewer
-*/
-class Path {
-	static match(str) { return false; }
-	is(other) { return other.toString() == this.toString(); }
-
-	/* sync getters */
-	toString() {}
-	getName() {}
-	getImage() {}
-	getDate() {}
-	getSize() {}
-	getMode() {}
-	getDescription() { return this.toString(); }
-	getParent() {}
-	append(leaf) {}
-
-	/* never fails */
-	async stat() {}
-
-	/* these can be called only after stat */
-	getSort() { return (this.supports(CHILDREN) ? 1 : 2); }
-	exists() {}
-	supports(what) {}
-	async getChildren() {}
-
-	/* misc */
-	async create(opts) {}
-	async rename(newPath) {}
-	async delete() {}
-	async setDate(date) {}
-	createStream(type, opts) {}
-
-	activate(list) {
-		if (this.supports(CHILDREN)) { list.setPath(this); }
-	}
-}
+// list children
+ // create descendants
+ // can we read contents?
+ // can we rename / modify contents?
 
 const fs$1 = require("fs");
 
-function readlink(linkPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.readlink(linkPath, (err, target) => {
-			err ? reject(err) : resolve(target);
-		});
-	});
-}
-
-function readdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.readdir(path, (err, files) => {
-			err ? reject(err) : resolve(files);
-		});
-	});
-}
-
-function mkdir(path, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.mkdir(path, mode, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function open(path, flags, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.open(path, flags, mode, (err, fd) => {
-			err ? reject(err) : resolve(fd);
-		});
-	});
-}
-
-function close(fd) {
-	return new Promise((resolve, reject) => {
-		fs$1.close(fd, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
-
-function rename(oldPath, newPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.rename(oldPath, newPath, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
-
-function unlink(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.unlink(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function rmdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.rmdir(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function utimes(path, atime, mtime) {
-	return new Promise((resolve, reject) => {
-		fs$1.utimes(path, atime, mtime, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function symlink(target, path) {
-	return new Promise((resolve, reject) => {
-		fs$1.symlink(target, path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function size(bytes, options = {}) {
-	{
-		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
-	}
-}
-
-const type = {
-	"mime": "mimetypes",
-	"place": "places",
-	"action": "actions",
-	"emblem": "emblems"
-};
-
-const fallback = {
-	"audio/wav": "audio/x-wav",
-	"audio/ogg": "audio/x-vorbis+ogg",
-	"application/x-httpd-php": "application/x-php",
-	"application/x-tex": "text/x-tex",
-	"application/x-sh": "application/x-shellscript",
-	"application/java-archive": "application/x-java-archive",
-	"application/x-sql": "text/x-sql",
-	"audio/x-flac": "audio/x-flac+ogg",
-	"image/x-pixmap": "gnome-mime-image/x-xpixmap",
-	"font/otf": "font/x-generic",
-	"application/font-woff": "font/x-generic",
-	"application/font-woff2": "font/x-generic",
-	"application/x-font-ttf": "font/x-generic",
-	"audio/mp4": "audio/x-generic"
-};
-
-function formatPath(path) {
-	let name = path.name;
-	if (name in fallback) { name = fallback[name]; }
-	name = name.replace(/\//g, "-");
-	return `../img/faenza/${type[path.type]}/16/${name}.png`;
-}
-
-
-var faenza = Object.freeze({
-	formatPath: formatPath
-});
-
-const SIZE = 16;
-const THEME = faenza;
-
-const LOCAL = ["link"];
-
-const KEYWORD = {
-	"folder": {
-		type: "place",
-		name: "folder"
-	},
-	"file": {
-		type: "mime",
-		name: "text-plain"
-	},
-	"up": {
-		type: "action",
-		name: "go-up"
-	},
-	"favorite": {
-		type: "emblem",
-		name: "emblem-favorite"
-	},
-	"broken": {
-		type: "action",
-		name: "gtk-cancel"
-	}
-};
-
-let cache = Object.create(null);
-let link = null;
-
-async function createImage(src) {
-	let img = node("img", {src});
-	return new Promise((resolve, reject) => {
-		img.onload = e => resolve(img);
-		img.onerror = reject;
-	});
-}
-
-function createCacheKey(name, options) {
-	return `${name}${options.link ? "-link" : ""}`;
-}
-
-function nameToPath(name) {
-	let path;
-	if (name.indexOf("/") == -1) { // keyword
-		if (LOCAL.indexOf(name) > -1) { return `../img/${name}.png`; } // local image
-		path = KEYWORD[name]; // keyword-to-mimetype mapping
-	} else {
-		path = {name, type:"mime"};
-	}
-	return THEME.formatPath(path);
-}
-
-async function createIcon(name, options) {
-	let canvas = node("canvas", {width:SIZE, height:SIZE});
-	let ctx = canvas.getContext("2d");
-
-	let path = nameToPath(name);
-	let image;
-
-	try {
-		image = await createImage(path);
-	} catch (e) {
-		console.warn("No icon found for", name);
-		image = await createImage(nameToPath("file"));
-	}
-
-	ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-	if (options.link) {
-		if (!link) { 
-			link = await createIcon("link", {link:false});
-		}
-		ctx.drawImage(link, 0, SIZE - link.height);
-	}
-
-	return canvas;
-}
-
-function drawCached(canvas, cached) {
-	canvas.width = cached.width;
-	canvas.height = cached.height;
-	canvas.getContext("2d").drawImage(cached, 0, 0);
-}
-
-function create(name, options = {}) {
-	let canvas = node("canvas", {width:SIZE, height:SIZE});
-	let key = createCacheKey(name, options);
-
-	if (key in cache) { // cached image or Promise
-		let cached = cache[key];
-		if (cached instanceof Promise) { // cached Promise
-			cached.then(icon => drawCached(canvas, icon));
-		} else { // cached image
-			drawCached(canvas, cached);
-		}
-	} else { // cache empty
-		let cached = createIcon(name, options).then(icon => cache[key] = icon);
-		cache[key] = cached;
-		cached.then(icon => drawCached(canvas, icon));
-	}
-
-	return canvas;
-}
-
 const mime = require("mime");
-
-function getType(str) {
-	let mt = mime.getType(str);
-	if (mt) { return mt; }
-
-	if (str.match(/\.py$/i)) { return "text/x-python"; }
-
-	return "file";
-}
 
 const fs = require("fs");
 const path = require("path");
 const {shell} = require("electron").remote;
-
-function statsToMetadata(stats) {
-	return {
-		isDirectory: stats.isDirectory(),
-		isSymbolicLink: stats.isSymbolicLink(),
-		date: stats.mtime,
-		size: stats.size,
-		mode: stats.mode
-	}
-}
-
-function getMetadata(path, options = {}) {
-	return new Promise((resolve, reject) => {
-		let cb = (err, stats) => {
-			if (err) { 
-				reject(err);
-			} else {
-				resolve(statsToMetadata(stats));
-			}
-		};
-		options.link ? fs.lstat(path, cb) : fs.stat(path, cb);
-	});
-}
-
-class Local extends Path {
-	static match(str) { return str.match(/^\//); }
-
-	constructor(p) {
-		super();
-		this._path = path.resolve(p); // to get rid of a trailing slash
-		this._target = null; // string, relative or absolute; null when failed to readlink
-		this._targetPath = null; // Local, absolute, for icon resolution, might not exist
-		this._error = null;
-		this._meta = {};
-	}
-
-	toString() { return this._path; }
-	getName() { return path.basename(this._path) || "/"; }
-	getDate() { return this._meta.date; }
-	getSize() { return (this._meta.isDirectory ? undefined : this._meta.size); }
-	getMode() { return this._meta.mode; }
-	getImage() {
-		let mimeType = getType(this.toString()) || "file"; 
-
-		let link = this._meta.isSymbolicLink;
-		let name = mimeType; // regular file
-
-		if (link) {
-			if (!this._targetPath || !this._targetPath.exists()) { // unreadable/broken symlink
-				name = "broken";
-			} else if (this._targetPath.supports(CHILDREN)) { // symlink to existing directory
-				name = "folder";
-			}
-		} else if (this.supports(CHILDREN)) { // regular directory
-			name = "folder";
-		}
-
-		return create(name, {link});
-	}
-	exists() { return ("isDirectory" in this._meta); }
-
-	getSort() {
-		if (this._meta.isSymbolicLink && this._targetPath) {
-			return this._targetPath.getSort();
-		} else {
-			return super.getSort();
-		}
-	}
-
-	/* symlink-specific */
-	isSymbolicLink() { return this._meta.isSymbolicLink; }
-	getTarget() { return this._target; }
-
-	getDescription() {
-		let d = this._path;
-		if (this._meta.isSymbolicLink) { d = `${d} → ${this._target}`; }
-
-		if (!this._meta.isDirectory) {
-			let size$$1 = this.getSize();
-			/* force raw bytes, no auto units */
-			if (size$$1 !== undefined) { d = `${d}, ${size(size$$1, {auto:false})} bytes`; }
-		}
-		return d;
-	}
- 
-	getParent() {
-		let parent = new this.constructor(path.dirname(this._path));
-		return (parent.is(this) ? null : parent);
-	}
-
-	supports(what) { 
-		switch (what) {
-			case CHILDREN:
-			case CREATE:
-				return this._meta.isDirectory;
-			break;
-
-			case READ:
-			case WRITE:
-				return true;
-			break;
-		}
-	}
-
-	activate(list) {
-		if (this.supports(CHILDREN)) {
-			return super.activate(list);
-		} else {
-			shell.openItem(this._path);
-		}
-	}
-
-	append(leaf) {
-		let newPath = path.resolve(this._path, leaf);
-		return new this.constructor(newPath);
-	}
-
-	async create(opts = {}) {
-		if (opts.link) {
-			return symlink(opts.link, this._path);
-		} else if (opts.dir) {
-			return mkdir(this._path);
-		} else {
-			let handle = await open(this._path, "wx", opts.mode);
-			return close(handle);
-		}
-	}
-
-	async rename(newPath) {
-		return rename(this._path, newPath.toString());
-	}
-
-	async delete() {
-		return (this._meta.isDirectory ? rmdir(this._path) : unlink(this._path));
-	}
-
-	async setDate(date$$1) {
-		let ts = date$$1.getTime()/1000;
-		return utimes(this._path, ts, ts);
-	}
-
-	async getChildren() {
-		let names = await readdir(this._path);
-		let paths = names
-			.map(name => path.resolve(this._path, name))
-			.map(name => new this.constructor(name));
-
-		let promises = paths.map(path => path.stat());
-		await Promise.all(promises);
-
-		return paths;
-	}
-
-	createStream(type, opts) {
-		switch (type) {
-			case "r": return fs.createReadStream(this._path, opts); break;
-			case "w": return fs.createWriteStream(this._path, opts); break;
-			default: throw new Error(`Unknown stream type "${type}"`); break;
-		}
-	}
-
-	async stat() {
-		try {
-			this._meta = await getMetadata(this._path, {link:true});
-		} catch (e) {
-			this._meta = {};
-		}
-
-		if (!this._meta.isSymbolicLink) { return; }
-
-		// symlink: get target path (readlink), get target metadata (stat)
-		try {
-			let target = await readlink(this._path);
-			this._target = target;
-
-			// resolve relative path
-			let linkDir = path.dirname(this._path);
-			target = path.resolve(linkDir, target);
-
-			let targetPath = new Local(target);
-			this._targetPath = targetPath;
-
-			await targetPath.stat();
-
-		} catch (e) {} // failed to readlink
-	}
-}
 
 const background = "#e8e8e8";
 
@@ -721,90 +272,61 @@ function close$2(value) {
 	resolve$1(value);
 }
 
-let storage$1 = []; // strings
-let root = null; // root fav: path
-
-
-
-
-function list() { return storage$1; }
-
-
-function remove(index) { 
-	storage$1[index] = null;
-	publish("path-change", null, {path:root});
-}
-
-class Favorite extends Path {
-	constructor(path, index) {
-		super();
-		this._path = path;
-		this._index = index;
-	}
-
-	toString() { return this._path.toString(); }
-	getName() { return this.toString(); }
-	getSize() { return this._index; }
-	getImage() { return create("favorite"); }
-	getSort() { return (this._index == 0 ? 10 : this._index); }
-
-	supports(what) {
-		if (what == WRITE) { return true; }
-		return false;
-	}
-
-	delete() {
-		remove(this._index);
-	}
-
-	activate(list$$1) {
-		list$$1.setPath(this._path);
-	}
-}
-
-class Favorites extends Path {
-	static match(str) { return str.match(/^fav:/i); }
-
-	toString() { return "fav:"; }
-	getName() { return "Favorites"; }
-	supports(what) {
-		if (what == CHILDREN) { return true; }
-		return false;
-	}
-
-	getChildren() {
-		return list().map((path, index) => {
-			return path ? new Favorite(path, index) : null;
-		}).filter(path => path);
-	}
-}
-
 const {app} = require("electron").remote;
-const ALL = [Favorites, Local];
-function fromString(str) {
-	let ctors = ALL.filter(ctor => ctor.match(str));
-	if (!ctors.length) { throw new Error(`No Path available to handle "${str}"`); }
-	let Ctor = ctors.shift();
-	return new Ctor(str);
+
+const {remote: remote$2} = require("electron");
+const settings = remote$2.require("electron-settings");
+
+const defaults = {
+	"favorites": [],
+	"panes": {},
+	"editor.bin": "/usr/bin/subl",
+	"newfile": "new.txt",
+	"terminal.bin": "/usr/bin/xfce4-terminal",
+	"terminal.args": `--working-directory=%s`
+};
+
+function get$1(key) {
+	return settings.get(key, defaults[key]);
 }
 
-/* Text viewer window - local (ui) part */
+function set$2(key, value) {
+	return settings.set(key, value);
+}
 
-const electron = require("electron");
-let buffer = new Buffer(0);
+function fromForm(name) {
+	let node$$1 = findName(name);
+	let value = node$$1.value;
+	set$2(name, value);
+}
 
-electron.ipcRenderer.on("path", (e, data) => {
-	let path = fromString(data);
-	let stream = path.createStream("r");
+function toForm(name) {
+	let node$$1 = findName(name);
+	let value = get$1(name);
+	node$$1.value = value;
+}
 
-	stream.on("data", part => {
-		buffer = Buffer.concat([buffer, part]);
-		document.querySelector("textarea").value = buffer;
-	});
-});
+function onInput(e) {
+	let node$$1 = e.target;
+	fromForm(node$$1.name);
+}
 
-register("window:close", "Escape", () => {
-	window.close();
-});
+function findName(name) {
+	return document.querySelector(`[name='${name}']`);
+}
+
+function initName(name) {
+	toForm(name);
+	let node$$1 = findName(name);
+	node$$1.addEventListener("input", onInput);
+}
+
+function init() {
+	let names = Array.from(document.querySelectorAll("[name]")).map(n => n.name);
+	names.forEach(initName);
+	register("window:close", "Escape", () => window.close());
+}
+
+init();
 
 }());

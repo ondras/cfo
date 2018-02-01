@@ -7,7 +7,8 @@ import * as command from "util/command.js";
 import * as paths from "path/paths.js";
 import * as pubsub from "util/pubsub.js";
 import * as clipboard from "util/clipboard.js";
-import * as settings from "settings/remote.js";
+import * as settings from "util/settings.js";
+import * as settingsWindow from "settings/remote.js";
 
 import Delete from "operation/delete.js";
 import Copy from "operation/copy.js";
@@ -115,7 +116,8 @@ command.register("file:new", "Shift+F4", async () => {
 	if (!path.supports(CREATE)) { return; }
 
 	/* fixme new.txt mit jako preferenci */
-	let name = await prompt(`Create new file in "${path}"`, "new.txt");
+	let name = settings.get("newfile");
+	name = await prompt(`Create new file in "${path}"`, name);
 	if (!name) { return; }
 
 	let newPath = path.append(name);
@@ -139,8 +141,8 @@ command.register("file:edit", "F4", () => {
 	let file = panes.getActive().getList().getSelection({multi:false});
 	if (file.supports(CHILDREN) || !file.supports(WRITE)) { return; }
 
-	/* fixme configurable */
-	let child = require("child_process").spawn("/usr/bin/subl", [file]);
+	let bin = settings.get("editor.bin");
+	let child = require("child_process").spawn(bin, [file]);
 
 	child.on("error", e => alert(e.message));
 });
@@ -210,5 +212,14 @@ command.register("app:devtools", "F12", () => {
 });
 
 command.register("app:settings", [], () => {
-	settings.open();
+	settingsWindow.open();
+});
+
+command.register("app:terminal", [], () => {
+	let bin = settings.get("terminal.bin");
+	let path = panes.getActive().getList().getPath();
+	let args = settings.get("terminal.args").split(" ").map(arg => arg.replace("%s", path.toString()));
+	console.log(bin, args);
+	let child = require("child_process").spawn(bin, args);
+	child.on("error", e => alert(e.message));
 });

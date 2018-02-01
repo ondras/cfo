@@ -254,8 +254,8 @@ var image = Object.freeze({
 /* Audio/Video viewer window - remote (data) part */
 
 const remote$3 = require("electron").remote;
-const audio = /ogg|mp3|wav|m4a/i;
-const video = /mpe?g|mkv|webm|mov|mp4/i;
+const audio = /(ogg|mp3|wav|m4a)$/i;
+const video = /(mpe?g|mkv|webm|mov|mp4)$/i;
 
 const windowOptions$2 = {
 	center: true,
@@ -275,8 +275,6 @@ function view$3(path, list) {
 	let window = new remote$3.BrowserWindow(options);
 	window.setMenu(null);
 	window.loadURL(`file://${__dirname}/../viewer/av/index.html`);
-
-//	window.toggleDevTools();
 
 	let webContents = window.webContents;
 	webContents.once("did-finish-load", () => {
@@ -1200,9 +1198,7 @@ function register(func, key) {
 	REGISTRY.push(item);
 }
 
-function init$3() {
-	window.addEventListener("keydown", handler);
-}
+window.addEventListener("keydown", handler);
 
 let storage = []; // strings
 let root = null; // root fav: path
@@ -2222,7 +2218,27 @@ function get$1() {
 	return clipboard.readText().split(SEP);
 }
 
-const remote$6 = require("electron").remote;
+const {remote: remote$6} = require("electron");
+const settings = remote$6.require("electron-settings");
+
+const defaults = {
+	"favorites": [],
+	"panes": {},
+	"editor.bin": "/usr/bin/subl",
+	"newfile": "new.txt",
+	"terminal.bin": "/usr/bin/xfce4-terminal",
+	"terminal.args": `--working-directory=%s`
+};
+
+function get$2(key) {
+	return settings.get(key, defaults[key]);
+}
+
+function set$3(key, value) {
+	return settings.set(key, value);
+}
+
+const remote$7 = require("electron").remote;
 let window$1;
 
 const windowOptions$5 = {
@@ -2240,7 +2256,7 @@ function open$1() {
 //	let currentOptions = { title: path.toString(), width, height };
 	let options = Object.assign({}, windowOptions$5 /*, currentOptions */);
 
-	window$1 = new remote$6.BrowserWindow(options);
+	window$1 = new remote$7.BrowserWindow(options);
 	window$1.setMenu(null);
 	window$1.loadURL(`file://${__dirname}/../settings/index.html`);
 
@@ -2763,7 +2779,8 @@ register$1("file:new", "Shift+F4", async () => {
 	if (!path.supports(CREATE)) { return; }
 
 	/* fixme new.txt mit jako preferenci */
-	let name = await prompt(`Create new file in "${path}"`, "new.txt");
+	let name = get$2("newfile");
+	name = await prompt(`Create new file in "${path}"`, name);
 	if (!name) { return; }
 
 	let newPath = path.append(name);
@@ -2787,8 +2804,8 @@ register$1("file:edit", "F4", () => {
 	let file = getActive().getList().getSelection({multi:false});
 	if (file.supports(CHILDREN) || !file.supports(WRITE)) { return; }
 
-	/* fixme configurable */
-	let child = require("child_process").spawn("/usr/bin/subl", [file]);
+	let bin = get$2("editor.bin");
+	let child = require("child_process").spawn(bin, [file]);
 
 	child.on("error", e => alert(e.message));
 });
@@ -2861,9 +2878,18 @@ register$1("app:settings", [], () => {
 	open$1();
 });
 
+register$1("app:terminal", [], () => {
+	let bin = get$2("terminal.bin");
+	let path = getActive().getList().getPath();
+	let args = get$2("terminal.args").split(" ").map(arg => arg.replace("%s", path.toString()));
+	console.log(bin, args);
+	let child = require("child_process").spawn(bin, args);
+	child.on("error", e => alert(e.message));
+});
+
 const Menu = require('electron').remote.Menu;
 
-function init$4() {
+function init$3() {
 	const template = [
 		{
 			label: "&File",
@@ -2899,7 +2925,7 @@ function init$4() {
 				menuItem("fixme", "&Search"),
 				menuItem("fixme", "Create &archive"),
 				{type: "separator"}, /* fixme sort? */
-				menuItem("fixme", "O&pen console"),
+				menuItem("app:terminal", "O&pen terminal"),
 				menuItem("app:settings", "&Options")
 			]
 		},
@@ -2918,8 +2944,7 @@ function init$4() {
 	Menu.setApplicationMenu(menu);
 }
 
-const {remote} = require('electron');
-const settings = remote.require('electron-settings');
+const {remote} = require("electron");
 
 window.FIXME = (...args) => console.error(...args);
 window.sleep = (delay = 1000) => new Promise(r => setTimeout(r, delay));
@@ -2956,17 +2981,16 @@ if (!("".padStart)) {
 
 function saveSettings(e) {
 	let win = remote.getCurrentWindow();
-	settings.set("window.size", win.getSize());
-	settings.set("window.position", win.getPosition());
-	settings.set("panes", toJSON());
-	settings.set("favorites", toJSON$1());
+	set$3("window.size", win.getSize());
+	set$3("window.position", win.getPosition());
+	set$3("panes", toJSON());
+	set$3("favorites", toJSON$1());
 }
 
 function init() {
 	init$3();
-	init$4();
-	init$2(settings.get("favorites", []));
-	init$1(settings.get("panes", {}));
+	init$2(get$2("favorites"));
+	init$1(get$2("panes"));
 	window.addEventListener("beforeunload", saveSettings);
 }
 

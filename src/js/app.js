@@ -1,14 +1,13 @@
 import * as commands from "commands.js"; // fixme nema explicitni inicializaci
 import * as panes from "panes.js";
 import * as menu from "menu.js";
-import * as keyboard from "util/keyboard.js";
 import * as favorites from "util/favorites.js";
 
 import * as icons from "util/icons.js";
 import * as mime from "util/mime.js";
+import * as settings from "util/settings.js";
 
-const {remote} = require('electron');
-const settings = remote.require('electron-settings');
+const {remote} = require("electron");
 
 window.FIXME = (...args) => console.error(...args);
 window.sleep = (delay = 1000) => new Promise(r => setTimeout(r, delay));
@@ -52,10 +51,9 @@ function saveSettings(e) {
 }
 
 function init() {
-	keyboard.init();
 	menu.init();
-	favorites.init(settings.get("favorites", []));
-	panes.init(settings.get("panes", {}));
+	favorites.init(settings.get("favorites"));
+	panes.init(settings.get("panes"));
 	window.addEventListener("beforeunload", saveSettings);
 }
 
