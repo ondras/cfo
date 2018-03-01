@@ -8,6 +8,14 @@
 
 	<body>
 		<fieldset>
+			<legend>Appearance</legend>
+			<label class="reload">Icon theme: <select name="icons">
+				<option value="faenza">Faenza</option>
+				<option value="numix">Numix</option>
+			</select>
+			<label class="reload">Automatic size units: <input type="checkbox" name="autosize" /></label>
+		</fieldset>
+		<fieldset>
 			<legend>Terminal</legend>
 			<label>Executable path: <input name="terminal.bin" /></label>
 			<label>Arguments: <input name="terminal.args" /></label>
@@ -16,7 +24,9 @@
 			<legend>Miscellaneous</legend>
 			<label>Editor executable: <input name="editor.bin" /></label>
 			<label>New file name: <input name="newfile" /></label>
+			</label>
 		</fieldset>
+		<p>Note: settings marked with <span class="reload"></span> will be applied after application restart.</p>
 		<script src="settings.js"></script>
 	</body>
 </html>

@@ -19,6 +19,7 @@ body {
 }
 body {
   margin: 1em;
+  font-size: 14px;
 }
 label {
   display: block;
@@ -28,4 +29,8 @@ legend {
 }
 fieldset {
   margin: 1em 0;
+}
+.reload::before {
+  content: "*";
+  color: red;
 }

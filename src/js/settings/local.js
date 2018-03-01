@@ -5,14 +5,18 @@ import * as settings from "util/settings.js";
 
 function fromForm(name) {
 	let node = findName(name);
-	let value = node.value;
+	let value = ("checked" in node ? node.checked : node.value);
 	settings.set(name, value);
 }
 
 function toForm(name) {
 	let node = findName(name);
 	let value = settings.get(name);
-	node.value = value;
+	if ("checked" in node) {
+		node.checked = value;
+	} else {
+		node.value = value;
+	}
 }
 
 function onInput(e) {
@@ -27,7 +31,11 @@ function findName(name) {
 function initName(name) {
 	toForm(name);
 	let node = findName(name);
-	node.addEventListener("input", onInput);
+	if ("checked" in node) {
+		node.addEventListener("click", onInput);
+	} else {
+		node.addEventListener("input", onInput);
+	}
 }
 
 function init() {

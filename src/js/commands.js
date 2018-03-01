@@ -115,7 +115,6 @@ command.register("file:new", "Shift+F4", async () => {
 	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
-	/* fixme new.txt mit jako preferenci */
 	let name = settings.get("newfile");
 	name = await prompt(`Create new file in "${path}"`, name);
 	if (!name) { return; }

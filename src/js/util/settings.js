@@ -7,7 +7,9 @@ const defaults = {
 	"editor.bin": "/usr/bin/subl",
 	"newfile": "new.txt",
 	"terminal.bin": "/usr/bin/xfce4-terminal",
-	"terminal.args": `--working-directory=%s`
+	"terminal.args": `--working-directory=%s`,
+	"icons": "faenza",
+	"autosize": false
 }
 
 export function get(key) {

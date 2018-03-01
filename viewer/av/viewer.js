@@ -121,6 +121,100 @@ function isEnabled(command) {
 
 const fs$1 = require("fs");
 
+const {remote} = require("electron");
+const settings = remote.require("electron-settings");
+
+const defaults = {
+	"favorites": [],
+	"panes": {},
+	"editor.bin": "/usr/bin/subl",
+	"newfile": "new.txt",
+	"terminal.bin": "/usr/bin/xfce4-terminal",
+	"terminal.args": `--working-directory=%s`,
+	"icons": "faenza",
+	"autosize": false
+};
+
+function get(key) {
+	return settings.get(key, defaults[key]);
+}
+
+const autoSize = get("autosize");
+
+const type = {
+	"mime": "mimetypes",
+	"place": "places",
+	"action": "actions",
+	"emblem": "emblems"
+};
+
+const fallback = {
+	"audio/wav": "audio/x-wav",
+	"audio/ogg": "audio/x-vorbis+ogg",
+	"application/x-httpd-php": "application/x-php",
+	"application/x-tex": "text/x-tex",
+	"application/x-sh": "application/x-shellscript",
+	"application/java-archive": "application/x-java-archive",
+	"application/x-sql": "text/x-sql",
+	"audio/x-flac": "audio/x-flac+ogg",
+	"image/x-pixmap": "gnome-mime-image/x-xpixmap",
+	"font/otf": "font/x-generic",
+	"application/font-woff": "font/x-generic",
+	"application/font-woff2": "font/x-generic",
+	"application/x-font-ttf": "font/x-generic",
+	"audio/mp4": "audio/x-generic"
+};
+
+function formatPath(path) {
+	let name = path.name;
+	if (name in fallback) { name = fallback[name]; }
+	name = name.replace(/\//g, "-");
+	return `../img/faenza/${type[path.type]}/16/${name}.png`;
+}
+
+
+var faenza = Object.freeze({
+	formatPath: formatPath
+});
+
+const type$1 = {
+	"mime": "mimetypes",
+	"place": "places",
+	"action": "actions",
+	"emblem": "emblems"
+};
+
+const fallback$1 = {
+	"audio/wav": "audio/x-wav",
+	"audio/ogg": "audio/x-vorbis+ogg",
+	"application/x-httpd-php": "application/x-php",
+	"application/x-tex": "text/x-tex",
+	"application/x-sh": "application/x-shellscript",
+	"application/java-archive": "application/x-java-archive",
+	"text/less": "text/x-scss",
+	"text/coffeescript": "application/vnd.coffeescript",
+	"application/x-sql": "application/sql",
+	"application/font-woff": "font/woff",
+	"application/font-woff2": "font/woff",
+	"application/rdf+xml": "text/rdf+xml"
+};
+
+function formatPath$1(path) {
+	let name = path.name;
+	if (name in fallback$1) { name = fallback$1[name]; }
+	name = name.replace(/\//g, "-");
+	return `../img/numix/${type$1[path.type]}/${name}.svg`;
+}
+
+
+
+var numix = Object.freeze({
+	formatPath: formatPath$1
+});
+
+const THEMES = {faenza, numix};
+const THEME = THEMES[get("icons")];
+
 const mime = require("mime");
 
 const fs = require("fs");
@@ -131,9 +225,9 @@ const background = "#e8e8e8";
 
 /* Progress window - remote (data) part */
 
-const remote = require("electron").remote;
+const remote$1 = require("electron").remote;
 const windowOptions = {
-	parent: remote.getCurrentWindow(),
+	parent: remote$1.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -146,9 +240,9 @@ const windowOptions = {
 
 /* Issue window - remote (data) part */
 
-const remote$1 = require("electron").remote;
+const remote$2 = require("electron").remote;
 const windowOptions$1 = {
-	parent: remote$1.getCurrentWindow(),
+	parent: remote$2.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,

@@ -1,4 +1,9 @@
+import * as settings from "util/settings.js";
+
 const MASK = "rwxrwxrwx";
+const autoSize = settings.get("autosize");
+const UNITS = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
+const UNIT_STEP = 1 << 10;
 
 export function mode(m) {
 	return MASK.replace(/./g, (ch, index) => {
@@ -20,15 +25,14 @@ export function date(date) {
 }
 
 export function size(bytes, options = {}) {
-	if (0 /*this.getPreference("autosize") */ && options.auto) {
-		var units = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
-		var step = 1 << 10;
-		var index = 0;
-		while (bytes / step >= 1 && index+1 < units.length) {
-			bytes /= step;
+	if (autoSize && options.auto) {
+		let index = 0;
+		while (bytes / UNIT_STEP >= 1 && index+1 < UNITS.length) {
+			bytes /= UNIT_STEP;
 			index++;
 		}
-		return `${bytes.toFixed(2)} ${units[index]}`;
+		let frac = (index > 0 ? 2 : 0);
+		return `${bytes.toFixed(frac)} ${UNITS[index]}`;
 	} else {
 		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
 	}

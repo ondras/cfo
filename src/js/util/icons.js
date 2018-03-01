@@ -1,9 +1,11 @@
 import * as html from "util/html.js";
 import * as faenza from "./icons/faenza.js"
 import * as numix from "./icons/numix.js"
+import * as settings from "util/settings.js";
 
+const THEMES = {faenza, numix};
 const SIZE = 16;
-const THEME = faenza;
+const THEME = THEMES[settings.get("icons")];
 
 const LOCAL = ["link"];
 

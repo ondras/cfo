@@ -39,7 +39,7 @@ export function init(saved) {
 
 export function toJSON() { return storage.map(path => path && path.toString()); }
 export function list() { return storage; }
-export function set(path, index) { 
+export function set(path, index) {
 	storage[index] = path;
 	pubsub.publish("path-change", null, {path:root});
 }

@@ -675,8 +675,66 @@ var faenza = Object.freeze({
 	formatPath: formatPath
 });
 
+const type$1 = {
+	"mime": "mimetypes",
+	"place": "places",
+	"action": "actions",
+	"emblem": "emblems"
+};
+
+const fallback$1 = {
+	"audio/wav": "audio/x-wav",
+	"audio/ogg": "audio/x-vorbis+ogg",
+	"application/x-httpd-php": "application/x-php",
+	"application/x-tex": "text/x-tex",
+	"application/x-sh": "application/x-shellscript",
+	"application/java-archive": "application/x-java-archive",
+	"text/less": "text/x-scss",
+	"text/coffeescript": "application/vnd.coffeescript",
+	"application/x-sql": "application/sql",
+	"application/font-woff": "font/woff",
+	"application/font-woff2": "font/woff",
+	"application/rdf+xml": "text/rdf+xml"
+};
+
+function formatPath$1(path) {
+	let name = path.name;
+	if (name in fallback$1) { name = fallback$1[name]; }
+	name = name.replace(/\//g, "-");
+	return `../img/numix/${type$1[path.type]}/${name}.svg`;
+}
+
+
+
+var numix = Object.freeze({
+	formatPath: formatPath$1
+});
+
+const {remote: remote$6} = require("electron");
+const settings = remote$6.require("electron-settings");
+
+const defaults = {
+	"favorites": [],
+	"panes": {},
+	"editor.bin": "/usr/bin/subl",
+	"newfile": "new.txt",
+	"terminal.bin": "/usr/bin/xfce4-terminal",
+	"terminal.args": `--working-directory=%s`,
+	"icons": "faenza",
+	"autosize": false
+};
+
+function get(key) {
+	return settings.get(key, defaults[key]);
+}
+
+function set(key, value) {
+	return settings.set(key, value);
+}
+
+const THEMES = {faenza, numix};
 const SIZE = 16;
-const THEME = faenza;
+const THEME = THEMES[get("icons")];
 
 const LOCAL = ["link"];
 
@@ -881,6 +939,9 @@ function symlink(target, path) {
 }
 
 const MASK = "rwxrwxrwx";
+const autoSize = get("autosize");
+const UNITS = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
+const UNIT_STEP = 1 << 10;
 
 function mode(m) {
 	return MASK.replace(/./g, (ch, index) => {
@@ -902,7 +963,15 @@ function date(date) {
 }
 
 function size(bytes, options = {}) {
-	{
+	if (autoSize && options.auto) {
+		let index = 0;
+		while (bytes / UNIT_STEP >= 1 && index+1 < UNITS.length) {
+			bytes /= UNIT_STEP;
+			index++;
+		}
+		let frac = (index > 0 ? 2 : 0);
+		return `${bytes.toFixed(frac)} ${UNITS[index]}`;
+	} else {
 		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
 	}
 }
@@ -1205,7 +1274,7 @@ let root = null; // root fav: path
 
 function viewFunc(i) {
 	return async () => {
-		let path = get(i);
+		let path = get$1(i);
 		if (!path) { return; }
 		getActive().getList().setPath(path);
 	};
@@ -1216,7 +1285,7 @@ function setFunc(i) {
 		let path = getActive().getList().getPath();
 		let result = await confirm$1(`Set "${path}" as favorite? It will be accessible as Ctrl+${i}.`);
 		if (!result) { return; }
-		set(path, i);
+		set$1(path, i);
 	}
 }
 
@@ -1234,11 +1303,11 @@ function init$2(saved) {
 
 function toJSON$1() { return storage.map(path => path && path.toString()); }
 function list() { return storage; }
-function set(path, index) { 
+function set$1(path, index) {
 	storage[index] = path;
 	publish("path-change", null, {path:root});
 }
-function get(index) { return storage[index]; }
+function get$1(index) { return storage[index]; }
 function remove(index) { 
 	storage[index] = null;
 	publish("path-change", null, {path:root});
@@ -1361,7 +1430,7 @@ function isGroup(path) {
 
 const node$1 = document.querySelector("footer");
 
-function set$1(value) {
+function set$2(value) {
 	node$1.innerHTML = value;
 }
 
@@ -1812,7 +1881,7 @@ class List {
 			str = `Selected ${size(bytes, {auto:false})} bytes in ${fileCount} files and ${dirCount} directories`;
 		}
 
-		set$1(str);
+		set$2(str);
 	}
 
 	_search(ch) {
@@ -2210,32 +2279,12 @@ register$1("tab:close", "Ctrl+W", () => {
 const clipboard = require("electron").clipboard;
 const SEP = "\n";
 
-function set$2(names) {
+function set$3(names) {
 	clipboard.writeText(names.join(SEP));
 }
 
-function get$1() {
+function get$2() {
 	return clipboard.readText().split(SEP);
-}
-
-const {remote: remote$6} = require("electron");
-const settings = remote$6.require("electron-settings");
-
-const defaults = {
-	"favorites": [],
-	"panes": {},
-	"editor.bin": "/usr/bin/subl",
-	"newfile": "new.txt",
-	"terminal.bin": "/usr/bin/xfce4-terminal",
-	"terminal.args": `--working-directory=%s`
-};
-
-function get$2(key) {
-	return settings.get(key, defaults[key]);
-}
-
-function set$3(key, value) {
-	return settings.set(key, value);
 }
 
 const remote$7 = require("electron").remote;
@@ -2691,7 +2740,7 @@ async function copyOrCut(mode) {
 	}
 
 	let names = items.map(path => toClipboard(path));
-	set$2(names);
+	set$3(names);
 	clipMode = mode;
 }
 
@@ -2742,7 +2791,7 @@ register$1("clip:paste", "Ctrl+V", async () => {
 	let path = list.getPath();
 
 	/* group of valid paths */
-	let p = get$1().map(fromClipboard).filter(path => path);
+	let p = get$2().map(fromClipboard).filter(path => path);
 	if (!p.length) { return; }
 
 	let group$$1 = group(p);
@@ -2778,8 +2827,7 @@ register$1("file:new", "Shift+F4", async () => {
 	let path = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
-	/* fixme new.txt mit jako preferenci */
-	let name = get$2("newfile");
+	let name = get("newfile");
 	name = await prompt(`Create new file in "${path}"`, name);
 	if (!name) { return; }
 
@@ -2804,7 +2852,7 @@ register$1("file:edit", "F4", () => {
 	let file = getActive().getList().getSelection({multi:false});
 	if (file.supports(CHILDREN) || !file.supports(WRITE)) { return; }
 
-	let bin = get$2("editor.bin");
+	let bin = get("editor.bin");
 	let child = require("child_process").spawn(bin, [file]);
 
 	child.on("error", e => alert(e.message));
@@ -2879,9 +2927,9 @@ register$1("app:settings", [], () => {
 });
 
 register$1("app:terminal", [], () => {
-	let bin = get$2("terminal.bin");
+	let bin = get("terminal.bin");
 	let path = getActive().getList().getPath();
-	let args = get$2("terminal.args").split(" ").map(arg => arg.replace("%s", path.toString()));
+	let args = get("terminal.args").split(" ").map(arg => arg.replace("%s", path.toString()));
 	console.log(bin, args);
 	let child = require("child_process").spawn(bin, args);
 	child.on("error", e => alert(e.message));
@@ -2981,16 +3029,16 @@ if (!("".padStart)) {
 
 function saveSettings(e) {
 	let win = remote.getCurrentWindow();
-	set$3("window.size", win.getSize());
-	set$3("window.position", win.getPosition());
-	set$3("panes", toJSON());
-	set$3("favorites", toJSON$1());
+	set("window.size", win.getSize());
+	set("window.position", win.getPosition());
+	set("panes", toJSON());
+	set("favorites", toJSON$1());
 }
 
 function init() {
 	init$3();
-	init$2(get$2("favorites"));
-	init$1(get$2("panes"));
+	init$2(get("favorites"));
+	init$1(get("panes"));
 	window.addEventListener("beforeunload", saveSettings);
 }
 
