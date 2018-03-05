@@ -67,7 +67,10 @@ export default class List {
 		this._pathToBeFocused = this._path; // will try to focus it afterwards
 		await path.stat();
 		let loaded = await this._loadPathContents(path);
-		loaded && pubsub.publish("list-change", this);
+		if (loaded) {
+			pubsub.publish("list-change", this);
+			this._updateTitle();
+		}
 		return loaded;
 	}
 
@@ -97,6 +100,8 @@ export default class List {
 
 		this._focusPath(this._pathToBeFocused, 0);
 		this._pathToBeFocused = null;
+
+		this._updateTitle();
 	}
 
 	deactivate() {
@@ -460,6 +465,13 @@ export default class List {
 
 		status.set(str);
 	}
+
+	_updateTitle() {
+		let path = this._path;
+		if (!path) { return; }
+		document.title = `${path.toString()} – CFO`;
+	}
+
 
 	_search(ch) {
 		let str = `${this._prefix}${ch}`;
