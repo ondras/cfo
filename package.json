@@ -12,10 +12,10 @@
     "start": "electron .",
     "rollup": "rollup",
     "lessc": "lessc",
-	"test": "make tests"
+    "test": "make tests"
   },
   "dependencies": {
-    "electron": "^1.7.9",
+    "electron": "^1.8.2",
     "electron-settings": "^3.1.1",
     "mime": "^2.0.3"
   }
