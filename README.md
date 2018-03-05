@@ -41,7 +41,7 @@ CFO is using [Numix icons](https://github.com/numixproject/numix-icon-theme) and
 - Miscellaneous
   - [X] Menu
   - [X] No toolbar
-  - [ ] Configuration
+  - [X] Configuration
   - [X] Persistence
   - [X] Selection
   - [X] Clipboard support
