@@ -710,8 +710,7 @@ var numix = Object.freeze({
 	formatPath: formatPath$1
 });
 
-const {remote: remote$6} = require("electron");
-const settings = remote$6.require("electron-settings");
+const settings = require("electron-settings");
 
 const defaults = {
 	"favorites": [],
@@ -856,87 +855,19 @@ class Up extends Path {
 	}
 }
 
+const promisify = require("util").promisify;
 const fs$1 = require("fs");
 
-function readlink(linkPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.readlink(linkPath, (err, target) => {
-			err ? reject(err) : resolve(target);
-		});
-	});
-}
-
-function readdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.readdir(path, (err, files) => {
-			err ? reject(err) : resolve(files);
-		});
-	});
-}
-
-function mkdir(path, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.mkdir(path, mode, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function open(path, flags, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.open(path, flags, mode, (err, fd) => {
-			err ? reject(err) : resolve(fd);
-		});
-	});
-}
-
-function close$2(fd) {
-	return new Promise((resolve, reject) => {
-		fs$1.close(fd, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
-
-function rename(oldPath, newPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.rename(oldPath, newPath, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
-
-function unlink(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.unlink(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function rmdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.rmdir(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function utimes(path, atime, mtime) {
-	return new Promise((resolve, reject) => {
-		fs$1.utimes(path, atime, mtime, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function symlink(target, path) {
-	return new Promise((resolve, reject) => {
-		fs$1.symlink(target, path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
+const readlink = promisify(fs$1.readlink);
+const readdir = promisify(fs$1.readdir);
+const mkdir = promisify(fs$1.mkdir);
+const rmdir = promisify(fs$1.rmdir);
+const open = promisify(fs$1.open);
+const close$2 = promisify(fs$1.close);
+const rename = promisify(fs$1.rename);
+const unlink = promisify(fs$1.unlink);
+const utimes = promisify(fs$1.utimes);
+const symlink = promisify(fs$1.symlink);
 
 const MASK = "rwxrwxrwx";
 const autoSize = get("autosize");
@@ -2299,7 +2230,7 @@ function get$2() {
 	return clipboard.readText().split(SEP);
 }
 
-const remote$7 = require("electron").remote;
+const remote$6 = require("electron").remote;
 let window$1;
 
 const windowOptions$5 = {
@@ -2317,7 +2248,7 @@ function open$1() {
 //	let currentOptions = { title: path.toString(), width, height };
 	let options = Object.assign({}, windowOptions$5 /*, currentOptions */);
 
-	window$1 = new remote$7.BrowserWindow(options);
+	window$1 = new remote$6.BrowserWindow(options);
 	window$1.setMenu(null);
 	window$1.loadURL(`file://${__dirname}/../settings/index.html`);
 

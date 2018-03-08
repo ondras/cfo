@@ -46,7 +46,6 @@ const remote = require("electron").remote;
 const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
 const windowOptions = {
-	parent: remote.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -67,6 +66,7 @@ class Progress {
 
 	open() {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
+		options.parent = remote.getCurrentWindow();
 		this._window = new remote.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../progress/index.html`);
@@ -114,7 +114,6 @@ class Progress {
 
 const remote$1 = require("electron").remote;
 const windowOptions$1 = {
-	parent: remote$1.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,
@@ -135,6 +134,7 @@ class Issue {
 
 	open() {
 		let options = Object.assign({}, windowOptions$1, {title: this._config.title});
+		options.parent = remote$1.getCurrentWindow();
 		this._window = new remote$1.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../issue/index.html`);
@@ -410,90 +410,55 @@ class Delete extends Operation {
 	}
 }
 
+const promisify = require("util").promisify;
 const fs$1 = require("fs");
 
-function readlink(linkPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.readlink(linkPath, (err, target) => {
-			err ? reject(err) : resolve(target);
-		});
-	});
+const readlink = promisify(fs$1.readlink);
+const readdir = promisify(fs$1.readdir);
+const mkdir = promisify(fs$1.mkdir);
+const rmdir = promisify(fs$1.rmdir);
+const open = promisify(fs$1.open);
+const close = promisify(fs$1.close);
+const rename = promisify(fs$1.rename);
+const unlink = promisify(fs$1.unlink);
+const utimes = promisify(fs$1.utimes);
+const symlink = promisify(fs$1.symlink);
+
+const settings = require("electron-settings");
+
+const defaults = {
+	"favorites": [],
+	"panes": {},
+	"editor.bin": "/usr/bin/subl",
+	"newfile": "new.txt",
+	"terminal.bin": "/usr/bin/xfce4-terminal",
+	"terminal.args": `--working-directory=%s`,
+	"icons": "faenza",
+	"autosize": false
+};
+
+function get(key) {
+	return settings.get(key, defaults[key]);
 }
 
-function readdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.readdir(path, (err, files) => {
-			err ? reject(err) : resolve(files);
-		});
-	});
-}
+const autoSize = get("autosize");
+const UNITS = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
+const UNIT_STEP = 1 << 10;
 
-function mkdir(path, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.mkdir(path, mode, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
 
-function open(path, flags, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.open(path, flags, mode, (err, fd) => {
-			err ? reject(err) : resolve(fd);
-		});
-	});
-}
 
-function close(fd) {
-	return new Promise((resolve, reject) => {
-		fs$1.close(fd, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
 
-function rename(oldPath, newPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.rename(oldPath, newPath, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
-
-function unlink(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.unlink(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function rmdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.rmdir(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function utimes(path, atime, mtime) {
-	return new Promise((resolve, reject) => {
-		fs$1.utimes(path, atime, mtime, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function symlink(target, path) {
-	return new Promise((resolve, reject) => {
-		fs$1.symlink(target, path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
 
 function size(bytes, options = {}) {
-	{
+	if (autoSize && options.auto) {
+		let index = 0;
+		while (bytes / UNIT_STEP >= 1 && index+1 < UNITS.length) {
+			bytes /= UNIT_STEP;
+			index++;
+		}
+		let frac = (index > 0 ? 2 : 0);
+		return `${bytes.toFixed(frac)} ${UNITS[index]}`;
+	} else {
 		return bytes.toString().replace(/(\d{1,3})(?=(\d{3})+(?!\d))/g, "$1 ");
 	}
 }
@@ -544,8 +509,44 @@ var faenza = Object.freeze({
 	formatPath: formatPath
 });
 
+const type$1 = {
+	"mime": "mimetypes",
+	"place": "places",
+	"action": "actions",
+	"emblem": "emblems"
+};
+
+const fallback$1 = {
+	"audio/wav": "audio/x-wav",
+	"audio/ogg": "audio/x-vorbis+ogg",
+	"application/x-httpd-php": "application/x-php",
+	"application/x-tex": "text/x-tex",
+	"application/x-sh": "application/x-shellscript",
+	"application/java-archive": "application/x-java-archive",
+	"text/less": "text/x-scss",
+	"text/coffeescript": "application/vnd.coffeescript",
+	"application/x-sql": "application/sql",
+	"application/font-woff": "font/woff",
+	"application/font-woff2": "font/woff",
+	"application/rdf+xml": "text/rdf+xml"
+};
+
+function formatPath$1(path) {
+	let name = path.name;
+	if (name in fallback$1) { name = fallback$1[name]; }
+	name = name.replace(/\//g, "-");
+	return `../img/numix/${type$1[path.type]}/${name}.svg`;
+}
+
+
+
+var numix = Object.freeze({
+	formatPath: formatPath$1
+});
+
+const THEMES = {faenza, numix};
 const SIZE = 16;
-const THEME = faenza;
+const THEME = THEMES[get("icons")];
 
 const LOCAL = ["link"];
 
@@ -662,7 +663,7 @@ function getType(str) {
 
 const fs = require("fs");
 const path$1 = require("path");
-const {shell} = require("electron").remote;
+const remote$3 = require("electron").remote;
 
 function statsToMetadata(stats) {
 	return {
@@ -771,7 +772,7 @@ class Local extends Path {
 		if (this.supports(CHILDREN)) {
 			return super.activate(list);
 		} else {
-			shell.openItem(this._path);
+			remote$3.shell.openItem(this._path);
 		}
 	}
 
@@ -1167,7 +1168,7 @@ class Group extends Path {
 	}
 }
 
-const {app} = require("electron").remote;
+const remote$2 = require("electron").remote;
 const ALL = [Favorites, Local];
 function fromString(str) {
 	let ctors = ALL.filter(ctor => ctor.match(str));

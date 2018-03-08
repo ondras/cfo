@@ -5,7 +5,6 @@ import * as conf from "conf.js";
 
 const remote = require("electron").remote;
 const windowOptions = {
-	parent: remote.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,
@@ -26,6 +25,7 @@ export default class Issue {
 
 	open() {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
+		options.parent = remote.getCurrentWindow();
 		this._window = new remote.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../issue/index.html`);

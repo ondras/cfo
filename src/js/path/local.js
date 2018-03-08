@@ -6,7 +6,7 @@ import * as mime from "util/mime.js";
 
 const fs = require("fs");
 const path = require("path");
-const {shell} = require("electron").remote;
+const remote = require("electron").remote;
 
 function statsToMetadata(stats) {
 	return {
@@ -115,7 +115,7 @@ export default class Local extends Path {
 		if (this.supports(CHILDREN)) {
 			return super.activate(list);
 		} else {
-			shell.openItem(this._path);
+			remote.shell.openItem(this._path);
 		}
 	}
 

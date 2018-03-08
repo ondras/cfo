@@ -2,7 +2,7 @@ import Local from "./local.js";
 import Favorites from "./favorites.js";
 import Group from "./group.js";
 
-const {app} = require("electron").remote;
+const remote = require("electron").remote;
 const ALL = [Favorites, Local];
 const CLIP_PREFIX = "file://";
 
@@ -26,7 +26,7 @@ export function fromClipboard(name) {
 }
 
 export function home() {
-	return fromString(app.getPath("home"));
+	return fromString(remote.app.getPath("home"));
 }
 
 export function favorites() {

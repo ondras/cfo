@@ -1,3 +1,5 @@
+require("electron").remote = require("./electron-remote-mock").remote;
+
 global.document = {
 	createElement() {
 		return {
@@ -91,6 +93,8 @@ async function run() {
 	} else {
 		console.log("All tests PASSED");
 	}
+
+	require("electron").app.quit();
 }
 
 run();

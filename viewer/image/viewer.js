@@ -173,90 +173,21 @@ class Path {
 	}
 }
 
+const promisify = require("util").promisify;
 const fs$1 = require("fs");
 
-function readlink(linkPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.readlink(linkPath, (err, target) => {
-			err ? reject(err) : resolve(target);
-		});
-	});
-}
+const readlink = promisify(fs$1.readlink);
+const readdir = promisify(fs$1.readdir);
+const mkdir = promisify(fs$1.mkdir);
+const rmdir = promisify(fs$1.rmdir);
+const open = promisify(fs$1.open);
+const close = promisify(fs$1.close);
+const rename = promisify(fs$1.rename);
+const unlink = promisify(fs$1.unlink);
+const utimes = promisify(fs$1.utimes);
+const symlink = promisify(fs$1.symlink);
 
-function readdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.readdir(path, (err, files) => {
-			err ? reject(err) : resolve(files);
-		});
-	});
-}
-
-function mkdir(path, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.mkdir(path, mode, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function open(path, flags, mode) {
-	return new Promise((resolve, reject) => {
-		fs$1.open(path, flags, mode, (err, fd) => {
-			err ? reject(err) : resolve(fd);
-		});
-	});
-}
-
-function close(fd) {
-	return new Promise((resolve, reject) => {
-		fs$1.close(fd, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
-
-function rename(oldPath, newPath) {
-	return new Promise((resolve, reject) => {
-		fs$1.rename(oldPath, newPath, err => {
-			err ? reject(err) : resolve();
-		});
-	})
-}
-
-function unlink(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.unlink(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function rmdir(path) {
-	return new Promise((resolve, reject) => {
-		fs$1.rmdir(path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function utimes(path, atime, mtime) {
-	return new Promise((resolve, reject) => {
-		fs$1.utimes(path, atime, mtime, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-function symlink(target, path) {
-	return new Promise((resolve, reject) => {
-		fs$1.symlink(target, path, err => {
-			err ? reject(err) : resolve();
-		});
-	});
-}
-
-const {remote} = require("electron");
-const settings = remote.require("electron-settings");
+const settings = require("electron-settings");
 
 const defaults = {
 	"favorites": [],
@@ -678,9 +609,9 @@ const background = "#e8e8e8";
 
 /* Progress window - remote (data) part */
 
-const remote$1 = require("electron").remote;
+const remote = require("electron").remote;
 const windowOptions = {
-	parent: remote$1.getCurrentWindow(),
+	parent: remote.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -693,9 +624,9 @@ const windowOptions = {
 
 /* Issue window - remote (data) part */
 
-const remote$2 = require("electron").remote;
+const remote$1 = require("electron").remote;
 const windowOptions$1 = {
-	parent: remote$2.getCurrentWindow(),
+	parent: remote$1.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,

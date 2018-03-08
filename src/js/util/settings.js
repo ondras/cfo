@@ -1,5 +1,4 @@
-const {remote} = require("electron");
-const settings = remote.require("electron-settings");
+const settings = require("electron-settings");
 
 const defaults = {
 	"favorites": [],

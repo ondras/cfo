@@ -7,7 +7,6 @@ const remote = require("electron").remote;
 const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
 const windowOptions = {
-	parent: remote.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -28,6 +27,7 @@ export default class Progress {
 
 	open() {
 		let options = Object.assign({}, windowOptions, {title: this._config.title});
+		options.parent = remote.getCurrentWindow();
 		this._window = new remote.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../progress/index.html`);

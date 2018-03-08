@@ -119,10 +119,21 @@ function isEnabled(command) {
  // can we read contents?
  // can we rename / modify contents?
 
+const promisify = require("util").promisify;
 const fs$1 = require("fs");
 
-const {remote} = require("electron");
-const settings = remote.require("electron-settings");
+const readlink = promisify(fs$1.readlink);
+const readdir = promisify(fs$1.readdir);
+const mkdir = promisify(fs$1.mkdir);
+const rmdir = promisify(fs$1.rmdir);
+const open = promisify(fs$1.open);
+const close = promisify(fs$1.close);
+const rename = promisify(fs$1.rename);
+const unlink = promisify(fs$1.unlink);
+const utimes = promisify(fs$1.utimes);
+const symlink = promisify(fs$1.symlink);
+
+const settings = require("electron-settings");
 
 const defaults = {
 	"favorites": [],
@@ -225,9 +236,9 @@ const background = "#e8e8e8";
 
 /* Progress window - remote (data) part */
 
-const remote$1 = require("electron").remote;
+const remote = require("electron").remote;
 const windowOptions = {
-	parent: remote$1.getCurrentWindow(),
+	parent: remote.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -240,9 +251,9 @@ const windowOptions = {
 
 /* Issue window - remote (data) part */
 
-const remote$2 = require("electron").remote;
+const remote$1 = require("electron").remote;
 const windowOptions$1 = {
-	parent: remote$2.getCurrentWindow(),
+	parent: remote$1.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,

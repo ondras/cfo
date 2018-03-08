@@ -54,7 +54,6 @@ $(TESTS): tests/%: tests/src/% $(JS)
 	npm -s run rollup -- -c tests/rollup.config.js $< -o $@
 
 tests: $(TESTS)
-	@cd tests && node .
 
 clean:
 	rm -rf $(ALL)
