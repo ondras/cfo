@@ -112,6 +112,7 @@ export default class List {
 		this._node.classList.remove("active");
 
 		this._quickEdit.stop();
+		this._prefix = "";
 
 		this._pathToBeFocused = this.getSelection({multi:false});
 		this._removeFocus();
@@ -355,10 +356,7 @@ export default class List {
 
 	_getFocusedIndex() {
 		let focused = this._table.querySelector(".focus");
-
-		return this._items.reduce((result, item, index) => {
-			return (item.node == focused ? index : result);
-		}, -1);
+		return this._items.reduce((result, item, index) => (item.node == focused ? index : result), -1);
 	}
 
 	_focusByPage(diff) {
@@ -476,12 +474,19 @@ export default class List {
 	_search(ch) {
 		let str = `${this._prefix}${ch}`;
 
-		for (let i=0; i<this._items.length; i++) {
-			let name = this._items[i].path.getName();
+		let startIndex = this._getFocusedIndex();
+		if (startIndex == -1) { startIndex = 0; }
+
+		// start at the currently focused index
+		let items = this._items.slice(startIndex);
+		if (startIndex > 0) { items = items.concat(this._items.slice(0, startIndex)); }
+
+		for (let i=0; i<items.length; i++) {
+			let name = items[i].path.getName();
 			if (!name) { continue; }
 			if (name.toLowerCase().indexOf(str) == 0) { /* found! */
 				this._prefix = str;
-				this._focusAt(i);
+				this._focusAt((i + startIndex) % items.length);
 				return;
 			}
 		}

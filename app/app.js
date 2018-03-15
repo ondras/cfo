@@ -341,7 +341,6 @@ const remote$4 = require("electron").remote;
 const TIMEOUT = 1000/30; // throttle updates to once per TIMEOUT
 
 const windowOptions$3 = {
-	parent: remote$4.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	center: true,
@@ -362,6 +361,7 @@ class Progress {
 
 	open() {
 		let options = Object.assign({}, windowOptions$3, {title: this._config.title});
+		options.parent = remote$4.getCurrentWindow();
 		this._window = new remote$4.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../progress/index.html`);
@@ -409,7 +409,6 @@ class Progress {
 
 const remote$5 = require("electron").remote;
 const windowOptions$4 = {
-	parent: remote$5.getCurrentWindow(),
 	resizable: false,
 	fullscreenable: false,
 	alwaysOnTop: true,
@@ -430,6 +429,7 @@ class Issue {
 
 	open() {
 		let options = Object.assign({}, windowOptions$4, {title: this._config.title});
+		options.parent = remote$5.getCurrentWindow();
 		this._window = new remote$5.BrowserWindow(options);
 		this._window.setMenu(null);
 		this._window.loadURL(`file://${__dirname}/../issue/index.html`);
@@ -920,7 +920,7 @@ function getType(str) {
 
 const fs = require("fs");
 const path = require("path");
-const {shell} = require("electron").remote;
+const remote$7 = require("electron").remote;
 
 function statsToMetadata(stats) {
 	return {
@@ -1029,7 +1029,7 @@ class Local extends Path {
 		if (this.supports(CHILDREN)) {
 			return super.activate(list);
 		} else {
-			shell.openItem(this._path);
+			remote$7.shell.openItem(this._path);
 		}
 	}
 
@@ -1320,7 +1320,7 @@ class Group extends Path {
 	}
 }
 
-const {app} = require("electron").remote;
+const remote$6 = require("electron").remote;
 const ALL = [Favorites, Local];
 const CLIP_PREFIX = "file://";
 
@@ -1344,7 +1344,7 @@ function fromClipboard(name) {
 }
 
 function home() {
-	return fromString(app.getPath("home"));
+	return fromString(remote$6.app.getPath("home"));
 }
 
 function favorites() {
@@ -1466,6 +1466,7 @@ class List {
 		this._node.classList.remove("active");
 
 		this._quickEdit.stop();
+		this._prefix = "";
 
 		this._pathToBeFocused = this.getSelection({multi:false});
 		this._removeFocus();
@@ -1709,10 +1710,7 @@ class List {
 
 	_getFocusedIndex() {
 		let focused = this._table.querySelector(".focus");
-
-		return this._items.reduce((result, item, index) => {
-			return (item.node == focused ? index : result);
-		}, -1);
+		return this._items.reduce((result, item, index) => (item.node == focused ? index : result), -1);
 	}
 
 	_focusByPage(diff) {
@@ -1830,12 +1828,19 @@ class List {
 	_search(ch) {
 		let str = `${this._prefix}${ch}`;
 
-		for (let i=0; i<this._items.length; i++) {
-			let name = this._items[i].path.getName();
+		let startIndex = this._getFocusedIndex();
+		if (startIndex == -1) { startIndex = 0; }
+
+		// start at the currently focused index
+		let items = this._items.slice(startIndex);
+		if (startIndex > 0) { items = items.concat(this._items.slice(0, startIndex)); }
+
+		for (let i=0; i<items.length; i++) {
+			let name = items[i].path.getName();
 			if (!name) { continue; }
 			if (name.toLowerCase().indexOf(str) == 0) { /* found! */
 				this._prefix = str;
-				this._focusAt(i);
+				this._focusAt((i + startIndex) % items.length);
 				return;
 			}
 		}
@@ -2230,7 +2235,7 @@ function get$2() {
 	return clipboard.readText().split(SEP);
 }
 
-const remote$6 = require("electron").remote;
+const remote$8 = require("electron").remote;
 let window$1;
 
 const windowOptions$5 = {
@@ -2248,7 +2253,7 @@ function open$1() {
 //	let currentOptions = { title: path.toString(), width, height };
 	let options = Object.assign({}, windowOptions$5 /*, currentOptions */);
 
-	window$1 = new remote$6.BrowserWindow(options);
+	window$1 = new remote$8.BrowserWindow(options);
 	window$1.setMenu(null);
 	window$1.loadURL(`file://${__dirname}/../settings/index.html`);
 

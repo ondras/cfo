@@ -416,7 +416,7 @@ function getType(str) {
 
 const fs = require("fs");
 const path = require("path");
-const {shell} = require("electron").remote;
+const remote$1 = require("electron").remote;
 
 function statsToMetadata(stats) {
 	return {
@@ -525,7 +525,7 @@ class Local extends Path {
 		if (this.supports(CHILDREN)) {
 			return super.activate(list);
 		} else {
-			shell.openItem(this._path);
+			remote$1.shell.openItem(this._path);
 		}
 	}
 
@@ -605,38 +605,13 @@ class Local extends Path {
 	}
 }
 
-const background = "#e8e8e8";
-
 /* Progress window - remote (data) part */
 
-const remote = require("electron").remote;
-const windowOptions = {
-	parent: remote.getCurrentWindow(),
-	resizable: false,
-	fullscreenable: false,
-	center: true,
-	width: 500,
-	height: 100,
-	show: false,
-	useContentSize: true,
-	backgroundColor: background
-};
+const remote$2 = require("electron").remote;
 
 /* Issue window - remote (data) part */
 
-const remote$1 = require("electron").remote;
-const windowOptions$1 = {
-	parent: remote$1.getCurrentWindow(),
-	resizable: false,
-	fullscreenable: false,
-	alwaysOnTop: true,
-	center: true,
-	width: 500,
-	height: 60,
-	show: false,
-	useContentSize: true,
-	backgroundColor: background
-};
+const remote$3 = require("electron").remote;
 
 let resolve;
 
@@ -808,7 +783,7 @@ class Favorites extends Path {
 	}
 }
 
-const {app} = require("electron").remote;
+const remote = require("electron").remote;
 const ALL = [Favorites, Local];
 function fromString(str) {
 	let ctors = ALL.filter(ctor => ctor.match(str));

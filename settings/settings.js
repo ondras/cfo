@@ -234,40 +234,15 @@ const mime = require("mime");
 
 const fs = require("fs");
 const path = require("path");
-const {shell} = require("electron").remote;
-
-const background = "#e8e8e8";
+const remote$1 = require("electron").remote;
 
 /* Progress window - remote (data) part */
 
-const remote = require("electron").remote;
-const windowOptions = {
-	parent: remote.getCurrentWindow(),
-	resizable: false,
-	fullscreenable: false,
-	center: true,
-	width: 500,
-	height: 100,
-	show: false,
-	useContentSize: true,
-	backgroundColor: background
-};
+const remote$2 = require("electron").remote;
 
 /* Issue window - remote (data) part */
 
-const remote$1 = require("electron").remote;
-const windowOptions$1 = {
-	parent: remote$1.getCurrentWindow(),
-	resizable: false,
-	fullscreenable: false,
-	alwaysOnTop: true,
-	center: true,
-	width: 500,
-	height: 60,
-	show: false,
-	useContentSize: true,
-	backgroundColor: background
-};
+const remote$3 = require("electron").remote;
 
 let resolve;
 
@@ -381,7 +356,7 @@ function close$2(value) {
 	resolve$1(value);
 }
 
-const {app} = require("electron").remote;
+const remote = require("electron").remote;
 
 function fromForm(name) {
 	let node$$1 = findName(name);

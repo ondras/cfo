@@ -57,22 +57,5 @@ hypotezy:
   f8: WRITE
 
 
-COPY:
-file -> file = no append, copyof | ask, content
-file -> dir = append, copyof | ask, content
-file -> ? = content
-
-dir -> file = error
-dir -> dir = copyof | append, copyof | create, recurse
-dir -> ? = create+recurse
-
-
-MOVE:
-==> file -> file = ask; rename | content 
-file -> dir = append; rename | content
-file -> ? = rename | content
-
-dir -> file = error?
-dir -> dir = create+recurse
-dir -> ? = rename | create+recurse
-
+- pomlcka/plus v quicksearchi
+- issue neumi escape?
