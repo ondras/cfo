@@ -1,5 +1,5 @@
 export const CHILDREN = 0; // list children
-export const CREATE   = 1; // create descendants
+export const CREATE   = 1; // create descendants (FIXME APPEND?)
 export const READ     = 2; // can we read contents?
 export const WRITE    = 3; // can we rename / modify contents?
 

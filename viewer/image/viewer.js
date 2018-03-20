@@ -23,7 +23,7 @@ const KEYS = {
 
 const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
-const INPUTS = new Set(["input", "textarea", "button"]);
+const INPUTS = new Set(["input", "textarea"]);
 
 function handler(e) {
 	let nodeName = e.target.nodeName.toLowerCase();
@@ -126,7 +126,7 @@ function isEnabled(command) {
 }
 
 const CHILDREN = 0; // list children
-const CREATE   = 1; // create descendants
+const CREATE   = 1; // create descendants (FIXME APPEND?)
 const READ     = 2; // can we read contents?
 const WRITE    = 3; // can we rename / modify contents?
 
@@ -511,7 +511,12 @@ class Local extends Path {
 		switch (what) {
 			case CHILDREN:
 			case CREATE:
-				return this._meta.isDirectory;
+				if (this._meta.isDirectory) { return true; }
+				if (this._meta.isSymbolicLink) {
+					return (this._targetPath && this._targetPath.supports(what));
+				} else {
+					return false;
+				}
 			break;
 
 			case READ:

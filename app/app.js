@@ -124,7 +124,7 @@ function confirm$1(t) {
 }
 
 const CHILDREN = 0; // list children
-const CREATE   = 1; // create descendants
+const CREATE   = 1; // create descendants (FIXME APPEND?)
 const READ     = 2; // can we read contents?
 const WRITE    = 3; // can we rename / modify contents?
 
@@ -1015,7 +1015,12 @@ class Local extends Path {
 		switch (what) {
 			case CHILDREN:
 			case CREATE:
-				return this._meta.isDirectory;
+				if (this._meta.isDirectory) { return true; }
+				if (this._meta.isSymbolicLink) {
+					return (this._targetPath && this._targetPath.supports(what));
+				} else {
+					return false;
+				}
 			break;
 
 			case READ:
@@ -1142,7 +1147,7 @@ const KEYS = {
 
 const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
-const INPUTS = new Set(["input", "textarea", "button"]);
+const INPUTS = new Set(["input", "textarea"]);
 
 function handler(e) {
 	let nodeName = e.target.nodeName.toLowerCase();
@@ -2754,7 +2759,6 @@ register$1("clip:paste", "Ctrl+V", async () => {
 register$1("directory:new", "F7", async () => {
 	let list = getActive().getList();
 	let path = list.getPath();
-	window.ppp = list.getPath();
 	if (!path.supports(CREATE)) { return; }
 
 	let name = await prompt(`Create new directory in "${path}"`);

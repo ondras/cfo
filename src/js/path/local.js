@@ -101,7 +101,12 @@ export default class Local extends Path {
 		switch (what) {
 			case CHILDREN:
 			case CREATE:
-				return this._meta.isDirectory;
+				if (this._meta.isDirectory) { return true; }
+				if (this._meta.isSymbolicLink) {
+					return (this._targetPath && this._targetPath.supports(what));
+				} else {
+					return false;
+				}
 			break;
 
 			case READ:

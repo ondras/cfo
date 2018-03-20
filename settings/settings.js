@@ -23,7 +23,7 @@ const KEYS = {
 
 const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
-const INPUTS = new Set(["input", "textarea", "button"]);
+const INPUTS = new Set(["input", "textarea"]);
 
 function handler(e) {
 	let nodeName = e.target.nodeName.toLowerCase();
@@ -115,7 +115,7 @@ function isEnabled(command) {
 }
 
 // list children
- // create descendants
+ // create descendants (FIXME APPEND?)
  // can we read contents?
  // can we rename / modify contents?
 
