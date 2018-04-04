@@ -17,7 +17,8 @@ const fallback = {
 	"application/x-sql": "application/sql",
 	"application/font-woff": "font/woff",
 	"application/font-woff2": "font/woff",
-	"application/rdf+xml": "text/rdf+xml"
+	"application/rdf+xml": "text/rdf+xml",
+	"application/vnd.apple.mpegurl": "audio/x-mpegurl"
 }
 
 export function formatPath(path) {

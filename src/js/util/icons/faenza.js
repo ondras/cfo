@@ -19,7 +19,8 @@ const fallback = {
 	"application/font-woff": "font/x-generic",
 	"application/font-woff2": "font/x-generic",
 	"application/x-font-ttf": "font/x-generic",
-	"audio/mp4": "audio/x-generic"
+	"audio/mp4": "audio/x-generic",
+	"application/vnd.apple.mpegurl": "audio/x-mpegurl"
 }
 
 export function formatPath(path) {

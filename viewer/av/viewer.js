@@ -173,7 +173,8 @@ const fallback = {
 	"application/font-woff": "font/x-generic",
 	"application/font-woff2": "font/x-generic",
 	"application/x-font-ttf": "font/x-generic",
-	"audio/mp4": "audio/x-generic"
+	"audio/mp4": "audio/x-generic",
+	"application/vnd.apple.mpegurl": "audio/x-mpegurl"
 };
 
 function formatPath(path) {
@@ -207,7 +208,8 @@ const fallback$1 = {
 	"application/x-sql": "application/sql",
 	"application/font-woff": "font/woff",
 	"application/font-woff2": "font/woff",
-	"application/rdf+xml": "text/rdf+xml"
+	"application/rdf+xml": "text/rdf+xml",
+	"application/vnd.apple.mpegurl": "audio/x-mpegurl"
 };
 
 function formatPath$1(path) {
