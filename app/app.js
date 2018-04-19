@@ -2015,7 +2015,7 @@ class Pane {
 		this._labels = [];
 		this._node = node("div", {className:"pane"});
 
-		this._node.addEventListener("click", this);
+		this._node.addEventListener("click", this, true);
 
 		this._node.appendChild(this._tabs.getList());
 		this._node.appendChild(this._tabs.getNode());

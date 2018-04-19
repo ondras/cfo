@@ -18,7 +18,7 @@ export default class Pane {
 		this._labels = [];
 		this._node = html.node("div", {className:"pane"});
 
-		this._node.addEventListener("click", this);
+		this._node.addEventListener("click", this, true); // capture phase: before the list's table processes the event
 
 		this._node.appendChild(this._tabs.getList());
 		this._node.appendChild(this._tabs.getNode());
