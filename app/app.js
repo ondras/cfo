@@ -1372,7 +1372,7 @@ function set$2(value) {
 	node$1.innerHTML = value;
 }
 
-const TEMPLATE = document.querySelector("#list");
+const TEMPLATE = document.querySelector("#list").content;
 
 function SORT(a, b) {
 	let childScoreA = a.getSort();
@@ -1396,7 +1396,7 @@ class List {
 
 		this._prefix = ""; /* current search prefix */
 
-		let dom = TEMPLATE.content.cloneNode(true);
+		let dom = TEMPLATE.cloneNode(true);
 
 		this._node = dom.querySelector(".list");
 		this._scroll = dom.querySelector(".scroll");
@@ -1407,7 +1407,7 @@ class List {
 		this._table.addEventListener("dblclick", this);
 
 		this._quickEdit = new QuickEdit();
-		this._selected = {};
+		this._selected = new Set();
 
 		subscribe("path-change", this);
 	}
@@ -1418,6 +1418,11 @@ class List {
 
 	getNode() { return this._node; }
 	getPath() { return this._path; }
+
+	clearSelection() {
+		this._selected.clear();
+		this._syncSelected();
+	}
 
 	reload(pathToBeFocused) {
 		this._pathToBeFocused = pathToBeFocused;
@@ -1442,12 +1447,13 @@ class List {
 	}
 
 	getSelection(options = {}) {
-		if (!options.multi || Object.keys(this._selected).length == 0) {
+		if (!options.multi || this._selected.size == 0) {
 			let index = this._getFocusedIndex();
 			if (index == -1) { return null; }
 			return this._items[index].path;
 		} else {
-			let items = Object.keys(this._selected).map(index => this._items[index].path);
+			let items = [];
+			this._selected.forEach(index => items.push(this._items[index].path));
 			return group(items);
 		}
 	}
@@ -1655,7 +1661,7 @@ class List {
 		let fallbackIndex = (this._pathToBeFocused ? 0 : this._getFocusedIndex());
 
 		this._clear();
-		this._selected = {};
+		this._selected.clear();
 
 		this._input.value = this._path;
 		paths.sort(SORT);
@@ -1799,12 +1805,11 @@ class List {
 		let str = this._items[index].path.getDescription();
 
 		let selected = Object.keys(this._selected);
-		if (selected.length > 0) {
+		if (this._selected.size > 0) {
 			let fileCount = 0;
 			let dirCount = 0;
 			let bytes = 0;
-			selected.forEach(index => {
-				let item = this._items[index];
+			this._selected.forEach(index => { let item = this._items[index];
 
 				if (item.path.supports(CHILDREN)) {
 					dirCount++;
@@ -1856,7 +1861,7 @@ class List {
 
 	_syncSelected() {
 		this._items.forEach((item, index) => {
-			item.node.classList.toggle("selected", index in this._selected);
+			item.node.classList.toggle("selected", this._selected.has(index));
 		});
 		this._updateStatus();
 	}
@@ -1868,17 +1873,17 @@ class List {
 	}
 
 	_invertSelected() {
-		let newSelected = {};
+		let newSelected = new Set();
 
-		Object.keys(this._selected).forEach(index => { // copy already selected directories
+		this._selected.forEach(index => { // copy already selected directories
 			if (this._items[index].path.supports(CHILDREN)) { newSelected[index] = true; }
 		});
 
 		this._items.forEach((item, index) => {
-			if (index in this._selected) { return; } // already selected
+			if (this._selected.has(index)) { return; } // already selected
 			if (item.path.supports(CHILDREN)) { return; } // do not select directories
 			if (item.path instanceof Up) { return; } // do not select "..""
-			newSelected[index] = true;
+			newSelected.add(index);
 		});
 
 		this._selected = newSelected;
@@ -1890,9 +1895,9 @@ class List {
 		if (!pattern) { return; }
 		
 		this._items.forEach((item, index) => {
-			if (index in this._selected) { return; } // already selected
+			if (this._selected.has(index)) { return; } // already selected
 			if (item.path.supports(CHILDREN)) { return; } // do not select directories
-			if (item.path.getName().match(pattern)) { this._selected[index] = true; } // name match
+			if (item.path.getName().match(pattern)) { this._selected.add(index); } // name match
 		});
 
 		this._syncSelected();
@@ -1902,9 +1907,9 @@ class List {
 		let pattern = await this._getPattern("Deselect all files matching this pattern:");
 		if (!pattern) { return; }
 
-		Object.keys(this._selected).forEach(index => {
+		this._selected.forEach(index => {
 			let path = this._items[index].path;
-			if (path.getName().match(pattern)) { delete this._selected[index]; } // name match
+			if (path.getName().match(pattern)) { this._selected.delete(index); } // name match
 		});
 
 		this._syncSelected();
@@ -1922,20 +1927,20 @@ class List {
 	}
 
 	_selectAll() {
-		this._selected = {};
+		this._selected.clear();
 		this._items.forEach((item, index) => {
 			if (item.path instanceof Up) { return; }
-			this._selected[index] = true;
+			this._selected.add(index);
 		});
 		this._syncSelected();
 	}
 
 	_selectToggle(index) {
 		if (this._items[index].path instanceof Up) { return; }
-		if (index in this._selected) {
-			delete this._selected[index];
+		if (this._selected.has(index)) {
+			this._selected.delete(index);
 		} else {
-			this._selected[index] = true;
+			this._selected.add(index);
 		}
 		this._syncSelected();
 	}
@@ -2015,7 +2020,7 @@ class Pane {
 		this._labels = [];
 		this._node = node("div", {className:"pane"});
 
-		this._node.addEventListener("click", this, true);
+		this._node.addEventListener("click", this, true); // capture phase: before the list's table processes the event
 
 		this._node.appendChild(this._tabs.getList());
 		this._node.appendChild(this._tabs.getNode());
@@ -2848,6 +2853,7 @@ register$1("file:copy", "F5", async () => {
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
 
+	sourceList.clearSelection();
 	publish("path-change", null, {path:targetPath});
 });
 

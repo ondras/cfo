@@ -181,6 +181,7 @@ command.register("file:copy", "F5", async () => {
 	let copy = new Copy(sourcePath, targetPath);
 	await copy.run();
 
+	sourceList.clearSelection();
 	pubsub.publish("path-change", null, {path:targetPath});
 });
 
