@@ -11,7 +11,7 @@ import * as format from "util/format.js";
 import * as pubsub from "util/pubsub.js";
 import * as status from "status.js";
 
-const TEMPLATE = document.querySelector("#list").content;
+const TEMPLATE = document.querySelector("#list");
 
 function SORT(a, b) {
 	let childScoreA = a.getSort();
@@ -35,7 +35,7 @@ export default class List {
 
 		this._prefix = ""; /* current search prefix */
 
-		let dom = TEMPLATE.cloneNode(true);
+		let dom = TEMPLATE.content.cloneNode(true);
 
 		this._node = dom.querySelector(".list");
 		this._scroll = dom.querySelector(".scroll");

@@ -283,7 +283,7 @@ function close$1(value) {
 
 const node$1 = document.querySelector("footer");
 
-const TEMPLATE = document.querySelector("#list").content;
+const TEMPLATE = document.querySelector("#list");
 
 const PANES = [];
 let index = -1;
