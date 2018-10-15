@@ -56,3 +56,20 @@ exports.testDeleteGroup = async function testDeleteGroup(tmp) {
 	assertTree(dir2, {});
 	assertTree(file2, "aaa");
 }
+
+exports.testDeleteSymlinkDirectory = async function testDeleteSymlinkDirectory(tmp) {
+	const dir1 = path.join(tmp, "a");
+	const contents = {"b": "aaa"};
+	createTree(dir1, contents);
+	assertTree(dir1, contents);
+
+	const dir2 = path.join(tmp, "b");
+	const path2 = paths.fromString(dir2);
+	await path2.create({link:dir1});
+
+	let o = new Delete(paths.fromString(dir2));
+	let result = await o.run();
+
+	assert(result);
+	assertTree(dir1, contents);
+}

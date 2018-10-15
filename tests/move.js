@@ -204,7 +204,7 @@ class Operation {
 }
 
 const CHILDREN = 0; // list children
-const CREATE   = 1; // create descendants
+const CREATE   = 1; // create descendants (FIXME APPEND?)
 const READ     = 2; // can we read contents?
 const WRITE    = 3; // can we rename / modify contents?
 
@@ -248,91 +248,6 @@ class Path {
 
 	activate(list) {
 		if (this.supports(CHILDREN)) { list.setPath(this); }
-	}
-}
-
-function createRecord(path) {
-	return {
-		path,
-		children: null,
-		count: 1,
-		size: 0
-	};
-}
-
-class Scan extends Operation {
-	constructor(path) {
-		super();
-
-		this._path = path;
-
-		let options = {
-			title: "Directory scan in progress",
-			row1: "Scanning:",
-			progress1: ""
-		};
-		this._progress = new Progress(options);
-		this._progress.onClose = () => this.abort();
-	}
-
-	async run() {
-		super.run(); // schedule progress window
-		let result = await this._analyze(this._path);
-		this._end();
-		return result;
-	}
-
-	async _analyze(path) {
-		if (this._aborted) { return null; }
-		this._progress.update({row1: path.toString()});
-
-		await path.stat();
-
-		if (path.supports(CHILDREN)) { /* descend, recurse */
-			return this._analyzeDirectory(path);
-		} else { /* compute */
-			return this._analyzeFile(path);
-		}
-	}
-
-	async _analyzeDirectory(path) {
-		try {
-			let record = createRecord(path);
-			record.children = [];
-
-			let children = await path.getChildren();
-			let promises = children.map(childPath => this._analyze(childPath));
-			children = await Promise.all(promises);
-
-			children.forEach(child => {
-				record.children.push(child);
-				if (!child) { return; }
-				record.count += child.count;
-				record.size += child.size;
-			});
-			return record;
-		} catch (e) {
-			return this._handleError(e, path);
-		}
-	}
-
-	_analyzeFile(path) {
-		let record = createRecord(path);
-		record.size = record.path.getSize();
-		return record;
-	}
-
-	async _handleError(e, path) {
-		let text = e.message;
-		let title = "Error reading file/directory";
-		let buttons = ["retry", "skip", "skip-all", "abort"];
-		let result = await this._processIssue("scan", { text, title, buttons });
-
-		switch (result) {
-			case "retry": return this._analyze(path); break;
-			case "abort": this.abort(); return null; break;
-			default: return null; break;
-		}
 	}
 }
 
@@ -420,7 +335,8 @@ const fallback = {
 	"application/font-woff": "font/x-generic",
 	"application/font-woff2": "font/x-generic",
 	"application/x-font-ttf": "font/x-generic",
-	"audio/mp4": "audio/x-generic"
+	"audio/mp4": "audio/x-generic",
+	"application/vnd.apple.mpegurl": "audio/x-mpegurl"
 };
 
 function formatPath(path) {
@@ -454,7 +370,8 @@ const fallback$1 = {
 	"application/x-sql": "application/sql",
 	"application/font-woff": "font/woff",
 	"application/font-woff2": "font/woff",
-	"application/rdf+xml": "text/rdf+xml"
+	"application/rdf+xml": "text/rdf+xml",
+	"application/vnd.apple.mpegurl": "audio/x-mpegurl"
 };
 
 function formatPath$1(path) {
@@ -682,9 +599,14 @@ class Local extends Path {
 
 	supports(what) { 
 		switch (what) {
-			case CHILDREN:
+			case CHILDREN: // FIXME symlink je spis soubor nez adresar, co kdyby zde vracel false? nemusela by na nej byt vyjimka v operation.scan
 			case CREATE:
-				return this._meta.isDirectory;
+				if (this._meta.isDirectory) { return true; }
+				if (this._meta.isSymbolicLink) {
+					return (this._targetPath && this._targetPath.supports(what));
+				} else {
+					return false;
+				}
 			break;
 
 			case READ:
@@ -775,6 +697,93 @@ class Local extends Path {
 			await targetPath.stat();
 
 		} catch (e) {} // failed to readlink
+	}
+}
+
+function createRecord(path) {
+	return {
+		path,
+		children: null,
+		count: 1,
+		size: 0
+	};
+}
+
+class Scan extends Operation {
+	constructor(path) {
+		super();
+
+		this._path = path;
+
+		let options = {
+			title: "Directory scan in progress",
+			row1: "Scanning:",
+			progress1: ""
+		};
+		this._progress = new Progress(options);
+		this._progress.onClose = () => this.abort();
+	}
+
+	async run() {
+		super.run(); // schedule progress window
+		let result = await this._analyze(this._path);
+		this._end();
+		return result;
+	}
+
+	async _analyze(path) {
+		if (this._aborted) { return null; }
+		this._progress.update({row1: path.toString()});
+
+		await path.stat();
+
+		if (path instanceof Local && path.isSymbolicLink()) {
+			return this._analyzeFile(path);
+		} else if (path.supports(CHILDREN)) { // descend, recurse
+			return this._analyzeDirectory(path);
+		} else { // compute
+			return this._analyzeFile(path);
+		}
+	}
+
+	async _analyzeDirectory(path) {
+		try {
+			let record = createRecord(path);
+			record.children = [];
+
+			let children = await path.getChildren();
+			let promises = children.map(childPath => this._analyze(childPath));
+			children = await Promise.all(promises);
+
+			children.forEach(child => {
+				record.children.push(child);
+				if (!child) { return; }
+				record.count += child.count;
+				record.size += child.size;
+			});
+			return record;
+		} catch (e) {
+			return this._handleError(e, path);
+		}
+	}
+
+	_analyzeFile(path) {
+		let record = createRecord(path);
+		record.size = record.path.getSize();
+		return record;
+	}
+
+	async _handleError(e, path) {
+		let text = e.message;
+		let title = "Error reading file/directory";
+		let buttons = ["retry", "skip", "skip-all", "abort"];
+		let result = await this._processIssue("scan", { text, title, buttons });
+
+		switch (result) {
+			case "retry": return this._analyze(path); break;
+			case "abort": this.abort(); return null; break;
+			default: return null; break;
+		}
 	}
 }
 
@@ -1141,7 +1150,7 @@ const KEYS = {
 
 const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
 const REGISTRY = [];
-const INPUTS = new Set(["input", "textarea", "button"]);
+const INPUTS = new Set(["input", "textarea"]);
 
 function handler(e) {
 	let nodeName = e.target.nodeName.toLowerCase();

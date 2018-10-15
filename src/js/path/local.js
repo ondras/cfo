@@ -99,7 +99,7 @@ export default class Local extends Path {
 
 	supports(what) { 
 		switch (what) {
-			case CHILDREN:
+			case CHILDREN: // FIXME symlink je spis soubor nez adresar, co kdyby zde vracel false? nemusela by na nej byt vyjimka v operation.scan
 			case CREATE:
 				if (this._meta.isDirectory) { return true; }
 				if (this._meta.isSymbolicLink) {
