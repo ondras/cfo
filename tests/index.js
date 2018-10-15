@@ -85,16 +85,17 @@ async function run() {
 	let files = collectFiles();
 	let tests = collectTests(files);
 	let stats = await runTests(tests, tmp);
+	let exitCode = 0;
 
 	console.log(stats);
 	if (stats.failed > 0) {
-		process.exitCode = 1;
+		exitCode = 1;
 		console.log("Some tests FAILED");
 	} else {
 		console.log("All tests PASSED");
 	}
 
-	require("electron").app.quit();
+	require("electron").app.exit(exitCode);
 }
 
 run();
