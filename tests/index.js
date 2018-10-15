@@ -41,7 +41,6 @@ function collectTests(files) {
 			console.log(`Collected ${t.length} tests from ${file}`);
 		} catch (e) {
 			console.warn(`Skipping un-requireable ${file} (${e.message})`);
-			console.log(e);
 		}
 	}
 	return tests;
