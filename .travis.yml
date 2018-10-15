@@ -3,3 +3,7 @@ node_js:
   - "node"
 before_script:
   - make tests
+addons:
+  apt:
+    packages:
+    - libdbus-1-dev
