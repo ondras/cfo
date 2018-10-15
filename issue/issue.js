@@ -1,140 +1,136 @@
 (function () {
-'use strict';
+	'use strict';
 
-function clear(node) {
-	node.innerHTML = "";
-}
-
-function text(t) {
-	return document.createTextNode(t);
-}
-
-/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
-const KEYS = {
-	"return": "enter",
-	"left": "arrowleft",
-	"up": "arrowup",
-	"right": "arrowright",
-	"down": "arrowdown",
-	"esc": "escape"
-};
-
-const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
-const REGISTRY = [];
-const INPUTS = new Set(["input", "textarea"]);
-
-function handler(e) {
-	let nodeName = e.target.nodeName.toLowerCase();
-	// jen kdyz nejsme ve formularovem prvku... s pochybnou vyjimkou readOnly <textarea>, coz je text viewer
-	if (INPUTS.has(nodeName) && !e.target.readOnly) { return; }
-
-	let available = REGISTRY.filter(reg => {
-		for (let m in reg.modifiers) {
-			if (reg.modifiers[m] != e[m]) { return false; }
-		}
-
-		if (reg.key != e.key.toLowerCase() && reg.key != e.code.toLowerCase()) { return false; }
-
-		return true;
-	});
-
-	while (available.length) {
-		let executed = available.pop().func();
-		if (executed) { 
-			e.preventDefault();
-			return;
-		}
+	function clear(node) {
+		node.innerHTML = "";
 	}
-}
 
-function parse(key) {
-	let result = {
-		func: null,
-		modifiers: {}
+	function text(t) {
+		return document.createTextNode(t);
+	}
+
+	/* Accelerator-to-KeyboardEvent.key mapping where not 1:1 */
+	const KEYS = {
+		"return": "enter",
+		"left": "arrowleft",
+		"up": "arrowup",
+		"right": "arrowright",
+		"down": "arrowdown",
+		"esc": "escape"
 	};
 
-	key = key.toLowerCase();
+	const MODIFIERS = ["ctrl", "alt", "shift", "meta"]; // meta = command
+	const REGISTRY = [];
+	const INPUTS = new Set(["input", "textarea"]);
 
-	MODIFIERS.forEach(mod => {
-		let mkey = mod + "Key";
-		result.modifiers[mkey] = false;
+	function handler(e) {
+		let nodeName = e.target.nodeName.toLowerCase();
+		// jen kdyz nejsme ve formularovem prvku... s pochybnou vyjimkou readOnly <textarea>, coz je text viewer
+		if (INPUTS.has(nodeName) && !e.target.readOnly) { return; }
 
-		let re = new RegExp(mod + "[+-]");
-		key = key.replace(re, () => {
-			result.modifiers[mkey] = true;
-			return "";
-		});
-	});
+		let available = REGISTRY.filter(reg => {
+			for (let m in reg.modifiers) {
+				if (reg.modifiers[m] != e[m]) { return false; }
+			}
 
-	result.key = KEYS[key] || key;
+			if (reg.key != e.key.toLowerCase() && reg.key != e.code.toLowerCase()) { return false; }
 
-	return result;
-}
-
-function register$1(func, key) {
-	let item = parse(key);
-	item.func = func;
-	REGISTRY.push(item);
-}
-
-window.addEventListener("keydown", handler);
-
-const registry = Object.create(null);
-
-function register(command, keys, func) {
-	function wrap() {
-		if (isEnabled(command)) {
-			func(command);
 			return true;
-		} else {
-			return false;
+		});
+
+		while (available.length) {
+			let executed = available.pop().func();
+			if (executed) { 
+				e.preventDefault();
+				return;
+			}
 		}
 	}
 
-	keys = [].concat(keys || []);
+	function parse(key) {
+		let result = {
+			func: null,
+			modifiers: {}
+		};
 
-	registry[command] = {
-		func: wrap,
-		enabled: true,
-		key: keys[0]
-	};
+		key = key.toLowerCase();
 
-	keys.forEach(key => register$1(wrap, key));
+		MODIFIERS.forEach(mod => {
+			let mkey = mod + "Key";
+			result.modifiers[mkey] = false;
 
-	return command;
-}
+			let re = new RegExp(mod + "[+-]");
+			key = key.replace(re, () => {
+				result.modifiers[mkey] = true;
+				return "";
+			});
+		});
 
+		result.key = KEYS[key] || key;
 
+		return result;
+	}
 
+	function register(func, key) {
+		let item = parse(key);
+		item.func = func;
+		REGISTRY.push(item);
+	}
 
+	window.addEventListener("keydown", handler);
 
-function isEnabled(command) {
-	return registry[command].enabled;
-}
+	const registry = Object.create(null);
 
-/* Issue window - local (ui) part */
+	function register$1(command, keys, func) {
+		function wrap() {
+			if (isEnabled(command)) {
+				func(command);
+				return true;
+			} else {
+				return false;
+			}
+		}
 
-const electron = require("electron");
+		keys = [].concat(keys || []);
 
-electron.ipcRenderer.on("config", (e, data) => {
-	let text$$1 = document.querySelector("#text");
-	clear(text$$1);
-	text$$1.appendChild(text(data.text));
+		registry[command] = {
+			func: wrap,
+			enabled: true,
+			key: keys[0]
+		};
 
-	Array.from(document.querySelectorAll("button")).forEach(b => {
-		if (data.buttons.includes(b.dataset.action)) { return; }
-		b.parentNode.removeChild(b);
+		keys.forEach(key => register(wrap, key));
+
+		return command;
+	}
+
+	function isEnabled(command) {
+		return registry[command].enabled;
+	}
+
+	/* Issue window - local (ui) part */
+
+	const electron = require("electron");
+
+	electron.ipcRenderer.on("config", (e, data) => {
+		let text$$1 = document.querySelector("#text");
+		clear(text$$1);
+		text$$1.appendChild(text(data.text));
+
+		Array.from(document.querySelectorAll("button")).forEach(b => {
+			if (data.buttons.includes(b.dataset.action)) { return; }
+			b.parentNode.removeChild(b);
+		});
+
+		document.querySelector("button").focus();
 	});
 
-	document.querySelector("button").focus();
-});
+	register$1("window:close", "Escape", () => window.close());
 
-register("window:close", "Escape", () => window.close());
-
-document.addEventListener("click", e => {
-	let action = e.target.dataset.action;
-	if (!action) { return; }
-	electron.ipcRenderer.send("action", action);
-});
+	document.addEventListener("click", e => {
+		let action = e.target.dataset.action;
+		if (!action) { return; }
+		electron.ipcRenderer.send("action", action);
+	});
 
 }());
