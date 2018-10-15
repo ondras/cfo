@@ -1,5 +1,7 @@
 # CFO
 
+[![Build Status](https://travis-ci.com/ondras/cfo.svg?branch=master)](https://travis-ci.com/ondras/cfo)
+
 ![Screenshot](screenshot.png)
 
 CFO is a traditional two-pane file manager. It is aimed at power users, built to be controlled (almost exclusively) with keyboard shortcuts (most notably F-keys).
