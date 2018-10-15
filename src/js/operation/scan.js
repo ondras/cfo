@@ -1,6 +1,7 @@
 import Progress from "progress/remote.js";
 import Operation from "./operation.js";
 import {CHILDREN} from "path/path.js";
+import LocalPath from "path/local.js";
 
 function createRecord(path) {
 	return {
@@ -39,9 +40,11 @@ export default class Scan extends Operation {
 
 		await path.stat();
 
-		if (path.supports(CHILDREN)) { /* descend, recurse */
+		if (path instanceof LocalPath && path.isSymbolicLink()) {
+			return this._analyzeFile(path);
+		} else if (path.supports(CHILDREN)) { // descend, recurse
 			return this._analyzeDirectory(path);
-		} else { /* compute */
+		} else { // compute
 			return this._analyzeFile(path);
 		}
 	}
