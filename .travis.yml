@@ -6,4 +6,4 @@ before_script:
 addons:
   apt:
     packages:
-    - libdbus-1-3
+    - xvfb
