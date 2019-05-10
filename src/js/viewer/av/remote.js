@@ -8,7 +8,8 @@ const video = /(mpe?g|mkv|webm|mov|mp4)$/i;
 
 const windowOptions = {
 	center: true,
-	backgroundColor: conf.background
+	backgroundColor: conf.background,
+	webPreferences: { nodeIntegration: true }
 }
 
 export function match(path) {

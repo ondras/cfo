@@ -780,7 +780,7 @@
 	/* Text viewer window - local (ui) part */
 
 	const electron = require("electron");
-	let buffer = new Buffer(0);
+	let buffer = Buffer.from([]);
 
 	electron.ipcRenderer.on("path", (e, data) => {
 		let path = fromString(data);

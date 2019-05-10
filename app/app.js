@@ -179,7 +179,8 @@
 
 	const windowOptions = {
 		center: true,
-		backgroundColor: background
+		backgroundColor: background,
+		webPreferences: { nodeIntegration: true }
 	};
 
 	/* views everything */
@@ -213,7 +214,8 @@
 
 	const windowOptions$1 = {
 		center: true,
-		backgroundColor: background
+		backgroundColor: background,
+		webPreferences: { nodeIntegration: true }
 	};
 
 	function match$1(path) {
@@ -257,7 +259,8 @@
 
 	const windowOptions$2 = {
 		center: true,
-		backgroundColor: background
+		backgroundColor: background,
+		webPreferences: { nodeIntegration: true }
 	};
 
 	function match$2(path) {
@@ -345,7 +348,8 @@
 		height: 100,
 		show: false,
 		useContentSize: true,
-		backgroundColor: background
+		backgroundColor: background,
+		webPreferences: { nodeIntegration: true }
 	};
 
 	class Progress {
@@ -414,7 +418,8 @@
 		height: 60,
 		show: false,
 		useContentSize: true,
-		backgroundColor: background
+		backgroundColor: background,
+		webPreferences: { nodeIntegration: true }
 	};
 
 	class Issue {
@@ -2243,7 +2248,8 @@
 
 	const windowOptions$5 = {
 		center: true,
-		backgroundColor: background
+		backgroundColor: background,
+		webPreferences: { nodeIntegration: true }
 	};
 
 	function open$1() {

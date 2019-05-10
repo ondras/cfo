@@ -14,7 +14,8 @@ app.on("ready", () => {
 		x: position[0],
 		y: position[1],
 		icon: `${__dirname}/icon.png`,
-		backgroundColor: "#e8e8e8"
+		backgroundColor: "#e8e8e8",
+		webPreferences: { nodeIntegration: true }
 	}
 	let win = new BrowserWindow(options);
 	win.loadURL(`file://${__dirname}/app/index.html`);

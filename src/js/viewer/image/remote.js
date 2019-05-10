@@ -7,7 +7,8 @@ const remote = require("electron").remote;
 
 const windowOptions = {
 	center: true,
-	backgroundColor: conf.background
+	backgroundColor: conf.background,
+	webPreferences: { nodeIntegration: true }
 }
 
 export function match(path) {

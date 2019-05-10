@@ -5,7 +5,7 @@ import * as command from "util/command.js";
 import * as paths from "path/paths.js";
 
 const electron = require("electron");
-let buffer = new Buffer(0);
+let buffer = Buffer.from([]);
 
 electron.ipcRenderer.on("path", (e, data) => {
 	let path = paths.fromString(data);

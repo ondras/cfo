@@ -13,7 +13,8 @@ const windowOptions = {
 	height: 60,
 	show: false,
 	useContentSize: true,
-	backgroundColor: conf.background
+	backgroundColor: conf.background,
+	webPreferences: { nodeIntegration: true }
 }
 
 export default class Issue {

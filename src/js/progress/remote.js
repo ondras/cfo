@@ -14,7 +14,8 @@ const windowOptions = {
 	height: 100,
 	show: false,
 	useContentSize: true,
-	backgroundColor: conf.background
+	backgroundColor: conf.background,
+	webPreferences: { nodeIntegration: true }
 }
 
 export default class Progress {
