@@ -1051,11 +1051,10 @@
 			this._oldValue = value; /* remember so we can put it back on escape */
 
 			let image = cell.querySelector("img, canvas");
+			let width = cell.offsetWidth - image.offsetWidth;
 			while (image.nextSibling) {
 				image.nextSibling.parentNode.removeChild(image.nextSibling);
 			}
-
-			let width = cell.offsetWidth - image.offsetWidth;
 
 			cell.appendChild(this._input);
 			this._input.style.width = `${width}px`;
