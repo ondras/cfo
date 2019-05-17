@@ -21,6 +21,7 @@ class BrowserWindow {
 	show() {}
 	close() {}
 	hide() {}
+	destroy() {}
 }
 
 remote.BrowserWindow = BrowserWindow;

@@ -53,7 +53,8 @@
 		height: 100,
 		show: false,
 		useContentSize: true,
-		backgroundColor: background
+		backgroundColor: background,
+		webPreferences: { nodeIntegration: true }
 	};
 
 	class Progress {
@@ -122,7 +123,8 @@
 		height: 60,
 		show: false,
 		useContentSize: true,
-		backgroundColor: background
+		backgroundColor: background,
+		webPreferences: { nodeIntegration: true }
 	};
 
 	class Issue {
