@@ -137,7 +137,7 @@ command.register("file:view", "F3", () => {
 
 command.register("file:edit", "F4", () => {
 	let file = panes.getActive().getList().getSelection({multi:false});
-	if (file.supports(CHILDREN) || !file.supports(WRITE)) { return; }
+	if (!file.supports(WRITE)) { return; }
 
 	let bin = settings.get("editor.bin");
 	let child = require("child_process").spawn(bin, [file]);

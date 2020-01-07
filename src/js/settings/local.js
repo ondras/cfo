@@ -1,18 +1,20 @@
-import * as html from "util/html.js";
 import * as command from "util/command.js";
-import * as paths from "path/paths.js";
 import * as settings from "util/settings.js";
+
+function isBool(input) {
+	return (input.type == "radio" || input.type == "checkbox");
+}
 
 function fromForm(name) {
 	let node = findName(name);
-	let value = ("checked" in node ? node.checked : node.value);
+	let value = (isBool(node) ? node.checked : node.value);
 	settings.set(name, value);
 }
 
 function toForm(name) {
 	let node = findName(name);
 	let value = settings.get(name);
-	if ("checked" in node) {
+	if (isBool(node)) {
 		node.checked = value;
 	} else {
 		node.value = value;
@@ -31,7 +33,7 @@ function findName(name) {
 function initName(name) {
 	toForm(name);
 	let node = findName(name);
-	if ("checked" in node) {
+	if (isBool(node)) {
 		node.addEventListener("click", onInput);
 	} else {
 		node.addEventListener("input", onInput);
