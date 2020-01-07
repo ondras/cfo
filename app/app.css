@@ -114,6 +114,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: row;
+  overflow: hidden;
 }
 footer {
   line-height: 1.5;
