@@ -25,7 +25,7 @@ function syncSize() {
 		let rx = size[0]/avail[0];
 		let ry = size[1]/avail[1];
 		let r = Math.max(rx, ry);
-		if (r > 1) { 
+		if (r > 1) {
 			size[0] /= r;
 			size[1] /= r;
 		}
@@ -34,7 +34,7 @@ function syncSize() {
 		size[0] *= coef;
 		size[1] *= coef;
 	}
-	
+
 	position = [
 		(avail[0]-size[0])/2,
 		(avail[1]-size[1])/2
@@ -56,7 +56,7 @@ function syncSize() {
 function findScale(diff) {
 	let frac = size[0]/image.naturalWidth;
 	let index = (diff > 0 ? 0 : SCALES.length-1);
-		
+
 	while (index >= 0 && index < SCALES.length) {
 		if (diff * (SCALES[index] - frac) > 0) { return index; }
 		index += diff;
@@ -86,7 +86,7 @@ function moveBy(diff) {
 	props.forEach((prop, i) => {
 		let pos = position[i];
 		if (pos > 0) { return; } /* centered */
-		
+
 		pos += diff[i]*amount;
 		pos = Math.min(pos, 0);
 		pos = Math.max(pos, avail[i]-size[i]);
@@ -122,7 +122,9 @@ function load(i) {
 	currentIndex = i;
 	scale = null;
 	document.body.classList.add("loading");
-	image.src = allImages[currentIndex].toString();
+
+	let parts = allImages[currentIndex].toString().split("/");
+	image.src = parts.map(encodeURIComponent).join("/");
 }
 
 electron.ipcRenderer.on("path", (e, all, i) => {
