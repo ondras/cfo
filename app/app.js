@@ -2711,7 +2711,7 @@
 		let path = list.getPath();
 		while (true) {
 			let parent = path.getParent();
-			if (parent) { 
+			if (parent) {
 				path = parent;
 			} else {
 				break;
@@ -2768,7 +2768,7 @@
 		if (!name) { return; }
 
 		let newPath = path.append(name);
-		
+
 		try {
 			await newPath.create({dir:true});
 			list.reload(newPath);
@@ -2875,7 +2875,11 @@
 	});
 
 	register$1("app:devtools", "F12", () => {
-		require("electron").remote.getCurrentWindow().toggleDevTools();
+		try {
+			require("electron").remote.getCurrentWindow().openDevTools();
+		} catch (e) {
+			alert(e);
+		}
 	});
 
 	register$1("app:settings", [], () => {

@@ -43,7 +43,7 @@ command.register("list:top", "Ctrl+Backspace", () => {
 	let path = list.getPath();
 	while (true) {
 		let parent = path.getParent();
-		if (parent) { 
+		if (parent) {
 			path = parent;
 		} else {
 			break;
@@ -100,7 +100,7 @@ command.register("directory:new", "F7", async () => {
 	if (!name) { return; }
 
 	let newPath = path.append(name);
-	
+
 	try {
 		await newPath.create({dir:true});
 		list.reload(newPath);
@@ -207,7 +207,11 @@ command.register("file:move", "F6", async () => {
 });
 
 command.register("app:devtools", "F12", () => {
-	require("electron").remote.getCurrentWindow().toggleDevTools();
+	try {
+		require("electron").remote.getCurrentWindow().openDevTools();
+	} catch (e) {
+		alert(e);
+	}
 });
 
 command.register("app:settings", [], () => {
